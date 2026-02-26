@@ -1,9 +1,5 @@
 # Cuacaku 🌤️
 
-[![Android CI](https://github.com/eltfd/Cuacaku/actions/workflows/android-ci.yml/badge.svg)](https://github.com/eltfd/Cuacaku/actions/workflows/android-ci.yml)
-[![Release](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml/badge.svg)](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml)
-[![Latest Release](https://img.shields.io/github/v/release/eltfd/Cuacaku)](https://github.com/eltfd/Cuacaku/releases/latest)
-
 Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data open source.
 
 ---
