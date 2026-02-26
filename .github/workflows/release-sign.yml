@@ -27,14 +27,15 @@ jobs:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           if [ -z "$SIGNING_KEY" ]; then echo "SIGNING_KEY secret is missing" && exit 1; fi
-          echo "$SIGNING_KEY" | base64 --decode > keystore.jks
+          mkdir -p app
+          echo "$SIGNING_KEY" | base64 --decode > app/keystore.jks
 
       - name: Grant exec to gradlew
         run: chmod +x ./gradlew
 
       - name: Build release APK (signed)
         env:
-          RELEASE_KEYSTORE_FILE: keystore.jks
+          RELEASE_KEYSTORE_FILE: app/keystore.jks
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
