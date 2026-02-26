@@ -33,7 +33,7 @@ class DataRetentionManager(private val context: Context) {
         private const val AI_PREFS_NAME = "ai_learning_data"
 
         /** Batas total ukuran data AI (bytes) */
-        const val MAX_STORAGE_BYTES = 20_000L  // 20 KB
+        const val MAX_STORAGE_BYTES = 25_000L  // 25 KB (includes Fisher matrix + drift state)
 
         /** Interval cleanup otomatis (24 jam) */
         private const val CLEANUP_INTERVAL_MS = 24 * 3600 * 1000L
