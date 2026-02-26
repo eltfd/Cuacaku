@@ -47,7 +47,7 @@ object DisasterNeuralNetwork {
     private const val TEMPERATURE = 1.3f  // Output calibration temperature
 
     const val MODEL_VERSION = "MLP-v1.1-incremental"
-    const val TOTAL_PARAMS = INPUT * H1 + H1 + H1 * H2 + H2 + H2 * OUTPUT + OUTPUT // 1222
+    const val TOTAL_PARAMS = INPUT * H1 + H1 + H1 * H2 + H2 + H2 * OUTPUT + OUTPUT // 1302
 
     // ── Flat Weight Arrays (row-major) ──
     private val w1 = FloatArray(INPUT * H1)
@@ -56,10 +56,6 @@ object DisasterNeuralNetwork {
     private val b2 = FloatArray(H2)
     private val w3 = FloatArray(H2 * OUTPUT)
     private val b3 = FloatArray(OUTPUT)
-
-    init {
-        initializeWeights()
-    }
 
     // ════════════════════════════════════════════════
     //  Forward Propagation
@@ -191,6 +187,11 @@ object DisasterNeuralNetwork {
         floatArrayOf(0.40f, 0.20f, 0.30f, 0.70f, 0.20f, 0.10f), // 18: weatherSeverity
         floatArrayOf(0.10f, 0.10f, 0.20f, 0.25f, 0.10f, 0.10f)  // 19: temperatureHigh
     )
+
+    // Init block — harus setelah RELEVANCE agar tidak NPE
+    init {
+        initializeWeights()
+    }
 
     // ════════════════════════════════════════════════
     //  Domain-Informed Weight Initialization
