@@ -118,6 +118,8 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    // Unit testing
+    testImplementation("junit:junit:4.13.2")
 
     // Accompanist (Permissions) - version compatible with Compose 1.5.x
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
