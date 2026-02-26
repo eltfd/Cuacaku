@@ -188,4 +188,53 @@ object WeatherWorkerScheduler {
 
         WorkManager.getInstance(context).enqueue(workRequest)
     }
+
+    // ════════════════════════════════════════════════
+    //  AI Learning Worker — Silent Background Learning
+    // ════════════════════════════════════════════════
+
+    /**
+     * Schedule periodic AI learning (setiap 12 jam).
+     *
+     * Constraints lebih ketat dari weather update karena learning
+     * tidak urgent — user tidak perlu hasilnya segera:
+     * - Requires network (untuk fetch cuaca terbaru)
+     * - Requires battery not low (hemat daya)
+     *
+     * Interval 12 jam dipilih karena:
+     * - Cuaca berubah signifikan dalam 12 jam (pagi ↔ malam)
+     * - Cukup sering untuk maintain akurasi
+     * - Cukup jarang untuk tidak boros resource
+     */
+    fun scheduleAiLearning(context: Context) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
+            .build()
+
+        val workRequest = PeriodicWorkRequestBuilder<AiLearningWorker>(
+            repeatInterval = 12,
+            repeatIntervalTimeUnit = TimeUnit.HOURS
+        )
+            .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            AiLearningWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            workRequest
+        )
+    }
+
+    /**
+     * Cancel scheduled AI learning
+     */
+    fun cancelAiLearning(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(AiLearningWorker.WORK_NAME)
+    }
 }

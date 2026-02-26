@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.media.AudioAttributes
 import android.os.Build
 import com.weather.forecast.notification.NotificationChannels
+import com.weather.forecast.worker.WeatherWorkerScheduler
 
 /**
  * Application class untuk Cuacaku App
@@ -14,6 +15,7 @@ import com.weather.forecast.notification.NotificationChannels
  * - Initialize notification channels
  * - Setup dependency injection (manual for simplicity)
  * - Configure WorkManager for background tasks
+ * - Schedule AI learning worker (silent, invisible to user)
  */
 class WeatherApplication : Application() {
 
@@ -21,6 +23,15 @@ class WeatherApplication : Application() {
         super.onCreate()
         instance = this
         createNotificationChannels()
+        scheduleBackgroundTasks()
+    }
+
+    /**
+     * Schedule background workers.
+     * AI Learning berjalan setiap 12 jam secara silent — user tidak tahu.
+     */
+    private fun scheduleBackgroundTasks() {
+        WeatherWorkerScheduler.scheduleAiLearning(this)
     }
 
     /**
