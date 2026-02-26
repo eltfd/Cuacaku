@@ -69,4 +69,4 @@ app/src/main/java/com/weather/forecast/
 - Min SDK: 26 (Android 8.0)
 - Target SDK: 34 (Android 14)
 - No API keys required
-- Version: 1.2.0 (versionCode 3)
+- Version: 1.4.0 (versionCode 5)
