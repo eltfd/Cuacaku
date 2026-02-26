@@ -4,6 +4,7 @@ package com.weather.forecast.data.model
  * UI-ready Water Quality data models
  *
  * Menggabungkan data dari Marine API (laut) dan Flood API (sungai).
+ * Termasuk analisis tren tinggi muka air.
  */
 
 /**
@@ -12,7 +13,38 @@ package com.weather.forecast.data.model
 data class WaterQualityData(
     val marine: MarineData?,
     val flood: FloodData?,
+    /** Ringkasan tinggi muka air & tren seluruh sumber */
+    val waterLevelSummary: WaterLevelSummary? = null,
     val lastUpdated: Long = System.currentTimeMillis()
+)
+
+// ===================== WATER LEVEL SUMMARY =====================
+
+/**
+ * Ringkasan tinggi muka air gabungan dari laut & sungai.
+ * Ditampilkan sebagai overview card di bagian atas screen.
+ */
+data class WaterLevelSummary(
+    /** Tren gelombang laut 7 hari ke depan */
+    val seaWaveTrend: WaterLevelTrend = WaterLevelTrend.STABLE,
+    /** Tinggi gelombang saat ini */
+    val currentWaveHeight: Double = 0.0,
+    /** Tinggi gelombang prediksi besok */
+    val tomorrowWaveHeight: Double = 0.0,
+    /** Perubahan gelombang (%) hari ini → besok */
+    val waveChangePercent: Double = 0.0,
+    /** Tren debit sungai 7 hari ke depan */
+    val riverDischargeTrend: WaterLevelTrend = WaterLevelTrend.STABLE,
+    /** Debit sungai hari ini */
+    val currentDischarge: Double = 0.0,
+    /** Debit sungai prediksi besok */
+    val tomorrowDischarge: Double = 0.0,
+    /** Perubahan debit (%) hari ini → besok */
+    val dischargeChangePercent: Double = 0.0,
+    /** Apakah data laut tersedia */
+    val hasMarineData: Boolean = false,
+    /** Apakah data sungai tersedia */
+    val hasFloodData: Boolean = false
 )
 
 // ===================== MARINE (Laut) =====================
@@ -78,6 +110,10 @@ data class DailyMarineData(
     val wavePeriodMax: Double,
     val swellWaveHeightMax: Double,
     val seaCondition: SeaCondition,
+    /** Tren tinggi gelombang dibanding hari sebelumnya */
+    val waveTrend: WaterLevelTrend = WaterLevelTrend.STABLE,
+    /** Persentase perubahan tinggi gelombang */
+    val waveChangePercent: Double = 0.0,
     /** Prakiraan per jam */
     val hourlyForecasts: List<HourlyMarineData> = emptyList()
 ) {
@@ -94,7 +130,9 @@ data class DailyMarineData(
  * Data debit sungai (UI-ready)
  */
 data class FloodData(
-    val dailyForecast: List<DailyFloodData>
+    val dailyForecast: List<DailyFloodData>,
+    /** Tren keseluruhan debit sungai */
+    val overallTrend: WaterLevelTrend = WaterLevelTrend.STABLE
 )
 
 /**
@@ -107,7 +145,11 @@ data class DailyFloodData(
     val dischargeMean: Double,
     val dischargeMax: Double,
     val dischargeMin: Double,
-    val floodRisk: FloodRisk
+    val floodRisk: FloodRisk,
+    /** Tren muka air dibanding hari sebelumnya */
+    val waterLevelTrend: WaterLevelTrend = WaterLevelTrend.STABLE,
+    /** Persentase perubahan debit */
+    val dischargeChangePercent: Double = 0.0
 ) {
     val dischargeFormatted: String
         get() = "%.1f m³/s".format(riverDischarge)
@@ -117,6 +159,68 @@ data class DailyFloodData(
 }
 
 // ===================== ENUMS =====================
+
+/**
+ * Tren tinggi muka air — dihitung dari perbandingan data prakiraan harian.
+ *
+ * @param label English label
+ * @param labelId Indonesian label
+ * @param icon Arrow emoji
+ * @param colorHex Color representation
+ */
+enum class WaterLevelTrend(
+    val label: String,
+    val labelId: String,
+    val icon: String,
+    val colorHex: Long
+) {
+    RISING_FAST(
+        label = "Rising Fast",
+        labelId = "Naik Cepat",
+        icon = "⬆️",
+        colorHex = 0xFFD32F2F
+    ),
+    RISING(
+        label = "Rising",
+        labelId = "Naik",
+        icon = "↗️",
+        colorHex = 0xFFF44336
+    ),
+    STABLE(
+        label = "Stable",
+        labelId = "Stabil",
+        icon = "➡️",
+        colorHex = 0xFF4CAF50
+    ),
+    FALLING(
+        label = "Falling",
+        labelId = "Turun",
+        icon = "↘️",
+        colorHex = 0xFF2196F3
+    ),
+    FALLING_FAST(
+        label = "Falling Fast",
+        labelId = "Turun Cepat",
+        icon = "⬇️",
+        colorHex = 0xFF0288D1
+    );
+
+    companion object {
+        /**
+         * Hitung tren berdasarkan persentase perubahan
+         * @param changePercent persentase perubahan (positif = naik, negatif = turun)
+         */
+        fun fromChangePercent(changePercent: Double): WaterLevelTrend {
+            return when {
+                changePercent > 30 -> RISING_FAST
+                changePercent > 10 -> RISING
+                changePercent > -10 -> STABLE
+                changePercent > -30 -> FALLING
+                else -> FALLING_FAST
+            }
+        }
+    }
+}
 
 /**
  * Kondisi laut berdasarkan tinggi gelombang (Douglas Sea Scale)

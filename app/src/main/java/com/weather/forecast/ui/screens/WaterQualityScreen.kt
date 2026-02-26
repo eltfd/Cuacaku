@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.weather.forecast.data.model.*
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
 import com.weather.forecast.ui.viewmodel.WaterQualityUiState
@@ -116,7 +118,16 @@ private fun WaterQualityContent(data: WaterQualityData) {
             WaterQualityHeader()
         }
 
-        // Marine / Sea Section
+        // ── Water Level Summary Card ──────────────────────
+        data.waterLevelSummary?.let { summary ->
+            if (summary.hasMarineData || summary.hasFloodData) {
+                item {
+                    WaterLevelSummaryCard(summary = summary)
+                }
+            }
+        }
+
+        // ── Marine / Sea Section ──────────────────────────
         data.marine?.let { marine ->
             item {
                 SectionTitle(
@@ -132,6 +143,13 @@ private fun WaterQualityContent(data: WaterQualityData) {
                 }
             }
 
+            // Wave height trend forecast
+            if (marine.dailyForecast.isNotEmpty()) {
+                item {
+                    WaveHeightTrendCard(dailyData = marine.dailyForecast)
+                }
+            }
+
             // Daily marine forecast (expandable)
             if (marine.dailyForecast.isNotEmpty()) {
                 item {
@@ -140,13 +158,21 @@ private fun WaterQualityContent(data: WaterQualityData) {
             }
         }
 
-        // Flood / River Section
+        // ── Flood / River Section ─────────────────────────
         data.flood?.let { flood ->
             if (flood.dailyForecast.isNotEmpty()) {
                 item {
                     SectionTitle(
                         icon = Icons.Outlined.Water,
-                        title = "Kondisi Sungai"
+                        title = "Tinggi Muka Air Sungai"
+                    )
+                }
+
+                // River level trend card
+                item {
+                    RiverLevelTrendCard(
+                        dailyData = flood.dailyForecast,
+                        overallTrend = flood.overallTrend
                     )
                 }
 
@@ -340,6 +366,346 @@ private fun MarineDetailItem(icon: ImageVector, label: String, value: String) {
     }
 }
 
+// ===================== WATER LEVEL SUMMARY =====================
+
+/**
+ * Card ringkasan tinggi muka air — overview tren untuk laut & sungai
+ */
+@Composable
+private fun WaterLevelSummaryCard(summary: WaterLevelSummary) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.2f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.ShowChart,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Perkiraan Tinggi Muka Air",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Sea wave trend ──
+            if (summary.hasMarineData) {
+                WaterLevelTrendRow(
+                    emoji = "🌊",
+                    label = "Gelombang Laut",
+                    currentValue = "%.1f m".format(summary.currentWaveHeight),
+                    tomorrowValue = "%.1f m".format(summary.tomorrowWaveHeight),
+                    changePercent = summary.waveChangePercent,
+                    trend = summary.seaWaveTrend
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // ── River discharge trend ──
+            if (summary.hasFloodData) {
+                WaterLevelTrendRow(
+                    emoji = "🏞️",
+                    label = "Debit Sungai",
+                    currentValue = "%.1f m³/s".format(summary.currentDischarge),
+                    tomorrowValue = "%.1f m³/s".format(summary.tomorrowDischarge),
+                    changePercent = summary.dischargeChangePercent,
+                    trend = summary.riverDischargeTrend
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Keterangan
+            Text(
+                text = "Perkiraan berdasarkan data 7 hari ke depan. " +
+                    "Tren dihitung dari perbandingan paruh pertama vs paruh kedua prakiraan.",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun WaterLevelTrendRow(
+    emoji: String,
+    label: String,
+    currentValue: String,
+    tomorrowValue: String,
+    changePercent: Double,
+    trend: WaterLevelTrend
+) {
+    val trendColor = Color(trend.colorHex)
+    val changeSign = if (changePercent >= 0) "+" else ""
+    val changeText = "${changeSign}${"%.1f".format(changePercent)}%"
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = emoji, fontSize = 20.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                modifier = Modifier.weight(1f)
+            )
+            // Trend badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(trendColor.copy(alpha = 0.3f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "${trend.icon} ${trend.labelId}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 32.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("Hari ini", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(currentValue, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Besok", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(tomorrowValue, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text("Perubahan", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(
+                    text = changeText,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                    color = trendColor
+                )
+            }
+        }
+    }
+}
+
+// ===================== WAVE HEIGHT TREND =====================
+
+/**
+ * Card visual tren tinggi gelombang 7 hari — bar chart sederhana + tren arrow
+ */
+@Composable
+private fun WaveHeightTrendCard(dailyData: List<DailyMarineData>) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.15f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Tren Gelombang 7 Hari",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = Color.White
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Simple bar chart representation
+            val maxWave = dailyData.maxOfOrNull { it.waveHeightMax } ?: 1.0
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                dailyData.take(7).forEach { day ->
+                    val fraction = (day.waveHeightMax / maxWave).toFloat().coerceIn(0.05f, 1f)
+                    val barColor = Color(day.seaCondition.colorHex)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        // Trend arrow
+                        Text(
+                            text = day.waveTrend.icon,
+                            fontSize = 10.sp
+                        )
+
+                        // Value
+                        Text(
+                            text = "%.1f".format(day.waveHeightMax),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontSize = 9.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Bar
+                        Box(
+                            modifier = Modifier
+                                .width(20.dp)
+                                .fillMaxHeight(fraction)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(barColor.copy(alpha = 0.7f))
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Day label
+                        Text(
+                            text = day.dayName.take(3),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 9.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ===================== RIVER LEVEL TREND =====================
+
+/**
+ * Card tren tinggi muka air sungai — overview + bar chart
+ */
+@Composable
+private fun RiverLevelTrendCard(
+    dailyData: List<DailyFloodData>,
+    overallTrend: WaterLevelTrend
+) {
+    val trendColor = Color(overallTrend.colorHex)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.15f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Tren Muka Air Sungai",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White
+                )
+                // Overall trend badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(trendColor.copy(alpha = 0.3f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${overallTrend.icon} ${overallTrend.labelId}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Bar chart for discharge
+            val maxDischarge = dailyData.maxOfOrNull { it.riverDischarge } ?: 1.0
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                dailyData.take(7).forEach { day ->
+                    val fraction = (day.riverDischarge / maxDischarge).toFloat().coerceIn(0.05f, 1f)
+                    val riskColor = Color(day.floodRisk.colorHex)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        // Trend arrow
+                        Text(
+                            text = day.waterLevelTrend.icon,
+                            fontSize = 10.sp
+                        )
+
+                        // Value
+                        Text(
+                            text = "%.0f".format(day.riverDischarge),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontSize = 9.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Bar
+                        Box(
+                            modifier = Modifier
+                                .width(20.dp)
+                                .fillMaxHeight(fraction)
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                .background(riskColor.copy(alpha = 0.7f))
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Day label
+                        Text(
+                            text = day.dayName.take(3),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 9.sp
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Debit sungai (m³/s) — semakin tinggi debit, semakin tinggi muka air. " +
+                    "Warna bar menunjukkan tingkat risiko banjir.",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
 // ===================== DAILY MARINE FORECAST =====================
 
 @Composable
@@ -422,6 +788,14 @@ private fun DailyMarineItem(
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
+
+                // Trend arrow
+                Text(
+                    text = data.waveTrend.icon,
+                    fontSize = 14.sp
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
 
                 Text(
                     text = data.waveHeightMaxFormatted,
@@ -575,6 +949,14 @@ private fun RiverDischargeItem(data: DailyFloodData) {
                 modifier = Modifier.weight(1f)
             )
 
+            // Trend arrow
+            Text(
+                text = data.waterLevelTrend.icon,
+                fontSize = 16.sp
+            )
+
+            Spacer(modifier = Modifier.width(6.dp))
+
             // Discharge value
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -582,11 +964,22 @@ private fun RiverDischargeItem(data: DailyFloodData) {
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
                 )
-                Text(
-                    text = "Rata-rata: ${data.dischargeMeanFormatted}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.6f)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Rata-rata: ${data.dischargeMeanFormatted}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                    if (data.dischargeChangePercent != 0.0) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        val sign = if (data.dischargeChangePercent > 0) "+" else ""
+                        Text(
+                            text = "${sign}${"%.0f".format(data.dischargeChangePercent)}%",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color(data.waterLevelTrend.colorHex)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))

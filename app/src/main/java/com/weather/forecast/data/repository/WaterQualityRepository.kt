@@ -21,6 +21,8 @@ import java.util.Locale
  * Responsibilities:
  * - Fetch marine & flood data secara paralel
  * - Transform ke UI-ready models
+ * - **Hitung tren tinggi muka air** (naik/turun/stabil)
+ * - Bangun ringkasan (WaterLevelSummary) untuk overview card
  * - Handle errors gracefully (satu API gagal tidak mempengaruhi lainnya)
  */
 class WaterQualityRepository {
@@ -56,16 +58,105 @@ class WaterQualityRepository {
                 val marine = marineDeferred.await()
                 val flood = floodDeferred.await()
 
+                // Bangun ringkasan tren tinggi muka air
+                val summary = buildWaterLevelSummary(marine, flood)
+
                 Result.success(
                     WaterQualityData(
                         marine = marine,
-                        flood = flood
+                        flood = flood,
+                        waterLevelSummary = summary
                     )
                 )
             } catch (e: Exception) {
                 Result.failure(e)
             }
         }
+    }
+
+    // ===================== WATER LEVEL SUMMARY =====================
+
+    /**
+     * Bangun ringkasan tinggi muka air dari data marine & flood.
+     *
+     * Tren dihitung dengan membandingkan data hari ini vs besok.
+     * Jika data besok tidak tersedia, bandingkan hari ini vs rata-rata 7 hari.
+     */
+    private fun buildWaterLevelSummary(marine: MarineData?, flood: FloodData?): WaterLevelSummary {
+        var seaWaveTrend = WaterLevelTrend.STABLE
+        var currentWave = 0.0
+        var tomorrowWave = 0.0
+        var waveChangePct = 0.0
+        val hasMarineData = marine != null && marine.dailyForecast.isNotEmpty()
+
+        if (hasMarineData) {
+            val dailyMarine = marine!!.dailyForecast
+            currentWave = dailyMarine.firstOrNull()?.waveHeightMax ?: 0.0
+            tomorrowWave = dailyMarine.getOrNull(1)?.waveHeightMax ?: currentWave
+
+            waveChangePct = if (currentWave > 0) {
+                ((tomorrowWave - currentWave) / currentWave) * 100.0
+            } else 0.0
+
+            // Tren keseluruhan: bandingkan rata-rata 3 hari pertama vs 3 hari terakhir
+            seaWaveTrend = calculateOverallTrend(dailyMarine.map { it.waveHeightMax })
+        }
+
+        var riverTrend = WaterLevelTrend.STABLE
+        var currentDischarge = 0.0
+        var tomorrowDischarge = 0.0
+        var dischargeChangePct = 0.0
+        val hasFloodData = flood != null && flood.dailyForecast.isNotEmpty()
+
+        if (hasFloodData) {
+            val dailyFlood = flood!!.dailyForecast
+            currentDischarge = dailyFlood.firstOrNull()?.riverDischarge ?: 0.0
+            tomorrowDischarge = dailyFlood.getOrNull(1)?.riverDischarge ?: currentDischarge
+
+            dischargeChangePct = if (currentDischarge > 0) {
+                ((tomorrowDischarge - currentDischarge) / currentDischarge) * 100.0
+            } else 0.0
+
+            riverTrend = calculateOverallTrend(dailyFlood.map { it.riverDischarge })
+        }
+
+        return WaterLevelSummary(
+            seaWaveTrend = seaWaveTrend,
+            currentWaveHeight = currentWave,
+            tomorrowWaveHeight = tomorrowWave,
+            waveChangePercent = waveChangePct,
+            riverDischargeTrend = riverTrend,
+            currentDischarge = currentDischarge,
+            tomorrowDischarge = tomorrowDischarge,
+            dischargeChangePercent = dischargeChangePct,
+            hasMarineData = hasMarineData,
+            hasFloodData = hasFloodData
+        )
+    }
+
+    /**
+     * Hitung tren keseluruhan dari deret data harian.
+     * Membandingkan rata-rata paruh pertama vs paruh kedua.
+     */
+    private fun calculateOverallTrend(values: List<Double>): WaterLevelTrend {
+        if (values.size < 2) return WaterLevelTrend.STABLE
+
+        val half = values.size / 2
+        val firstHalf = values.take(half).average()
+        val secondHalf = values.takeLast(half).average()
+
+        val changePct = if (firstHalf > 0) {
+            ((secondHalf - firstHalf) / firstHalf) * 100.0
+        } else 0.0
+
+        return WaterLevelTrend.fromChangePercent(changePct)
+    }
+
+    /**
+     * Hitung persentase perubahan antara dua nilai
+     */
+    private fun changePercent(previous: Double, current: Double): Double {
+        return if (previous > 0) ((current - previous) / previous) * 100.0 else 0.0
     }
 
     // ===================== MARINE TRANSFORM =====================
@@ -143,7 +234,8 @@ class WaterQualityRepository {
         val dateFormatter = DateTimeFormatter.ISO_DATE
         val locale = Locale("id", "ID")
 
-        return daily.time.mapIndexedNotNull { index, dateStr ->
+        // Buat list terlebih dahulu tanpa tren
+        val rawList = daily.time.mapIndexedNotNull { index, dateStr ->
             try {
                 val date = LocalDate.parse(dateStr, dateFormatter)
                 val dayName = date.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
@@ -163,6 +255,20 @@ class WaterQualityRepository {
                 null
             }
         }
+
+        // Tambahkan tren: bandingkan tiap hari dengan hari sebelumnya
+        return rawList.mapIndexed { index, data ->
+            if (index == 0) {
+                data // hari pertama tanpa tren
+            } else {
+                val prevWave = rawList[index - 1].waveHeightMax
+                val pct = changePercent(prevWave, data.waveHeightMax)
+                data.copy(
+                    waveTrend = WaterLevelTrend.fromChangePercent(pct),
+                    waveChangePercent = pct
+                )
+            }
+        }
     }
 
     // ===================== FLOOD TRANSFORM =====================
@@ -173,7 +279,8 @@ class WaterQualityRepository {
         val dateFormatter = DateTimeFormatter.ISO_DATE
         val locale = Locale("id", "ID")
 
-        val dailyList = daily.time.mapIndexedNotNull { index, dateStr ->
+        // Buat raw list tanpa tren
+        val rawList = daily.time.mapIndexedNotNull { index, dateStr ->
             try {
                 val date = LocalDate.parse(dateStr, dateFormatter)
                 val dayName = date.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
@@ -197,6 +304,26 @@ class WaterQualityRepository {
             }
         }
 
-        return FloodData(dailyForecast = dailyList)
+        // Tambahkan tren: bandingkan tiap hari dengan hari sebelumnya
+        val withTrend = rawList.mapIndexed { index, data ->
+            if (index == 0) {
+                data
+            } else {
+                val prevDischarge = rawList[index - 1].riverDischarge
+                val pct = changePercent(prevDischarge, data.riverDischarge)
+                data.copy(
+                    waterLevelTrend = WaterLevelTrend.fromChangePercent(pct),
+                    dischargeChangePercent = pct
+                )
+            }
+        }
+
+        // Hitung tren keseluruhan
+        val overallTrend = calculateOverallTrend(rawList.map { it.riverDischarge })
+
+        return FloodData(
+            dailyForecast = withTrend,
+            overallTrend = overallTrend
+        )
     }
 }
