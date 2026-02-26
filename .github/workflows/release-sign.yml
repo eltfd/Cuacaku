@@ -45,6 +45,7 @@ jobs:
       - name: Create GitHub release and upload APK
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.event.inputs.tag }}
           files: |
             app/build/outputs/apk/release/app-release.apk
         env:
