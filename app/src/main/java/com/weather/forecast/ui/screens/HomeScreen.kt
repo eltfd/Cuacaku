@@ -1,6 +1,9 @@
 package com.weather.forecast.ui.screens
 
 import android.Manifest
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -491,8 +495,15 @@ private fun HourlyForecastItem(hourly: HourlyWeatherData) {
     }
 }
 
+/**
+ * Prakiraan 7 hari — setiap hari bisa di-expand untuk melihat prakiraan per jam (24 jam).
+ * State expanded per‐hari disimpan di `expandedDays` set.
+ */
 @Composable
 private fun DailyForecastSection(dailyData: List<DailyWeatherData>) {
+    // Track which days are expanded by their date string
+    var expandedDays by remember { mutableStateOf(setOf<String>()) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -509,12 +520,25 @@ private fun DailyForecastSection(dailyData: List<DailyWeatherData>) {
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
-            dailyData.forEach { daily ->
-                DailyForecastItem(daily = daily)
-                if (daily != dailyData.last()) {
+            dailyData.forEachIndexed { index, daily ->
+                val isExpanded = daily.date in expandedDays
+
+                DailyForecastItem(
+                    daily = daily,
+                    isExpanded = isExpanded,
+                    onToggleExpand = {
+                        expandedDays = if (isExpanded) {
+                            expandedDays - daily.date
+                        } else {
+                            expandedDays + daily.date
+                        }
+                    }
+                )
+
+                if (index < dailyData.lastIndex) {
                     Divider(
                         color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.padding(vertical = 8.dp)
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
@@ -522,59 +546,249 @@ private fun DailyForecastSection(dailyData: List<DailyWeatherData>) {
     }
 }
 
+/**
+ * Item prakiraan harian — menampilkan ringkasan hari dan panel
+ * prakiraan per jam yang bisa di-expand.
+ *
+ * Saat di-tap akan menampilkan/menyembunyikan detail prakiraan per jam
+ * dalam format horizontal scroll, sama seperti HourlyForecastSection.
+ */
 @Composable
-private fun DailyForecastItem(daily: DailyWeatherData) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = daily.dayName,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White,
-            modifier = Modifier.weight(1f)
-        )
-
+private fun DailyForecastItem(
+    daily: DailyWeatherData,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Header row — selalu tampil, bisa di-tap untuk expand/collapse
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.Center
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleExpand)
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            WeatherIcon(
-                weatherCode = daily.weatherCode,
-                isDay = true,
-                modifier = Modifier.size(24.dp)
+            // Nama hari
+            Text(
+                text = daily.dayName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White,
+                modifier = Modifier.weight(1f)
             )
-            if (daily.precipitationProbabilityMax > 0) {
-                Spacer(modifier = Modifier.width(4.dp))
+
+            // Icon cuaca + probabilitas hujan
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                WeatherIcon(
+                    weatherCode = daily.weatherCode,
+                    isDay = true,
+                    modifier = Modifier.size(24.dp)
+                )
+                if (daily.precipitationProbabilityMax > 0) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = daily.precipitationProbabilityFormatted,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Rainy
+                    )
+                }
+            }
+
+            // Suhu max/min + expand indicator
+            Row(
+                modifier = Modifier.weight(1.2f),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = daily.precipitationProbabilityFormatted,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Rainy
+                    text = daily.temperatureMaxFormatted,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White
+                )
+                Text(
+                    text = " / ",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.5f)
+                )
+                Text(
+                    text = daily.temperatureMinFormatted,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Tutup" else "Buka prakiraan per jam",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .rotate(if (isExpanded) 180f else 0f)
                 )
             }
         }
 
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.End
+        // Expanded hourly detail — prakiraan per jam untuk hari ini
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
         ) {
+            DailyHourlyDetail(daily = daily)
+        }
+    }
+}
+
+/**
+ * Panel detail prakiraan per jam di dalam item harian.
+ *
+ * Menampilkan LazyRow horizontal berisi 24 kartu jam untuk hari tersebut.
+ * Juga menampilkan info sunrise/sunset dan ringkasan angin.
+ */
+@Composable
+private fun DailyHourlyDetail(daily: DailyWeatherData) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, bottom = 8.dp)
+    ) {
+        // Info ringkas: sunrise, sunset, angin max
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.WbSunny,
+                    contentDescription = null,
+                    tint = Sunny,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = daily.sunrise,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.WbTwilight,
+                    contentDescription = null,
+                    tint = GradientSunsetStart,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = daily.sunset,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.Air,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "${daily.windSpeedMax.toInt()} km/h",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            }
+        }
+
+        // Prakiraan per jam — horizontal scroll
+        if (daily.hourlyForecasts.isNotEmpty()) {
             Text(
-                text = daily.temperatureMaxFormatted,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White
+                text = "Prakiraan Tiap Jam",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.7f),
+                modifier = Modifier.padding(bottom = 6.dp)
             )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(daily.hourlyForecasts) { hourly ->
+                    DailyHourlyItem(hourly = hourly)
+                }
+            }
+        } else {
             Text(
-                text = " / ",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Data per jam tidak tersedia",
+                style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.5f)
             )
+        }
+    }
+}
+
+/**
+ * Kartu kecil untuk 1 jam di dalam panel detail harian.
+ * Menampilkan jam, icon, suhu, probabilitas hujan, dan kecepatan angin.
+ */
+@Composable
+private fun DailyHourlyItem(hourly: HourlyWeatherData) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.15f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Jam
             Text(
-                text = daily.temperatureMinFormatted,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.7f)
+                text = hourly.hour,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            // Icon cuaca
+            WeatherIcon(
+                weatherCode = hourly.weatherCode,
+                isDay = hourly.isDay,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            // Suhu
+            Text(
+                text = hourly.temperatureFormatted,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White
+            )
+            // Probabilitas hujan (jika > 0)
+            if (hourly.precipitationProbability > 0) {
+                Text(
+                    text = hourly.precipitationProbabilityFormatted,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Rainy
+                )
+            }
+            // Kecepatan angin
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.Air,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    text = "${hourly.windSpeed.toInt()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+            }
         }
     }
 }

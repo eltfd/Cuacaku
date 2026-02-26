@@ -102,7 +102,9 @@ class WeatherRepository {
         } ?: createDefaultCurrentWeather()
 
         val hourly = transformHourlyData(response.hourlyForecast)
-        val daily = transformDailyData(response.dailyForecast)
+        // Kelompokkan semua data per jam berdasarkan tanggal untuk prakiraan harian
+        val hourlyByDate = transformAllHourlyDataByDate(response.hourlyForecast)
+        val daily = transformDailyData(response.dailyForecast, hourlyByDate)
 
         return WeatherData(
             location = LocationInfo(
@@ -120,6 +122,9 @@ class WeatherRepository {
 
     /**
      * Transform hourly forecast data
+     *
+     * Mengambil data per jam dari jam sekarang sampai 24 jam ke depan
+     * untuk ditampilkan di horizontal scroll "Prakiraan Per Jam" utama.
      */
     private fun transformHourlyData(hourly: HourlyForecast?): List<HourlyWeatherData> {
         if (hourly == null) return emptyList()
@@ -159,9 +164,69 @@ class WeatherRepository {
     }
 
     /**
-     * Transform daily forecast data
+     * Transform SEMUA data hourly dan kelompokkan berdasarkan tanggal
+     *
+     * Mengembalikan Map<String, List<HourlyWeatherData>> dimana key = tanggal (yyyy-MM-dd)
+     * dan value = list 24 data per jam untuk hari tersebut.
+     *
+     * Digunakan untuk menyisipkan prakiraan per jam ke dalam setiap item prakiraan harian
+     * sehingga pengguna bisa melihat detail cuaca setiap jam dalam 1 hari.
      */
-    private fun transformDailyData(daily: DailyForecast?): List<DailyWeatherData> {
+    private fun transformAllHourlyDataByDate(hourly: HourlyForecast?): Map<String, List<HourlyWeatherData>> {
+        if (hourly == null) return emptyMap()
+
+        val formatter = DateTimeFormatter.ISO_DATE_TIME
+        val hourFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        val dateFormatter = DateTimeFormatter.ISO_DATE
+
+        val allHourly = hourly.time.mapIndexedNotNull { index, timeStr ->
+            try {
+                val time = LocalDateTime.parse(timeStr, formatter)
+
+                HourlyWeatherData(
+                    time = timeStr,
+                    hour = time.format(hourFormatter),
+                    temperature = hourly.temperature.getOrNull(index) ?: 0.0,
+                    apparentTemperature = hourly.apparentTemperature.getOrNull(index) ?: 0.0,
+                    humidity = hourly.humidity.getOrNull(index) ?: 0,
+                    weatherCode = hourly.weatherCode.getOrNull(index) ?: 0,
+                    weatherCondition = WeatherCondition.fromCode(hourly.weatherCode.getOrNull(index) ?: 0),
+                    precipitationProbability = hourly.precipitationProbability.getOrNull(index) ?: 0,
+                    precipitation = hourly.precipitation.getOrNull(index) ?: 0.0,
+                    windSpeed = hourly.windSpeed.getOrNull(index) ?: 0.0,
+                    uvIndex = hourly.uvIndex.getOrNull(index) ?: 0.0,
+                    isDay = (hourly.isDay.getOrNull(index) ?: 1) == 1,
+                    visibility = hourly.visibility.getOrNull(index) ?: 0.0
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        // Kelompokkan berdasarkan tanggal (yyyy-MM-dd)
+        return allHourly.groupBy { hourlyItem ->
+            try {
+                val time = LocalDateTime.parse(hourlyItem.time, formatter)
+                time.toLocalDate().format(dateFormatter)
+            } catch (e: Exception) {
+                ""
+            }
+        }.filterKeys { it.isNotEmpty() }
+    }
+
+    /**
+     * Transform daily forecast data
+     *
+     * Setiap DailyWeatherData dilengkapi dengan hourlyForecasts
+     * berisi prakiraan per jam (24 data) untuk hari tersebut.
+     *
+     * @param daily DailyForecast dari API response
+     * @param hourlyByDate Map data per jam yang sudah dikelompokkan berdasarkan tanggal
+     */
+    private fun transformDailyData(
+        daily: DailyForecast?,
+        hourlyByDate: Map<String, List<HourlyWeatherData>> = emptyMap()
+    ): List<DailyWeatherData> {
         if (daily == null) return emptyList()
 
         val dateFormatter = DateTimeFormatter.ISO_DATE
@@ -187,7 +252,8 @@ class WeatherRepository {
                     precipitationSum = daily.precipitationSum.getOrNull(index) ?: 0.0,
                     precipitationProbabilityMax = daily.precipitationProbabilityMax.getOrNull(index) ?: 0,
                     windSpeedMax = daily.windSpeedMax.getOrNull(index) ?: 0.0,
-                    windGustsMax = daily.windGustsMax.getOrNull(index) ?: 0.0
+                    windGustsMax = daily.windGustsMax.getOrNull(index) ?: 0.0,
+                    hourlyForecasts = hourlyByDate[dateStr] ?: emptyList()
                 )
             } catch (e: Exception) {
                 null

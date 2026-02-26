@@ -102,6 +102,10 @@ data class HourlyWeatherData(
 
 /**
  * Data prakiraan harian (UI-ready)
+ *
+ * Setiap item harian berisi daftar prakiraan per jam (hourlyForecasts)
+ * yang menampilkan detail cuaca untuk setiap jam dalam 1 hari tersebut.
+ * Data per jam dikelompokkan berdasarkan tanggal dari response API.
  */
 data class DailyWeatherData(
     val date: String,
@@ -118,7 +122,9 @@ data class DailyWeatherData(
     val precipitationSum: Double,
     val precipitationProbabilityMax: Int,
     val windSpeedMax: Double,
-    val windGustsMax: Double
+    val windGustsMax: Double,
+    /** Prakiraan per jam (24 data) untuk hari ini */
+    val hourlyForecasts: List<HourlyWeatherData> = emptyList()
 ) {
     val temperatureMaxFormatted: String
         get() = "${temperatureMax.toInt()}°"
