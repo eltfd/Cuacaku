@@ -1,18 +1,27 @@
 # Weather Forecast App 🌤️
 
+[![Android CI](https://github.com/eltfd/weather-forecast-app/actions/workflows/android-ci.yml/badge.svg)](https://github.com/eltfd/weather-forecast-app/actions/workflows/android-ci.yml)
+[![Release](https://github.com/eltfd/weather-forecast-app/actions/workflows/release-sign.yml/badge.svg)](https://github.com/eltfd/weather-forecast-app/actions/workflows/release-sign.yml)
+[![Latest Release](https://img.shields.io/github/v/release/eltfd/weather-forecast-app)](https://github.com/eltfd/weather-forecast-app/releases/latest)
+
 Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data **100% gratis dan open source**. Tidak memerlukan API key atau berlangganan apapun.
 
 ## 📋 Daftar Isi
 
 - [Fitur](#-fitur)
+- [Tech Stack](#-tech-stack)
 - [Arsitektur](#-arsitektur)
 - [Sumber Data](#-sumber-data)
 - [Struktur Proyek](#-struktur-proyek)
 - [Setup & Instalasi](#-setup--instalasi)
 - [Build & Run](#-build--run)
+- [CI/CD Pipeline](#-cicd-pipeline)
+- [Release & Signing](#-release--signing)
 - [Sistem Notifikasi](#-sistem-notifikasi)
 - [API Documentation](#-api-documentation)
 - [Panduan Pengembangan](#-panduan-pengembangan)
+- [Troubleshooting](#-troubleshooting)
+- [Referensi](#-referensi)
 
 ---
 
@@ -39,6 +48,30 @@ Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data **100% grati
 - 🌈 Dynamic color (Android 12+)
 - 🔄 Pull-to-refresh
 - 📱 Edge-to-edge display
+
+---
+
+## 🛠️ Tech Stack
+
+| Category | Technology | Version |
+|----------|-----------|---------|
+| Language | Kotlin | 1.9.21 |
+| UI | Jetpack Compose (BOM) | 2023.10.01 |
+| Design | Material Design 3 | via BOM |
+| Architecture | MVVM | — |
+| Networking | Retrofit + OkHttp | 2.9.0 / 4.12.0 |
+| JSON | Gson | 2.10.1 |
+| Database | Room | 2.6.1 |
+| Preferences | DataStore | 1.0.0 |
+| Background | WorkManager | 2.9.0 |
+| Location | Play Services Location | 21.1.0 |
+| Permissions | Accompanist Permissions | 0.32.0 |
+| Build | Gradle (Kotlin DSL) | 8.5 |
+| Java | JDK | 17 |
+| Min SDK | Android 8.0 | API 26 |
+| Target SDK | Android 14 | API 34 |
+| CI/CD | GitHub Actions | — |
+| Signing | Keystore (base64 secret) | — |
 
 ---
 
@@ -262,6 +295,113 @@ See `TROUBLESHOOTING.md` for common errors and fixes, and `CHANGELOG.md` for rec
 
 ---
 
+## 🔄 CI/CD Pipeline
+
+Project ini menggunakan **GitHub Actions** untuk Continuous Integration dan Continuous Delivery.
+
+### Workflows
+
+| Workflow | File | Trigger | Tujuan |
+|----------|------|---------|--------|
+| Android CI | `.github/workflows/android-ci.yml` | Push/PR ke `main` | Build debug APK, upload artifact |
+| Release (signed) | `.github/workflows/release-sign.yml` | Manual dispatch | Build signed release APK, buat GitHub Release |
+
+### 1. Android CI (`android-ci.yml`)
+
+Berjalan otomatis setiap push atau pull request ke branch `main`.
+
+**Steps:**
+1. Checkout code
+2. Setup JDK 17 (Temurin) dengan Gradle cache
+3. Build debug APK (`./gradlew assembleDebug`)
+4. Upload `app-debug.apk` sebagai artifact
+
+**Status badge:**
+```
+[![Android CI](https://github.com/eltfd/weather-forecast-app/actions/workflows/android-ci.yml/badge.svg)](https://github.com/eltfd/weather-forecast-app/actions/workflows/android-ci.yml)
+```
+
+### 2. Release Signing (`release-sign.yml`)
+
+Dispatch manual dari tab Actions → "Release (signed)" → "Run workflow".
+
+**Input:**
+- `tag` — Tag name untuk release (contoh: `v1.0.0`, `v1.1.0`)
+
+**Steps:**
+1. Checkout code
+2. Setup JDK 17 (Temurin) dengan Gradle cache
+3. Decode keystore dari secret `SIGNING_KEY` (base64) → `app/keystore.jks`
+4. Build release APK (`./gradlew assembleRelease`)
+5. Buat GitHub Release dengan tag dan upload `app-release.apk`
+
+**Dispatch via CLI:**
+```bash
+gh workflow run release-sign.yml -f tag=v1.1.0
+```
+
+---
+
+## 🔐 Release & Signing
+
+### Repository Secrets
+
+Signing dikonfigurasi menggunakan GitHub repository secrets:
+
+| Secret | Deskripsi |
+|--------|-----------|
+| `SIGNING_KEY` | Base64-encoded keystore (`.jks`) file |
+| `RELEASE_KEY_ALIAS` | Alias key di dalam keystore |
+| `RELEASE_KEY_PASSWORD` | Password untuk key |
+| `RELEASE_STORE_PASSWORD` | Password untuk keystore |
+
+### Signing Config (`app/build.gradle.kts`)
+
+```kotlin
+signingConfigs {
+    create("release") {
+        val keystoreFile = System.getenv("RELEASE_KEYSTORE_FILE") ?: "keystore.jks"
+        storeFile = file(keystoreFile)
+        storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: ""
+        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: ""
+        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: ""
+    }
+}
+```
+
+### Membuat Keystore Baru
+
+Jika perlu regenerate keystore:
+
+```bash
+# Generate keystore
+keytool -genkeypair -v \
+  -keystore release-keystore.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias your-alias \
+  -dname "CN=Your Name, OU=Dev, O=Org, L=City, ST=State, C=ID"
+
+# Encode ke base64
+base64 -i release-keystore.jks | tr -d '\n'
+
+# Set sebagai secret di GitHub
+gh secret set SIGNING_KEY < <(base64 -i release-keystore.jks)
+gh secret set RELEASE_KEY_ALIAS -b "your-alias"
+gh secret set RELEASE_KEY_PASSWORD -b "your-password"
+gh secret set RELEASE_STORE_PASSWORD -b "your-password"
+```
+
+### Download Release APK
+
+Release APK tersedia di [GitHub Releases](https://github.com/eltfd/weather-forecast-app/releases).
+
+```bash
+# Download via CLI
+gh release download v1.0.0 -p "app-release.apk"
+```
+
+---
+
 ## 🔔 Sistem Notifikasi
 
 ### Notification Channels
@@ -405,7 +545,35 @@ MIT License - Free to use and modify.
 
 ---
 
-## 🙏 Credits
+## � Troubleshooting
+
+Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md) untuk solusi masalah umum, termasuk:
+- SDK location not found
+- Gradle wrapper JAR missing
+- Compose runtime crash (version mismatch)
+- CI/CD signing errors (keystore path, permissions)
+- ADB device visibility
+
+---
+
+## 📖 Referensi
+
+| Resource | Link |
+|----------|------|
+| Repository | https://github.com/eltfd/weather-forecast-app |
+| Releases | https://github.com/eltfd/weather-forecast-app/releases |
+| CI Runs | https://github.com/eltfd/weather-forecast-app/actions |
+| Open-Meteo API | https://open-meteo.com/en/docs |
+| Nominatim API | https://nominatim.org/release-docs/develop/api/Overview/ |
+| Compose BOM | https://developer.android.com/develop/ui/compose/bom |
+| Material3 | https://m3.material.io |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Troubleshooting | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
+
+---
+
+## �🙏 Credits
 
 - **Weather Data**: [Open-Meteo](https://open-meteo.com)
 - **Geocoding**: [Nominatim/OpenStreetMap](https://nominatim.org)
