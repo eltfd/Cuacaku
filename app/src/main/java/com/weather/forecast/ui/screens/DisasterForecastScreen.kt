@@ -165,7 +165,10 @@ private fun DisasterForecastContent(data: DisasterForecast) {
                 summary = data.aiSummary,
                 riskLevel = data.overallRiskLevel,
                 aiModelVersion = data.aiModelVersion,
-                aiDataCompleteness = data.aiDataCompleteness
+                aiDataCompleteness = data.aiDataCompleteness,
+                learningSteps = data.learningSteps,
+                learningSamples = data.learningSamples,
+                storageUsed = data.storageUsed
             )
         }
 
@@ -265,7 +268,10 @@ private fun AiSummaryCard(
     summary: String,
     riskLevel: RiskLevel,
     aiModelVersion: String = "",
-    aiDataCompleteness: Double = 0.0
+    aiDataCompleteness: Double = 0.0,
+    learningSteps: Long = 0,
+    learningSamples: Int = 0,
+    storageUsed: String = ""
 ) {
     Card(
         modifier = Modifier
@@ -300,7 +306,7 @@ private fun AiSummaryCard(
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = "AI",
+                            text = if (learningSteps > 0) "AI+L" else "AI",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp
@@ -316,13 +322,30 @@ private fun AiSummaryCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AiInfoChip(label = "Model", value = aiModelVersion.substringBefore("-domain"))
+                    AiInfoChip(label = "Model", value = aiModelVersion.substringBefore("-incremental"))
                     AiInfoChip(
                         label = "Data",
                         value = "${"%.0f".format(aiDataCompleteness * 100)}%"
                     )
+                    if (learningSteps > 0) {
+                        AiInfoChip(label = "Learned", value = "${learningSteps}x")
+                    }
+                }
+
+                // Learning status row
+                if (learningSteps > 0 || learningSamples > 0) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AiInfoChip(label = "Sampel", value = "$learningSamples")
+                        if (storageUsed.isNotEmpty()) {
+                            AiInfoChip(label = "Storage", value = storageUsed)
+                        }
+                    }
                 }
             }
 
@@ -892,11 +915,12 @@ private fun DisasterFooter() {
 
             Text(
                 text = "Analisis menggunakan Neural Network (MLP 20→32→16→6) " +
-                    "dengan domain-informed initialization, dikombinasikan " +
-                    "dengan rule-based scoring (ensemble fusion). " +
-                    "Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017). " +
-                    "Data dari Open-Meteo (cuaca), Marine API (laut), " +
-                    "dan GloFAS/ECMWF (sungai). " +
+                    "dengan domain-informed initialization + incremental learning. " +
+                    "Model belajar otomatis dari data harian (maks 50 sampel, ~16 KB). " +
+                    "Data > 30 hari otomatis dihapus. " +
+                    "Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017), " +
+                    "Sahoo et al. (ICML 2018). " +
+                    "Data dari Open-Meteo, Marine API, GloFAS/ECMWF. " +
                     "Prakiraan bersifat indikatif — ikuti peringatan resmi BMKG.",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.4f),
@@ -906,7 +930,7 @@ private fun DisasterFooter() {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "AI Engine: MLP-v1.0 • Open-Meteo • GloFAS • ECMWF",
+                text = "AI Engine: MLP-v1.1 + Incremental Learning • Open-Meteo • GloFAS",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.3f)
             )

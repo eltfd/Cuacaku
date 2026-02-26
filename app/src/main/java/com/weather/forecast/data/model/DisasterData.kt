@@ -33,7 +33,13 @@ data class DisasterForecast(
     /** Jumlah fitur input ke NN */
     val aiFeatureCount: Int = 0,
     /** Kelengkapan data input (0.0 – 1.0) */
-    val aiDataCompleteness: Double = 0.0
+    val aiDataCompleteness: Double = 0.0,
+    /** Total langkah incremental learning */
+    val learningSteps: Long = 0,
+    /** Jumlah learning samples tersimpan */
+    val learningSamples: Int = 0,
+    /** Penggunaan storage AI (human-readable) */
+    val storageUsed: String = ""
 )
 
 /**

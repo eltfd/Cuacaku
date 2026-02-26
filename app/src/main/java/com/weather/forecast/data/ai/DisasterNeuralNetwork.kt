@@ -46,7 +46,7 @@ object DisasterNeuralNetwork {
     private const val OUTPUT = 6
     private const val TEMPERATURE = 1.3f  // Output calibration temperature
 
-    const val MODEL_VERSION = "MLP-v1.0-domain-calibrated"
+    const val MODEL_VERSION = "MLP-v1.1-incremental"
     const val TOTAL_PARAMS = INPUT * H1 + H1 + H1 * H2 + H2 + H2 * OUTPUT + OUTPUT // 1222
 
     // ── Flat Weight Arrays (row-major) ──
@@ -69,9 +69,10 @@ object DisasterNeuralNetwork {
      * Prediksi risiko bencana dari vektor fitur ternormalisasi.
      *
      * @param features FloatArray ukuran 20 — fitur cuaca [0, 1]
+     * @param deltas Delta bobot dari incremental learning (nullable)
      * @return FloatArray ukuran 6 — skor risiko [0, 1] per jenis bencana
      */
-    fun predict(features: FloatArray): FloatArray {
+    fun predict(features: FloatArray, deltas: WeightDeltas? = null): FloatArray {
         require(features.size == INPUT) {
             "Expected $INPUT features, got ${features.size}"
         }
@@ -97,16 +98,47 @@ object DisasterNeuralNetwork {
         }
 
         // Layer 3: Hidden2 → Output (Sigmoid + Temperature Scaling)
+        // Terapkan delta dari incremental learning jika tersedia
         val out = FloatArray(OUTPUT)
         for (j in 0 until OUTPUT) {
             var sum = b3[j]
+            if (deltas != null && j < deltas.b3Delta.size) sum += deltas.b3Delta[j]
             for (i in 0 until H2) {
-                sum += h2[i] * w3[i * OUTPUT + j]
+                var w = w3[i * OUTPUT + j]
+                if (deltas != null) {
+                    val idx = i * OUTPUT + j
+                    if (idx < deltas.w3Delta.size) w += deltas.w3Delta[idx]
+                }
+                sum += h2[i] * w
             }
             out[j] = sigmoid(sum / TEMPERATURE)
         }
 
         return out
+    }
+
+    /**
+     * Forward pass hingga hidden layer 2 saja.
+     * Dibutuhkan oleh IncrementalLearningEngine untuk menghitung gradient.
+     */
+    fun forwardToH2(features: FloatArray): FloatArray {
+        require(features.size == INPUT)
+
+        val h1 = FloatArray(H1)
+        for (j in 0 until H1) {
+            var sum = b1[j]
+            for (i in 0 until INPUT) sum += features[i] * w1[i * H1 + j]
+            h1[j] = leakyReLU(sum)
+        }
+
+        val h2 = FloatArray(H2)
+        for (j in 0 until H2) {
+            var sum = b2[j]
+            for (i in 0 until H1) sum += h1[i] * w2[i * H2 + j]
+            h2[j] = leakyReLU(sum)
+        }
+
+        return h2
     }
 
     // ════════════════════════════════════════════════

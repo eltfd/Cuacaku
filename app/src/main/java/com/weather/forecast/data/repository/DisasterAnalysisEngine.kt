@@ -3,6 +3,7 @@ package com.weather.forecast.data.repository
 import com.weather.forecast.data.ai.DisasterNeuralNetwork
 import com.weather.forecast.data.ai.WeatherFeatureExtractor
 import com.weather.forecast.data.ai.WeatherFeatures
+import com.weather.forecast.data.ai.WeightDeltas
 import com.weather.forecast.data.model.*
 
 /**
@@ -42,7 +43,8 @@ object DisasterAnalysisEngine {
     fun analyzeToday(
         weather: WeatherData?,
         marine: WaterQualityData?,
-        flood: WaterQualityData?
+        flood: WaterQualityData?,
+        weightDeltas: WeightDeltas? = null
     ): List<DisasterPrediction> {
         val predictions = mutableListOf<DisasterPrediction>()
 
@@ -62,7 +64,7 @@ object DisasterAnalysisEngine {
 
         // ═══ Phase 2: Neural Network + Ensemble Fusion ═══
         val features = WeatherFeatureExtractor.extractForToday(weather, marine ?: flood)
-        val nnScores = DisasterNeuralNetwork.predict(features.features)
+        val nnScores = DisasterNeuralNetwork.predict(features.features, weightDeltas)
         return ensembleFuse(predictions, nnScores, features).sortedByDescending { it.riskScore }
     }
 
@@ -75,7 +77,8 @@ object DisasterAnalysisEngine {
         hourlyForDay: List<HourlyWeatherData>,
         marineDaily: DailyMarineData?,
         floodDaily: DailyFloodData?,
-        allDaily: List<DailyWeatherData>
+        allDaily: List<DailyWeatherData>,
+        weightDeltas: WeightDeltas? = null
     ): List<DisasterPrediction> {
         val predictions = mutableListOf<DisasterPrediction>()
 
@@ -90,7 +93,7 @@ object DisasterAnalysisEngine {
         val features = WeatherFeatureExtractor.extractForDay(
             dayIndex, daily, hourlyForDay, marineDaily, floodDaily, allDaily
         )
-        val nnScores = DisasterNeuralNetwork.predict(features.features)
+        val nnScores = DisasterNeuralNetwork.predict(features.features, weightDeltas)
         return ensembleFuse(predictions, nnScores, features).sortedByDescending { it.riskScore }
     }
 

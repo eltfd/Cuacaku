@@ -28,7 +28,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
 
     private val airQualityRepository = AirQualityRepository()
     private val waterQualityRepository = WaterQualityRepository()
-    private val disasterRepository = DisasterRepository()
+    private val disasterRepository = DisasterRepository(application)
     private val locationManager = LocationManager(application)
     private val preferencesManager = PreferencesManager(application)
 
