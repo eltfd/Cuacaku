@@ -16,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.weather.forecast.ui.screens.AirQualityScreen
+import com.weather.forecast.ui.screens.DisasterForecastScreen
 import com.weather.forecast.ui.screens.HomeScreen
 import com.weather.forecast.ui.screens.SettingsScreen
 import com.weather.forecast.ui.screens.WaterQualityScreen
@@ -29,6 +30,7 @@ object Routes {
     const val HOME = "home"
     const val AIR_QUALITY = "air_quality"
     const val WATER_QUALITY = "water_quality"
+    const val DISASTER = "disaster"
     const val SETTINGS = "settings"
 }
 
@@ -58,6 +60,12 @@ enum class BottomNavItem(
         title = "Air",
         selectedIcon = Icons.Filled.Water,
         unselectedIcon = Icons.Outlined.Water
+    ),
+    DISASTER(
+        route = Routes.DISASTER,
+        title = "Bencana",
+        selectedIcon = Icons.Filled.Warning,
+        unselectedIcon = Icons.Outlined.Warning
     )
 }
 
@@ -75,7 +83,7 @@ fun WeatherNavigation() {
 
     // Only show bottom bar on main screens (not settings)
     val showBottomBar = currentDestination?.route in listOf(
-        Routes.HOME, Routes.AIR_QUALITY, Routes.WATER_QUALITY
+        Routes.HOME, Routes.AIR_QUALITY, Routes.WATER_QUALITY, Routes.DISASTER
     )
 
     Scaffold(
@@ -133,6 +141,12 @@ fun WeatherNavigation() {
 
             composable(Routes.WATER_QUALITY) {
                 WaterQualityScreen(
+                    viewModel = environmentViewModel
+                )
+            }
+
+            composable(Routes.DISASTER) {
+                DisasterForecastScreen(
                     viewModel = environmentViewModel
                 )
             }

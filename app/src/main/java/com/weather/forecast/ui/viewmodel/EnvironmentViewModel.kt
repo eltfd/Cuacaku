@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.weather.forecast.data.model.AirQualityData
+import com.weather.forecast.data.model.DisasterForecast
 import com.weather.forecast.data.model.WaterQualityData
 import com.weather.forecast.data.preferences.PreferencesManager
 import com.weather.forecast.data.repository.AirQualityRepository
+import com.weather.forecast.data.repository.DisasterRepository
 import com.weather.forecast.data.repository.WaterQualityRepository
 import com.weather.forecast.location.LocationManager
 import kotlinx.coroutines.flow.*
@@ -26,6 +28,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
 
     private val airQualityRepository = AirQualityRepository()
     private val waterQualityRepository = WaterQualityRepository()
+    private val disasterRepository = DisasterRepository()
     private val locationManager = LocationManager(application)
     private val preferencesManager = PreferencesManager(application)
 
@@ -36,6 +39,10 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     // Water Quality UI State
     private val _waterQualityState = MutableStateFlow<WaterQualityUiState>(WaterQualityUiState.Loading)
     val waterQualityState: StateFlow<WaterQualityUiState> = _waterQualityState.asStateFlow()
+
+    // Disaster UI State
+    private val _disasterState = MutableStateFlow<DisasterUiState>(DisasterUiState.Loading)
+    val disasterState: StateFlow<DisasterUiState> = _disasterState.asStateFlow()
 
     // Track current location for refresh
     private var currentLatitude: Double? = null
@@ -63,9 +70,10 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             currentLatitude = location.first
             currentLongitude = location.second
 
-            // Load both in parallel
+            // Load all in parallel
             launch { loadAirQualityData(location.first, location.second) }
             launch { loadWaterQualityData(location.first, location.second) }
+            launch { loadDisasterData(location.first, location.second) }
         }
     }
 
@@ -105,6 +113,24 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    /**
+     * Load disaster forecast data saja
+     */
+    fun loadDisasterData() {
+        viewModelScope.launch {
+            val lat = currentLatitude
+            val lon = currentLongitude
+            if (lat != null && lon != null) {
+                loadDisasterData(lat, lon)
+            } else {
+                val location = getLocation() ?: return@launch
+                currentLatitude = location.first
+                currentLongitude = location.second
+                loadDisasterData(location.first, location.second)
+            }
+        }
+    }
+
     private suspend fun loadAirQualityData(latitude: Double, longitude: Double) {
         _airQualityState.value = AirQualityUiState.Loading
 
@@ -127,6 +153,19 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         }.onFailure { error ->
             _waterQualityState.value = WaterQualityUiState.Error(
                 message = error.message ?: "Gagal memuat data kualitas air"
+            )
+        }
+    }
+
+    private suspend fun loadDisasterData(latitude: Double, longitude: Double) {
+        _disasterState.value = DisasterUiState.Loading
+
+        val result = disasterRepository.getDisasterForecast(latitude, longitude)
+        result.onSuccess { data ->
+            _disasterState.value = DisasterUiState.Success(data)
+        }.onFailure { error ->
+            _disasterState.value = DisasterUiState.Error(
+                message = error.message ?: "Gagal memuat prakiraan bencana"
             )
         }
     }
@@ -158,6 +197,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         } else {
             _airQualityState.value = AirQualityUiState.Error("Lokasi tidak tersedia")
             _waterQualityState.value = WaterQualityUiState.Error("Lokasi tidak tersedia")
+            _disasterState.value = DisasterUiState.Error("Lokasi tidak tersedia")
             null
         }
     }
@@ -179,4 +219,13 @@ sealed class WaterQualityUiState {
     data object Loading : WaterQualityUiState()
     data class Success(val data: WaterQualityData) : WaterQualityUiState()
     data class Error(val message: String) : WaterQualityUiState()
+}
+
+/**
+ * UI State untuk Disaster Forecast Screen
+ */
+sealed class DisasterUiState {
+    data object Loading : DisasterUiState()
+    data class Success(val data: DisasterForecast) : DisasterUiState()
+    data class Error(val message: String) : DisasterUiState()
 }
