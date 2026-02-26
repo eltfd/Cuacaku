@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths configuration
+    
+    Digunakan oleh AppUpdateManager untuk memberikan akses URI
+    ke file APK yang didownload di folder Downloads publik.
+    
+    Tanpa konfigurasi ini, Android 7.0+ akan menolak
+    intent instalasi APK karena file:// URI tidak diizinkan.
+    
+    @see com.weather.forecast.update.AppUpdateManager
+    @see AndroidManifest.xml (provider declaration)
+-->
+<paths>
+    <!--
+        Akses ke folder Downloads publik
+        Path: /storage/emulated/0/Download/
+        Digunakan untuk membaca APK yang didownload via DownloadManager
+    -->
+    <external-path
+        name="downloads"
+        path="Download/" />
+</paths>

@@ -25,6 +25,9 @@
     <!-- Wake Lock for background tasks -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Install/Update APK dari sumber tidak dikenal (self-update via GitHub Releases) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".WeatherApplication"
         android:allowBackup="true"
@@ -64,6 +67,24 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!--
+            FileProvider — diperlukan agar AppUpdateManager bisa
+            membagikan URI file APK ke PackageInstaller.
+            Android 7.0+ (API 24+) tidak mengizinkan file:// URI.
+            
+            @see res/xml/file_paths.xml
+            @see com.weather.forecast.update.AppUpdateManager
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- WorkManager Initialization -->
         <provider
