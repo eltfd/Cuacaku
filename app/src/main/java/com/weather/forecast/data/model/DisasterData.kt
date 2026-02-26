@@ -8,7 +8,8 @@ package com.weather.forecast.data.model
  * - Data laut (gelombang, swell) → banjir rob
  * - Data sungai (debit) → banjir bandang
  *
- * Engine menggunakan fuzzy-logic scoring dengan bobot per faktor.
+ * Engine menggunakan Neural Network (MLP) + rule-based ensemble.
+ * Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017)
  */
 
 /**
@@ -26,7 +27,13 @@ data class DisasterForecast(
     /** Ringkasan narasi AI */
     val aiSummary: String = "",
     /** Timestamp */
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
+    /** Versi model AI yang digunakan */
+    val aiModelVersion: String = "",
+    /** Jumlah fitur input ke NN */
+    val aiFeatureCount: Int = 0,
+    /** Kelengkapan data input (0.0 – 1.0) */
+    val aiDataCompleteness: Double = 0.0
 )
 
 /**
@@ -44,7 +51,11 @@ data class DisasterPrediction(
     /** Deskripsi narasi AI */
     val description: String,
     /** Rekomendasi tindakan */
-    val recommendation: String
+    val recommendation: String,
+    /** Skor mentah dari Neural Network (0.0 – 1.0) */
+    val aiRawScore: Double = 0.0,
+    /** Bobot NN dalam ensemble (0.0 – 0.6, tergantung kelengkapan data) */
+    val ensembleWeight: Double = 0.0
 )
 
 /**

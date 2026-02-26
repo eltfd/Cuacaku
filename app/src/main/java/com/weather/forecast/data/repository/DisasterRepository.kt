@@ -1,5 +1,7 @@
 package com.weather.forecast.data.repository
 
+import com.weather.forecast.data.ai.DisasterNeuralNetwork
+import com.weather.forecast.data.ai.WeatherFeatureExtractor
 import com.weather.forecast.data.api.RetrofitClient
 import com.weather.forecast.data.model.*
 import kotlinx.coroutines.Dispatchers
@@ -106,13 +108,19 @@ class DisasterRepository {
 
                 val aiSummary = DisasterAnalysisEngine.generateSummary(todayPredictions)
 
+                // ═══ AI Model Info ═══
+                val todayFeatures = WeatherFeatureExtractor.extractForToday(weather, water)
+
                 Result.success(
                     DisasterForecast(
                         todayPredictions = todayPredictions,
                         weeklyPredictions = weeklyPredictions,
                         highestAlert = highestAlert,
                         overallRiskLevel = overallRisk,
-                        aiSummary = aiSummary
+                        aiSummary = aiSummary,
+                        aiModelVersion = DisasterNeuralNetwork.MODEL_VERSION,
+                        aiFeatureCount = WeatherFeatureExtractor.FEATURE_COUNT,
+                        aiDataCompleteness = todayFeatures.dataCompleteness
                     )
                 )
             } catch (e: Exception) {

@@ -1,12 +1,22 @@
 package com.weather.forecast.data.repository
 
+import com.weather.forecast.data.ai.DisasterNeuralNetwork
+import com.weather.forecast.data.ai.WeatherFeatureExtractor
+import com.weather.forecast.data.ai.WeatherFeatures
 import com.weather.forecast.data.model.*
 
 /**
- * Disaster Analysis Engine — "AI" Berbasis Multi-Faktor
+ * Disaster Analysis Engine — Hybrid AI + Rule-Based
  *
- * Mesin analisis bencana yang menggunakan pendekatan *fuzzy-logic scoring*
- * dengan bobot per faktor meteorologi. Mirip sistem peringatan dini BMKG.
+ * Mesin analisis bencana yang menggabungkan:
+ * 1. Neural Network (MLP 20→32→16→6) untuk deteksi pola non-linear
+ * 2. Rule-based fuzzy-logic scoring untuk domain constraints
+ * 3. Ensemble fusion dengan adaptive weighting
+ *
+ * Referensi:
+ * - Gorishniy et al. (NeurIPS 2021) — MLP untuk data tabular
+ * - Guo et al. (ICML 2017) — Temperature scaling calibration
+ * - WMO Multi-Hazard Guidelines (2023)
  *
  * Data input:
  * - Cuaca: CAPE, angin (kecepatan/gust/arah), curah hujan, tekanan udara,
@@ -50,7 +60,10 @@ object DisasterAnalysisEngine {
         predictions.add(analyzeLandslide(hourly, dailyToday, weather?.daily))
         predictions.add(analyzeGroundSubsidence(hourly, dailyToday, weather?.daily, floodData))
 
-        return predictions.sortedByDescending { it.riskScore }
+        // ═══ Phase 2: Neural Network + Ensemble Fusion ═══
+        val features = WeatherFeatureExtractor.extractForToday(weather, marine ?: flood)
+        val nnScores = DisasterNeuralNetwork.predict(features.features)
+        return ensembleFuse(predictions, nnScores, features).sortedByDescending { it.riskScore }
     }
 
     /**
@@ -73,7 +86,12 @@ object DisasterAnalysisEngine {
         predictions.add(analyzeDailyLandslide(daily, hourlyForDay, allDaily, dayIndex))
         predictions.add(analyzeDailyGroundSubsidence(daily, hourlyForDay, allDaily, dayIndex, floodDaily))
 
-        return predictions.sortedByDescending { it.riskScore }
+        // ═══ Neural Network + Ensemble Fusion ═══
+        val features = WeatherFeatureExtractor.extractForDay(
+            dayIndex, daily, hourlyForDay, marineDaily, floodDaily, allDaily
+        )
+        val nnScores = DisasterNeuralNetwork.predict(features.features)
+        return ensembleFuse(predictions, nnScores, features).sortedByDescending { it.riskScore }
     }
 
     /**
@@ -100,6 +118,49 @@ object DisasterAnalysisEngine {
                 }
                 append("Harap waspada dan ikuti arahan pihak berwenang.")
             }
+        }
+    }
+
+    // ══════════════════════════════════════════════════
+    //  ENSEMBLE FUSION — Neural Network + Rule-Based
+    // ══════════════════════════════════════════════════
+
+    /**
+     * Menggabungkan skor rule-based dengan output Neural Network.
+     *
+     * Formula: finalScore = α × nnScore + (1 − α) × ruleScore
+     * dimana α = 0.6 × dataCompleteness
+     *
+     * NN mendapat bobot lebih besar (maks 60%) karena mampu menangkap
+     * interaksi non-linear antar fitur meteorologi yang tidak bisa
+     * ditangkap oleh aturan if-else.
+     *
+     * Saat data tidak lengkap (misalnya tidak ada data laut), bobot NN
+     * dikurangi secara otomatis dan rule-based mengambil alih.
+     */
+    private fun ensembleFuse(
+        rulePredictions: List<DisasterPrediction>,
+        nnScores: FloatArray,
+        features: WeatherFeatures
+    ): List<DisasterPrediction> {
+        val alpha = 0.6 * features.dataCompleteness  // Adaptive NN weight
+        val beta = 1.0 - alpha                         // Rule-based weight
+
+        return rulePredictions.map { pred ->
+            val idx = DisasterType.entries.indexOf(pred.type)
+            if (idx < 0 || idx >= nnScores.size) return@map pred
+
+            val nnScore = nnScores[idx].toDouble().coerceIn(0.0, 1.0)
+            val ruleScore = pred.riskScore
+            val fusedScore = (alpha * nnScore + beta * ruleScore).coerceIn(0.0, 1.0)
+
+            pred.copy(
+                riskScore = fusedScore,
+                riskLevel = scoreToRiskLevel(fusedScore),
+                confidence = maxOf(pred.confidence, features.dataCompleteness),
+                aiRawScore = nnScore,
+                ensembleWeight = alpha
+            )
         }
     }
 

@@ -34,7 +34,7 @@ import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
  * Disaster Forecast Screen — Prakiraan Potensi Bencana Berbasis AI
  *
  * Menampilkan analisis risiko bencana berdasarkan data cuaca, laut, dan sungai.
- * Menggunakan DisasterAnalysisEngine (fuzzy-logic scoring) untuk prediksi.
+ * Menggunakan Neural Network (MLP) + rule-based ensemble untuk prediksi.
  */
 @Composable
 fun DisasterForecastScreen(
@@ -161,7 +161,12 @@ private fun DisasterForecastContent(data: DisasterForecast) {
 
         // ═══ AI Summary Card ═══
         item {
-            AiSummaryCard(summary = data.aiSummary, riskLevel = data.overallRiskLevel)
+            AiSummaryCard(
+                summary = data.aiSummary,
+                riskLevel = data.overallRiskLevel,
+                aiModelVersion = data.aiModelVersion,
+                aiDataCompleteness = data.aiDataCompleteness
+            )
         }
 
         // ═══ Today's Predictions ═══
@@ -218,7 +223,7 @@ private fun DisasterHeader(riskLevel: RiskLevel) {
                     color = Color.White
                 )
                 Text(
-                    text = "Analisis AI Multi-Faktor",
+                    text = "Neural Network + Rule-Based Ensemble",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White.copy(alpha = 0.6f)
                 )
@@ -256,7 +261,12 @@ private fun DisasterHeader(riskLevel: RiskLevel) {
 
 @Suppress("UNUSED_PARAMETER")
 @Composable
-private fun AiSummaryCard(summary: String, riskLevel: RiskLevel) {
+private fun AiSummaryCard(
+    summary: String,
+    riskLevel: RiskLevel,
+    aiModelVersion: String = "",
+    aiDataCompleteness: Double = 0.0
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -266,14 +276,54 @@ private fun AiSummaryCard(summary: String, riskLevel: RiskLevel) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🤖", fontSize = 20.sp)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Ringkasan AI",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🧠", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Analisis Neural Network",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+
+                // AI Model badge
+                if (aiModelVersion.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF00C853).copy(alpha = 0.25f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "AI",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            ),
+                            color = Color(0xFF00E676)
+                        )
+                    }
+                }
+            }
+
+            // Model info row
+            if (aiModelVersion.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AiInfoChip(label = "Model", value = aiModelVersion.substringBefore("-domain"))
+                    AiInfoChip(
+                        label = "Data",
+                        value = "${"%.0f".format(aiDataCompleteness * 100)}%"
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -285,6 +335,28 @@ private fun AiSummaryCard(summary: String, riskLevel: RiskLevel) {
                 lineHeight = 22.sp
             )
         }
+    }
+}
+
+@Composable
+private fun AiInfoChip(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.White.copy(alpha = 0.08f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "$label: ",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.5f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            color = Color.White.copy(alpha = 0.8f)
+        )
     }
 }
 
@@ -368,7 +440,7 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
             Spacer(modifier = Modifier.height(8.dp))
             RiskScoreBar(score = prediction.riskScore, color = riskColor)
 
-            // Confidence
+            // Confidence + AI score
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -380,6 +452,13 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
+                if (prediction.aiRawScore > 0.0) {
+                    Text(
+                        text = "NN: ${"%.0f".format(prediction.aiRawScore * 100)}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF00E676).copy(alpha = 0.7f)
+                    )
+                }
                 Text(
                     text = "Keyakinan: ${"%.0f".format(prediction.confidence * 100)}%",
                     style = MaterialTheme.typography.labelSmall,
@@ -812,11 +891,13 @@ private fun DisasterFooter() {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Analisis menggunakan pendekatan AI multi-faktor (fuzzy-logic scoring) " +
-                    "dengan data dari Open-Meteo (cuaca), Marine API (laut), " +
+                text = "Analisis menggunakan Neural Network (MLP 20→32→16→6) " +
+                    "dengan domain-informed initialization, dikombinasikan " +
+                    "dengan rule-based scoring (ensemble fusion). " +
+                    "Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017). " +
+                    "Data dari Open-Meteo (cuaca), Marine API (laut), " +
                     "dan GloFAS/ECMWF (sungai). " +
-                    "Prakiraan ini bersifat indikatif — selalu ikuti peringatan resmi BMKG " +
-                    "dan pihak berwenang setempat.",
+                    "Prakiraan bersifat indikatif — ikuti peringatan resmi BMKG.",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.4f),
                 lineHeight = 16.sp
@@ -825,7 +906,7 @@ private fun DisasterFooter() {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Sumber: Open-Meteo • GloFAS • ECMWF",
+                text = "AI Engine: MLP-v1.0 • Open-Meteo • GloFAS • ECMWF",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.3f)
             )
