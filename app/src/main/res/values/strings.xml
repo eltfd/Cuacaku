@@ -53,4 +53,6 @@
     <string name="channel_weather_alerts_desc">Notifikasi untuk peringatan cuaca ekstrem</string>
     <string name="channel_daily_forecast">Prakiraan Harian</string>
     <string name="channel_daily_forecast_desc">Notifikasi prakiraan cuaca harian</string>
+    <string name="channel_extreme_emergency">🚨 DARURAT Cuaca Ekstrem</string>
+    <string name="channel_extreme_emergency_desc">Peringatan gawat darurat — getaran kuat, lewati mode senyap. Aktif saat risiko TINGGI atau EKSTREM.</string>
 </resources>

@@ -2,6 +2,7 @@ package com.weather.forecast.worker
 
 import android.content.Context
 import androidx.work.*
+import com.weather.forecast.data.model.RiskLevel
 import com.weather.forecast.data.model.WeatherCondition
 import com.weather.forecast.data.preferences.PreferencesManager
 import com.weather.forecast.data.repository.WeatherRepository
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit
  * - Severe weather alerts
  * - Rain probability alerts
  * - Temperature alerts
+ * - **Weather risk alerts (HIGH → vibration, EXTREME → emergency SOS vibration)**
  */
 class WeatherUpdateWorker(
     context: Context,
@@ -44,8 +46,8 @@ class WeatherUpdateWorker(
                 }
                 preferences.lastLatitude != null && preferences.lastLongitude != null -> {
                     android.location.Location("").apply {
-                        latitude = preferences.lastLatitude!!
-                        longitude = preferences.lastLongitude!!
+                        latitude = preferences.lastLatitude
+                        longitude = preferences.lastLongitude
                     }
                 }
                 else -> null
@@ -59,7 +61,7 @@ class WeatherUpdateWorker(
             val result = weatherRepository.getWeatherData(location.latitude, location.longitude)
             
             result.onSuccess { weatherData ->
-                // Severe weather alert
+                // Severe weather alert (WMO code based)
                 if (preferences.severeWeatherAlert &&
                     WeatherCondition.isSevereWeather(weatherData.current.weatherCode)) {
                     notificationManager.sendSevereWeatherAlert(
@@ -67,6 +69,34 @@ class WeatherUpdateWorker(
                         weatherCode = weatherData.current.weatherCode,
                         description = weatherData.current.weatherCondition.descriptionId
                     )
+                }
+
+                // ── Weather Potential Risk Alert ─────────────────────
+                // Hitung potensi cuaca dari data per jam 24 jam ke depan.
+                // Jika ada risiko HIGH → notif + getar.
+                // Jika ada risiko EXTREME → notif darurat + getar SOS.
+                if (preferences.severeWeatherAlert) {
+                    val potential = weatherData.currentPotential
+                        ?: weatherRepository.calculateCurrentPotential(
+                            weatherData.hourly,
+                            weatherData.current.weatherCode,
+                            weatherData.current.windGusts
+                        )
+
+                    val maxRisk = listOf(
+                        potential.stormRisk,
+                        potential.heavyRainRisk,
+                        potential.hailRisk,
+                        potential.strongWindRisk,
+                        potential.tornadoRisk
+                    ).maxByOrNull { it.ordinal } ?: RiskLevel.LOW
+
+                    if (maxRisk == RiskLevel.HIGH || maxRisk == RiskLevel.EXTREME) {
+                        notificationManager.sendWeatherRiskAlert(
+                            locationName = weatherData.location.name,
+                            potential = potential
+                        )
+                    }
                 }
 
                 // Rain alert

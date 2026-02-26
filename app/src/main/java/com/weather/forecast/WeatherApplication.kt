@@ -3,6 +3,7 @@ package com.weather.forecast
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.media.AudioAttributes
 import android.os.Build
 import com.weather.forecast.notification.NotificationChannels
 
@@ -27,6 +28,7 @@ class WeatherApplication : Application() {
      * Channels:
      * - Weather Alerts: High priority untuk cuaca ekstrem
      * - Daily Forecast: Default priority untuk notifikasi harian
+     * - Extreme Weather Emergency: Max priority, bypass DND, aggressive vibration
      */
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -52,7 +54,38 @@ class WeatherApplication : Application() {
                 description = getString(R.string.channel_daily_forecast_desc)
             }
 
-            notificationManager.createNotificationChannels(listOf(alertChannel, dailyChannel))
+            // Extreme Weather Emergency Channel — Max priority, aggressive vibration
+            // Pola getaran SOS-like: jeda-getar-jeda-getar-jeda-getar…
+            val extremeVibrationPattern = longArrayOf(
+                0, 500, 200, 500, 200, 500,   // 3× getar pendek (S)
+                400, 1000, 200, 1000, 200, 1000, // 3× getar panjang (O)
+                400, 500, 200, 500, 200, 500   // 3× getar pendek (S)
+            )
+
+            val emergencyChannel = NotificationChannel(
+                NotificationChannels.EXTREME_WEATHER_EMERGENCY,
+                getString(R.string.channel_extreme_emergency),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = getString(R.string.channel_extreme_emergency_desc)
+                enableVibration(true)
+                vibrationPattern = extremeVibrationPattern
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setBypassDnd(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setSound(
+                    android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI,
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .build()
+                )
+            }
+
+            notificationManager.createNotificationChannels(
+                listOf(alertChannel, dailyChannel, emergencyChannel)
+            )
         }
     }
 

@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -14,7 +17,10 @@ import com.weather.forecast.MainActivity
 import com.weather.forecast.R
 import com.weather.forecast.data.model.CurrentWeatherData
 import com.weather.forecast.data.model.DailyWeatherData
+import com.weather.forecast.data.model.RiskLevel
+import com.weather.forecast.data.model.WeatherAlert
 import com.weather.forecast.data.model.WeatherCondition
+import com.weather.forecast.data.model.WeatherPotential
 
 /**
  * Weather Notification Manager
@@ -24,14 +30,38 @@ import com.weather.forecast.data.model.WeatherCondition
  * - Severe weather alerts
  * - Rain alerts
  * - Temperature alerts
+ * - **HIGH risk weather alerts (vibration)**
+ * - **EXTREME risk emergency alerts (aggressive SOS vibration + bypass DND)**
  */
 class WeatherNotificationManager(private val context: Context) {
 
     private val notificationManager = NotificationManagerCompat.from(context)
 
+    // ── Vibration patterns ────────────────────────────────────────
+
     /**
-     * Check if notification permission granted (Android 13+)
+     * Pola getar untuk risiko TINGGI — 3× getar tegas
+     * [delay, vibrate, pause, vibrate, pause, vibrate]
      */
+    private val highRiskVibrationPattern = longArrayOf(
+        0, 400, 300, 400, 300, 400
+    )
+
+    /**
+     * Pola getar SOS untuk risiko EKSTREM — panjang & agresif
+     * Meniru sinyal darurat; ponsel bergetar berkali-kali agar user
+     * segera sadar dan mencari perlindungan.
+     *
+     * S (···)  O (–––)  S (···)
+     */
+    private val extremeVibrationPattern = longArrayOf(
+        0, 500, 200, 500, 200, 500,       // S  ···
+        400, 1000, 200, 1000, 200, 1000,   // O  –––
+        400, 500, 200, 500, 200, 500       // S  ···
+    )
+
+    // ── Permission check ─────────────────────────────────────────
+
     fun hasNotificationPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
@@ -43,9 +73,41 @@ class WeatherNotificationManager(private val context: Context) {
         }
     }
 
+    // ── Helpers ──────────────────────────────────────────────────
+
+    private fun getVibrator(): Vibrator {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val mgr = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            mgr.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
     /**
-     * Send daily forecast notification
+     * Trigger vibration with a given pattern.
+     * Repeat = -1 → play once.
+     * Amplitude = max for EXTREME to make it really felt.
      */
+    private fun vibrate(pattern: LongArray, isExtreme: Boolean = false) {
+        val vibrator = getVibrator()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val amplitudes = if (isExtreme) {
+                // All bursts at MAX amplitude
+                IntArray(pattern.size) { VibrationEffect.DEFAULT_AMPLITUDE }
+            } else {
+                IntArray(pattern.size) { VibrationEffect.DEFAULT_AMPLITUDE }
+            }
+            vibrator.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, -1)
+        }
+    }
+
+    // ── Standard notifications ───────────────────────────────────
+
     fun sendDailyForecastNotification(
         locationName: String,
         current: CurrentWeatherData,
@@ -75,9 +137,6 @@ class WeatherNotificationManager(private val context: Context) {
         notificationManager.notify(NotificationIds.DAILY_FORECAST, notification)
     }
 
-    /**
-     * Send severe weather alert notification
-     */
     fun sendSevereWeatherAlert(
         locationName: String,
         weatherCode: Int,
@@ -99,9 +158,6 @@ class WeatherNotificationManager(private val context: Context) {
         notificationManager.notify(NotificationIds.SEVERE_WEATHER, notification)
     }
 
-    /**
-     * Send rain alert notification
-     */
     fun sendRainAlert(
         locationName: String,
         precipitationProbability: Int,
@@ -123,9 +179,6 @@ class WeatherNotificationManager(private val context: Context) {
         notificationManager.notify(NotificationIds.RAIN_ALERT, notification)
     }
 
-    /**
-     * Send temperature alert notification
-     */
     fun sendTemperatureAlert(
         locationName: String,
         temperature: Double,
@@ -147,14 +200,172 @@ class WeatherNotificationManager(private val context: Context) {
         notificationManager.notify(NotificationIds.TEMPERATURE_ALERT, notification)
     }
 
+    // ── Risk-based alerts (HIGH & EXTREME) ───────────────────────
+
     /**
-     * Create notification with common settings
+     * Kirim notifikasi peringatan berdasarkan [WeatherPotential].
+     *
+     * - **HIGH** → channel WEATHER_ALERTS, priority HIGH, vibration 3×
+     * - **EXTREME** → channel EXTREME_WEATHER_EMERGENCY, priority MAX,
+     *   aggressive SOS vibration, fullscreen intent, bypass DND
+     *
+     * Dipanggil oleh [WeatherUpdateWorker] setelah menghitung potensi cuaca.
      */
+    fun sendWeatherRiskAlert(
+        locationName: String,
+        potential: WeatherPotential
+    ) {
+        if (!hasNotificationPermission()) return
+
+        // Tentukan level tertinggi dari semua risiko
+        val maxRisk = listOf(
+            potential.stormRisk,
+            potential.heavyRainRisk,
+            potential.hailRisk,
+            potential.strongWindRisk,
+            potential.tornadoRisk
+        ).maxByOrNull { it.ordinal } ?: return
+
+        // Hanya kirim untuk HIGH & EXTREME
+        if (maxRisk != RiskLevel.HIGH && maxRisk != RiskLevel.EXTREME) return
+
+        // Kumpulkan alert yang relevan (HIGH/EXTREME saja)
+        val relevantAlerts = potential.alerts.filter {
+            it.risk == RiskLevel.HIGH || it.risk == RiskLevel.EXTREME
+        }
+
+        if (relevantAlerts.isEmpty()) return
+
+        when (maxRisk) {
+            RiskLevel.EXTREME -> sendExtremeEmergencyNotification(locationName, relevantAlerts, potential)
+            RiskLevel.HIGH -> sendHighRiskNotification(locationName, relevantAlerts, potential)
+            else -> { /* nothing */ }
+        }
+    }
+
+    /**
+     * Notifikasi risiko TINGGI — getaran tegas, priority HIGH
+     */
+    private fun sendHighRiskNotification(
+        locationName: String,
+        alerts: List<WeatherAlert>,
+        potential: WeatherPotential
+    ) {
+        val alertSummary = alerts.joinToString(", ") { it.descriptionId }
+
+        val title = "⚠️ Peringatan Cuaca Risiko Tinggi"
+        val content = buildString {
+            append("$locationName — ")
+            append(alertSummary)
+            if (potential.maxWindGusts > 0) {
+                append("\nAngin hingga ${potential.maxWindGusts.toInt()} km/h")
+            }
+            append("\nHarap berhati-hati dan pantau perkembangan cuaca.")
+        }
+
+        val notification = createNotification(
+            channelId = NotificationChannels.WEATHER_ALERTS,
+            title = title,
+            content = content,
+            priority = NotificationCompat.PRIORITY_HIGH,
+            category = NotificationCompat.CATEGORY_ALARM,
+            vibrationPattern = highRiskVibrationPattern
+        )
+
+        notificationManager.notify(NotificationIds.HIGH_RISK_ALERT, notification)
+
+        // Trigger vibration manually as extra measure
+        vibrate(highRiskVibrationPattern, isExtreme = false)
+    }
+
+    /**
+     * 🚨 Notifikasi darurat EKSTREM
+     *
+     * - Channel khusus EXTREME_WEATHER_EMERGENCY (IMPORTANCE_MAX, bypass DND)
+     * - Getaran SOS agresif agar user segera sadar
+     * - Full-screen intent → langsung muncul di lock screen
+     * - Informasi singkat & jelas: SEGERA cari perlindungan
+     */
+    private fun sendExtremeEmergencyNotification(
+        locationName: String,
+        alerts: List<WeatherAlert>,
+        potential: WeatherPotential
+    ) {
+        val extremeAlerts = alerts.filter { it.risk == RiskLevel.EXTREME }
+        val highAlerts = alerts.filter { it.risk == RiskLevel.HIGH }
+
+        val alertSummary = (extremeAlerts + highAlerts).joinToString(", ") {
+            "${it.type.labelId} (${it.risk.labelId})"
+        }
+
+        val title = "🚨 DARURAT CUACA EKSTREM"
+        val content = buildString {
+            append("$locationName — SITUASI GAWAT DARURAT\n")
+            append(alertSummary)
+            append("\n")
+            if (potential.maxWindGusts > 0) {
+                append("Angin hingga ${potential.maxWindGusts.toInt()} km/h. ")
+            }
+            if (potential.maxCape > 0) {
+                append("CAPE: ${potential.maxCape.toInt()} J/kg. ")
+            }
+            append("\n⚠️ SEGERA CARI PERLINDUNGAN ATAU MENGUNGSI!")
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("open_weather_alert", true)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            1,  // unique requestCode
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Full-screen intent — shows on lock screen for true emergency feel
+        val fullScreenIntent = PendingIntent.getActivity(
+            context,
+            2,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(
+            context,
+            NotificationChannels.EXTREME_WEATHER_EMERGENCY
+        )
+            .setSmallIcon(R.drawable.ic_weather_splash)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(pendingIntent)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setVibrate(extremeVibrationPattern)
+            .setLights(android.graphics.Color.RED, 500, 200)
+            .setAutoCancel(true)
+            .setOngoing(true) // Tidak bisa di-swipe, harus dibuka
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        notificationManager.notify(NotificationIds.EXTREME_RISK_ALERT, notification)
+
+        // Trigger aggressive vibration explicitly
+        vibrate(extremeVibrationPattern, isExtreme = true)
+    }
+
+    // ── Notification builder ─────────────────────────────────────
+
     private fun createNotification(
         channelId: String,
         title: String,
         content: String,
-        priority: Int
+        priority: Int,
+        category: String? = null,
+        vibrationPattern: LongArray? = null
     ): Notification {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -175,19 +386,19 @@ class WeatherNotificationManager(private val context: Context) {
             .setPriority(priority)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .apply {
+                category?.let { setCategory(it) }
+                vibrationPattern?.let { setVibrate(it) }
+            }
             .build()
     }
 
-    /**
-     * Cancel specific notification
-     */
+    // ── Cancel helpers ───────────────────────────────────────────
+
     fun cancelNotification(notificationId: Int) {
         notificationManager.cancel(notificationId)
     }
 
-    /**
-     * Cancel all weather notifications
-     */
     fun cancelAllNotifications() {
         notificationManager.cancelAll()
     }
