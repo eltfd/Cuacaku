@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Weather Forecast</string>
+    <string name="current_weather">Cuaca Saat Ini</string>
+    <string name="hourly_forecast">Prakiraan Per Jam</string>
+    <string name="daily_forecast">Prakiraan Harian</string>
+    <string name="feels_like">Terasa seperti</string>
+    <string name="humidity">Kelembaban</string>
+    <string name="wind_speed">Kecepatan Angin</string>
+    <string name="pressure">Tekanan</string>
+    <string name="visibility">Jarak Pandang</string>
+    <string name="uv_index">Indeks UV</string>
+    <string name="sunrise">Matahari Terbit</string>
+    <string name="sunset">Matahari Terbenam</string>
+    <string name="loading">Memuat...</string>
+    <string name="error_location">Tidak dapat mendapatkan lokasi</string>
+    <string name="error_network">Tidak ada koneksi internet</string>
+    <string name="error_generic">Terjadi kesalahan</string>
+    <string name="retry">Coba Lagi</string>
+    <string name="settings">Pengaturan</string>
+    <string name="notifications">Notifikasi</string>
+    <string name="enable_notifications">Aktifkan Notifikasi</string>
+    <string name="daily_notification">Notifikasi Harian</string>
+    <string name="severe_weather_alert">Peringatan Cuaca Ekstrem</string>
+    <string name="rain_alert">Peringatan Hujan</string>
+    <string name="temperature_alert">Peringatan Suhu Ekstrem</string>
+    <string name="notification_time">Waktu Notifikasi</string>
+    <string name="units">Satuan</string>
+    <string name="celsius">Celsius (°C)</string>
+    <string name="fahrenheit">Fahrenheit (°F)</string>
+    <string name="kmh">km/jam</string>
+    <string name="mph">mph</string>
+    <string name="location_permission_required">Izin lokasi diperlukan untuk mendapatkan prakiraan cuaca</string>
+    <string name="grant_permission">Berikan Izin</string>
+    <string name="search_location">Cari Lokasi</string>
+    <string name="current_location">Lokasi Saat Ini</string>
+    <string name="last_updated">Terakhir diperbarui</string>
+    
+    <!-- Weather Conditions -->
+    <string name="weather_clear">Cerah</string>
+    <string name="weather_partly_cloudy">Berawan Sebagian</string>
+    <string name="weather_cloudy">Berawan</string>
+    <string name="weather_overcast">Mendung</string>
+    <string name="weather_fog">Berkabut</string>
+    <string name="weather_drizzle">Gerimis</string>
+    <string name="weather_rain">Hujan</string>
+    <string name="weather_heavy_rain">Hujan Lebat</string>
+    <string name="weather_snow">Salju</string>
+    <string name="weather_thunderstorm">Badai Petir</string>
+    
+    <!-- Notification Channel -->
+    <string name="channel_weather_alerts">Peringatan Cuaca</string>
+    <string name="channel_weather_alerts_desc">Notifikasi untuk peringatan cuaca ekstrem</string>
+    <string name="channel_daily_forecast">Prakiraan Harian</string>
+    <string name="channel_daily_forecast_desc">Notifikasi prakiraan cuaca harian</string>
+</resources>

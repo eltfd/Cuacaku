@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#1976D2</color>
+    <color name="primary_variant">#1565C0</color>
+    <color name="secondary">#FF9800</color>
+    <color name="secondary_variant">#F57C00</color>
+    <color name="background">#FAFAFA</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="error">#B00020</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_secondary">#000000</color>
+    <color name="on_background">#000000</color>
+    <color name="on_surface">#000000</color>
+    <color name="on_error">#FFFFFF</color>
+    
+    <!-- Weather condition colors -->
+    <color name="sunny">#FFB300</color>
+    <color name="cloudy">#78909C</color>
+    <color name="rainy">#42A5F5</color>
+    <color name="stormy">#5C6BC0</color>
+    <color name="snowy">#B3E5FC</color>
+    
+    <!-- Gradient colors for weather backgrounds -->
+    <color name="gradient_clear_start">#4FC3F7</color>
+    <color name="gradient_clear_end">#0288D1</color>
+    <color name="gradient_cloudy_start">#90A4AE</color>
+    <color name="gradient_cloudy_end">#546E7A</color>
+    <color name="gradient_rainy_start">#5C6BC0</color>
+    <color name="gradient_rainy_end">#3949AB</color>
+    <color name="gradient_night_start">#1A237E</color>
+    <color name="gradient_night_end">#000051</color>
+</resources>
