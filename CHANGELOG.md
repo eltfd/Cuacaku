@@ -5,6 +5,36 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Ver
 
 ---
 
+## [1.3.0] - 2026-02-26
+
+**Tag:** `v1.3.0`  
+**Release:** https://github.com/eltfd/Cuacaku/releases/tag/v1.3.0  
+**APK:** `app-release.apk` (signed)
+
+### Added — Notifikasi Darurat Cuaca
+- Channel notifikasi baru `EXTREME_WEATHER_EMERGENCY` — bypass Do Not Disturb, suara alarm
+- Notifikasi risiko **TINGGI**: priority HIGH + pola getaran 3× tegas (400ms, 300ms)
+- Notifikasi darurat **EKSTREM**: priority MAX + getaran SOS agresif S(···) O(–––) S(···) ~7 detik
+- Full-screen intent — muncul langsung di lock screen saat darurat
+- Notifikasi ongoing (tidak bisa di-swipe) untuk situasi gawat darurat
+- Lampu LED merah berkedip pada perangkat yang mendukung
+- Pesan tegas: "SEGERA CARI PERLINDUNGAN ATAU MENGUNGSI!"
+
+### Added — Permission & Integrasi
+- Permission `VIBRATE` untuk getaran darurat
+- Permission `USE_FULL_SCREEN_INTENT` untuk tampilan penuh di lock screen
+- `WeatherNotificationManager.sendWeatherRiskAlert()` — otomatis pilih level notifikasi sesuai risiko
+- `WeatherUpdateWorker` — hitung `WeatherPotential` dari data per jam 24 jam, trigger alert jika HIGH/EXTREME
+- Vibrator API eksplisit — SOS pattern untuk darurat, 3× pattern untuk risiko tinggi
+
+### Changed
+- `NotificationChannels.kt` — tambah channel darurat + notification ID baru (HIGH_RISK_ALERT, EXTREME_RISK_ALERT)
+- `WeatherApplication.kt` — buat channel darurat dengan vibration pattern, bypass DND, alarm audio
+- `WeatherNotificationManager.kt` — refactor total + metode baru untuk risk-based alerts
+- `WeatherUpdateWorker.kt` — integrasi weather potential calculation + risk alert dispatch
+
+---
+
 ## [1.2.1] - 2026-02-26
 
 **Tag:** `v1.2.1`  
