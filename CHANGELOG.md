@@ -5,6 +5,44 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Ver
 
 ---
 
+## [1.2.1] - 2026-02-26
+
+**Tag:** `v1.2.1`  
+**Release:** https://github.com/eltfd/Cuacaku/releases/tag/v1.2.1  
+**APK:** `app-release.apk` (signed)
+
+### Added — Potensi Cuaca Ekstrem
+- `WeatherPotential` model — analisis risiko badai petir, hujan lebat, hujan es, angin kencang, puting beliung
+- `RiskLevel` enum — 4 level: Rendah, Sedang, Tinggi, Ekstrem
+- `AlertType` enum — 7 tipe peringatan: Thunderstorm, Heavy Rain, Hail, Strong Wind, Tornado, Snowstorm, Freezing Rain
+- Kalkulasi risiko berdasarkan CAPE (Convective Available Potential Energy), freezing level height, wind shear
+- Potensi cuaca dihitung per hari dan untuk kondisi saat ini (24 jam ke depan)
+
+### Added — Data Cuaca Tambahan
+- API: `cape`, `dew_point_2m`, `freezing_level_height`, `wind_gusts_10m`, `surface_pressure`, `pressure_msl` (hourly)
+- API: `precipitation_hours` (daily)
+- Model: `rain`, `showers`, `snowfall`, `dewPoint`, `cape` di CurrentWeatherData
+- Model: `windDirection`, `windGusts`, `dewPoint`, `cape`, `freezingLevelHeight`, `rain`, `showers`, `snowfall`, `pressure` di HourlyWeatherData
+- Model: `windDirectionDominant`, `rainSum`, `showersSum`, `snowfallSum`, `precipitationHours`, `weatherPotential` di DailyWeatherData
+
+### Added — UI Baru di HomeScreen
+- **WindInfoCard**: Kompas arah angin real-time (Canvas), kecepatan, hembusan, arah lengkap
+- **WeatherPotentialCard**: Grid risiko cuaca (badai, hujan lebat, hujan es, angin, puting beliung, CAPE)
+- **PrecipitationDetailCard**: Detail presipitasi (total, hujan, hujan deras, salju)
+- **WeatherDetailsCard**: Diperluas 2 baris (+ titik embun, hembusan angin, tutupan awan)
+- Peringatan aktif dengan badge risiko berwarna
+- Hourly forecast item: panah arah angin + kecepatan
+- Daily expanded detail: arah & hembusan angin, badge potensi cuaca per hari, kelembaban per jam
+
+### Changed
+- `WeatherApiService.kt` — parameter API diperluas (CAPE, dew point, freezing level, dll)
+- `WeatherResponse.kt` — field baru di CurrentWeather, HourlyForecast, DailyForecast
+- `WeatherData.kt` — field baru + model WeatherPotential, RiskLevel, AlertType, helper functions
+- `WeatherRepository.kt` — kalkulasi weather potential, transform data diperkaya
+- `HomeScreen.kt` — UI diperkaya dengan semua section baru
+
+---
+
 ## [1.2.0] - 2026-02-27
 
 **Tag:** `v1.2.0`  

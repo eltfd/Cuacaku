@@ -60,18 +60,21 @@ interface WeatherApiService {
         // Current weather parameters
         const val CURRENT_PARAMS = "temperature_2m,relative_humidity_2m,apparent_temperature," +
                 "is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover," +
-                "pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m"
+                "pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m," +
+                "dew_point_2m,cape"
 
         // Hourly forecast parameters
         const val HOURLY_PARAMS = "temperature_2m,relative_humidity_2m,apparent_temperature," +
                 "precipitation_probability,precipitation,rain,showers,snowfall,weather_code," +
-                "cloud_cover,visibility,wind_speed_10m,wind_direction_10m,uv_index,is_day"
+                "cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m," +
+                "uv_index,is_day,dew_point_2m,cape,freezing_level_height," +
+                "surface_pressure,pressure_msl"
 
         // Daily forecast parameters
         const val DAILY_PARAMS = "weather_code,temperature_2m_max,temperature_2m_min," +
                 "apparent_temperature_max,apparent_temperature_min,sunrise,sunset," +
                 "uv_index_max,precipitation_sum,rain_sum,showers_sum,snowfall_sum," +
                 "precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max," +
-                "wind_direction_10m_dominant"
+                "wind_direction_10m_dominant,precipitation_hours"
     }
 }

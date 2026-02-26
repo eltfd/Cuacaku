@@ -97,7 +97,12 @@ class WeatherRepository {
                 pressure = c.pressure,
                 cloudCover = c.cloudCover,
                 precipitation = c.precipitation,
-                isDay = c.isDay == 1
+                isDay = c.isDay == 1,
+                rain = c.rain,
+                showers = c.showers,
+                snowfall = c.snowfall,
+                dewPoint = c.dewPoint ?: 0.0,
+                cape = c.cape ?: 0.0
             )
         } ?: createDefaultCurrentWeather()
 
@@ -105,6 +110,13 @@ class WeatherRepository {
         // Kelompokkan semua data per jam berdasarkan tanggal untuk prakiraan harian
         val hourlyByDate = transformAllHourlyDataByDate(response.hourlyForecast)
         val daily = transformDailyData(response.dailyForecast, hourlyByDate)
+
+        // Hitung potensi cuaca saat ini menggunakan data 24 jam ke depan
+        val currentPotential = calculateWeatherPotential(
+            hourlies = hourly,
+            weatherCode = current.weatherCode,
+            windGustsMax = current.windGusts
+        )
 
         return WeatherData(
             location = LocationInfo(
@@ -116,7 +128,8 @@ class WeatherRepository {
             ),
             current = current,
             hourly = hourly,
-            daily = daily
+            daily = daily,
+            currentPotential = currentPotential
         )
     }
 
@@ -155,7 +168,16 @@ class WeatherRepository {
                     windSpeed = hourly.windSpeed.getOrNull(index) ?: 0.0,
                     uvIndex = hourly.uvIndex.getOrNull(index) ?: 0.0,
                     isDay = (hourly.isDay.getOrNull(index) ?: 1) == 1,
-                    visibility = hourly.visibility.getOrNull(index) ?: 0.0
+                    visibility = hourly.visibility.getOrNull(index) ?: 0.0,
+                    windDirection = hourly.windDirection.getOrNull(index) ?: 0,
+                    windGusts = hourly.windGusts?.getOrNull(index) ?: 0.0,
+                    dewPoint = hourly.dewPoint?.getOrNull(index) ?: 0.0,
+                    cape = hourly.cape?.getOrNull(index) ?: 0.0,
+                    freezingLevelHeight = hourly.freezingLevelHeight?.getOrNull(index) ?: 0.0,
+                    rain = hourly.rain.getOrNull(index) ?: 0.0,
+                    showers = hourly.showers.getOrNull(index) ?: 0.0,
+                    snowfall = hourly.snowfall.getOrNull(index) ?: 0.0,
+                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0
                 )
             } catch (e: Exception) {
                 null
@@ -196,7 +218,16 @@ class WeatherRepository {
                     windSpeed = hourly.windSpeed.getOrNull(index) ?: 0.0,
                     uvIndex = hourly.uvIndex.getOrNull(index) ?: 0.0,
                     isDay = (hourly.isDay.getOrNull(index) ?: 1) == 1,
-                    visibility = hourly.visibility.getOrNull(index) ?: 0.0
+                    visibility = hourly.visibility.getOrNull(index) ?: 0.0,
+                    windDirection = hourly.windDirection.getOrNull(index) ?: 0,
+                    windGusts = hourly.windGusts?.getOrNull(index) ?: 0.0,
+                    dewPoint = hourly.dewPoint?.getOrNull(index) ?: 0.0,
+                    cape = hourly.cape?.getOrNull(index) ?: 0.0,
+                    freezingLevelHeight = hourly.freezingLevelHeight?.getOrNull(index) ?: 0.0,
+                    rain = hourly.rain.getOrNull(index) ?: 0.0,
+                    showers = hourly.showers.getOrNull(index) ?: 0.0,
+                    snowfall = hourly.snowfall.getOrNull(index) ?: 0.0,
+                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0
                 )
             } catch (e: Exception) {
                 null
@@ -236,6 +267,7 @@ class WeatherRepository {
             try {
                 val date = java.time.LocalDate.parse(dateStr, dateFormatter)
                 val dayName = date.dayOfWeek.getDisplayName(TextStyle.FULL, locale)
+                val dayHourly = hourlyByDate[dateStr] ?: emptyList()
 
                 DailyWeatherData(
                     date = dateStr,
@@ -253,7 +285,17 @@ class WeatherRepository {
                     precipitationProbabilityMax = daily.precipitationProbabilityMax.getOrNull(index) ?: 0,
                     windSpeedMax = daily.windSpeedMax.getOrNull(index) ?: 0.0,
                     windGustsMax = daily.windGustsMax.getOrNull(index) ?: 0.0,
-                    hourlyForecasts = hourlyByDate[dateStr] ?: emptyList()
+                    windDirectionDominant = daily.windDirectionDominant.getOrNull(index) ?: 0,
+                    rainSum = daily.rainSum.getOrNull(index) ?: 0.0,
+                    showersSum = daily.showersSum.getOrNull(index) ?: 0.0,
+                    snowfallSum = daily.snowfallSum.getOrNull(index) ?: 0.0,
+                    precipitationHours = daily.precipitationHours?.getOrNull(index) ?: 0.0,
+                    weatherPotential = calculateWeatherPotential(
+                        hourlies = dayHourly,
+                        weatherCode = daily.weatherCode.getOrNull(index) ?: 0,
+                        windGustsMax = daily.windGustsMax.getOrNull(index) ?: 0.0
+                    ),
+                    hourlyForecasts = dayHourly
                 )
             } catch (e: Exception) {
                 null
@@ -289,7 +331,182 @@ class WeatherRepository {
             pressure = 0.0,
             cloudCover = 0,
             precipitation = 0.0,
-            isDay = true
+            isDay = true,
+            rain = 0.0,
+            showers = 0.0,
+            snowfall = 0.0,
+            dewPoint = 0.0,
+            cape = 0.0
         )
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Weather Potential Calculation
+    // ──────────────────────────────────────────────────────────
+
+    /**
+     * Menghitung potensi cuaca ekstrem berdasarkan data per jam.
+     *
+     * CAPE (Convective Available Potential Energy):
+     * - 0-300 J/kg → stabil, tanpa badai
+     * - 300-1000 → sedikit tidak stabil, badai terisolasi mungkin
+     * - 1000-2500 → tidak stabil sedang, badai petir kemungkinan besar
+     * - 2500-3500 → sangat tidak stabil, badai hebat mungkin
+     * - >3500 → ekstrem, badai sangat hebat
+     *
+     * Freezing Level + CAPE + Thunderstorm → potensi hujan es
+     * CAPE tinggi + Wind shear tinggi → potensi puting beliung
+     */
+    private fun calculateWeatherPotential(
+        hourlies: List<HourlyWeatherData>,
+        weatherCode: Int,
+        windGustsMax: Double
+    ): WeatherPotential {
+        if (hourlies.isEmpty()) {
+            return WeatherPotential(
+                stormRisk = RiskLevel.LOW,
+                heavyRainRisk = RiskLevel.LOW,
+                hailRisk = RiskLevel.LOW,
+                strongWindRisk = RiskLevel.LOW,
+                tornadoRisk = RiskLevel.LOW
+            )
+        }
+
+        val maxCape = hourlies.maxOf { it.cape }
+        val minFreezingLevel = hourlies.filter { it.freezingLevelHeight > 0 }
+            .minOfOrNull { it.freezingLevelHeight } ?: 5000.0
+        val maxGusts = maxOf(windGustsMax, hourlies.maxOf { it.windGusts })
+        val maxPrecip = hourlies.maxOf { it.precipitation }
+        val maxRain = hourlies.maxOf { it.rain }
+        val hasThunderstormCode = weatherCode in listOf(95, 96, 99) ||
+                hourlies.any { it.weatherCode in listOf(95, 96, 99) }
+        val hasHailCode = weatherCode in listOf(96, 99) ||
+                hourlies.any { it.weatherCode in listOf(96, 99) }
+        val hasHeavyRainCode = weatherCode in listOf(65, 67, 82) ||
+                hourlies.any { it.weatherCode in listOf(65, 67, 82) }
+
+        // Wind shear indicator: difference between max gusts and avg wind speed
+        val avgWindSpeed = hourlies.map { it.windSpeed }.average()
+        val windShear = maxGusts - avgWindSpeed
+
+        // === Storm Risk ===
+        val stormRisk = when {
+            hasThunderstormCode && maxCape > 2500 -> RiskLevel.EXTREME
+            hasThunderstormCode || maxCape > 2500 -> RiskLevel.HIGH
+            maxCape > 1000 -> RiskLevel.MODERATE
+            maxCape > 300 -> RiskLevel.LOW
+            else -> RiskLevel.LOW
+        }
+
+        // === Heavy Rain Risk ===
+        val heavyRainRisk = when {
+            hasHeavyRainCode && maxRain > 20 -> RiskLevel.EXTREME
+            hasHeavyRainCode || maxRain > 15 -> RiskLevel.HIGH
+            maxRain > 5 || maxPrecip > 10 -> RiskLevel.MODERATE
+            maxPrecip > 2 -> RiskLevel.LOW
+            else -> RiskLevel.LOW
+        }
+
+        // === Hail Risk ===
+        // High CAPE + low freezing level + thunderstorm = hail potential
+        val hailRisk = when {
+            hasHailCode -> RiskLevel.EXTREME
+            maxCape > 2000 && minFreezingLevel < 2500 && hasThunderstormCode -> RiskLevel.HIGH
+            maxCape > 1500 && minFreezingLevel < 3000 -> RiskLevel.MODERATE
+            maxCape > 1000 && minFreezingLevel < 3500 -> RiskLevel.LOW
+            else -> RiskLevel.LOW
+        }
+
+        // === Strong Wind Risk ===
+        val strongWindRisk = when {
+            maxGusts > 90 -> RiskLevel.EXTREME   // 90+ km/h = damaging
+            maxGusts > 70 -> RiskLevel.HIGH      // 70+ km/h = very strong
+            maxGusts > 50 -> RiskLevel.MODERATE   // 50+ km/h = strong
+            maxGusts > 35 -> RiskLevel.LOW        // 35+ km/h = moderate
+            else -> RiskLevel.LOW
+        }
+
+        // === Tornado / Puting Beliung Risk ===
+        // Requires: Very high CAPE + significant wind shear + thunderstorm
+        val tornadoRisk = when {
+            maxCape > 3000 && windShear > 40 && hasThunderstormCode -> RiskLevel.EXTREME
+            maxCape > 2500 && windShear > 30 && hasThunderstormCode -> RiskLevel.HIGH
+            maxCape > 2000 && windShear > 25 -> RiskLevel.MODERATE
+            maxCape > 1500 && windShear > 20 -> RiskLevel.LOW
+            else -> RiskLevel.LOW
+        }
+
+        // Build alerts list
+        val alerts = mutableListOf<WeatherAlert>()
+
+        if (stormRisk >= RiskLevel.MODERATE) {
+            alerts.add(WeatherAlert(
+                type = AlertType.THUNDERSTORM,
+                risk = stormRisk,
+                description = "Thunderstorm potential based on CAPE ${maxCape.toInt()} J/kg",
+                descriptionId = "Potensi badai petir berdasarkan CAPE ${maxCape.toInt()} J/kg"
+            ))
+        }
+        if (heavyRainRisk >= RiskLevel.MODERATE) {
+            alerts.add(WeatherAlert(
+                type = AlertType.HEAVY_RAIN,
+                risk = heavyRainRisk,
+                description = "Heavy rain expected, max ${maxRain.toInt()} mm/h",
+                descriptionId = "Hujan lebat diperkirakan, maks ${maxRain.toInt()} mm/jam"
+            ))
+        }
+        if (hailRisk >= RiskLevel.MODERATE) {
+            alerts.add(WeatherAlert(
+                type = AlertType.HAIL,
+                risk = hailRisk,
+                description = "Hail potential with freezing level at ${(minFreezingLevel/1000).toInt()} km",
+                descriptionId = "Potensi hujan es dengan level beku di ${(minFreezingLevel/1000).toInt()} km"
+            ))
+        }
+        if (strongWindRisk >= RiskLevel.MODERATE) {
+            alerts.add(WeatherAlert(
+                type = AlertType.STRONG_WIND,
+                risk = strongWindRisk,
+                description = "Strong wind gusts up to ${maxGusts.toInt()} km/h",
+                descriptionId = "Hembusan angin kencang hingga ${maxGusts.toInt()} km/jam"
+            ))
+        }
+        if (tornadoRisk >= RiskLevel.MODERATE) {
+            alerts.add(WeatherAlert(
+                type = AlertType.TORNADO,
+                risk = tornadoRisk,
+                description = "Tornado/waterspout conditions: CAPE ${maxCape.toInt()}, shear ${windShear.toInt()}",
+                descriptionId = "Kondisi puting beliung: CAPE ${maxCape.toInt()}, geser angin ${windShear.toInt()}"
+            ))
+        }
+        if (hourlies.any { it.snowfall > 0 } && maxGusts > 40) {
+            alerts.add(WeatherAlert(
+                type = AlertType.SNOWSTORM,
+                risk = if (maxGusts > 60) RiskLevel.HIGH else RiskLevel.MODERATE,
+                description = "Snowstorm conditions with wind gusts ${maxGusts.toInt()} km/h",
+                descriptionId = "Kondisi badai salju dengan hembusan angin ${maxGusts.toInt()} km/jam"
+            ))
+        }
+
+        return WeatherPotential(
+            stormRisk = stormRisk,
+            heavyRainRisk = heavyRainRisk,
+            hailRisk = hailRisk,
+            strongWindRisk = strongWindRisk,
+            tornadoRisk = tornadoRisk,
+            maxCape = maxCape,
+            minFreezingLevel = minFreezingLevel,
+            maxWindGusts = maxGusts,
+            maxPrecipitation = maxPrecip,
+            alerts = alerts
+        )
+    }
+
+    /**
+     * Hitung potensi cuaca untuk data saat ini (current weather)
+     * menggunakan data hourly 24 jam ke depan.
+     */
+    fun calculateCurrentPotential(hourlyData: List<HourlyWeatherData>, currentWeatherCode: Int, currentWindGusts: Double): WeatherPotential {
+        return calculateWeatherPotential(hourlyData, currentWeatherCode, currentWindGusts)
     }
 }

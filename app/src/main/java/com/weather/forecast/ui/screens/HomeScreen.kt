@@ -4,12 +4,15 @@ import android.Manifest
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -17,12 +20,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.weather.forecast.data.model.*
@@ -30,6 +41,9 @@ import com.weather.forecast.ui.components.*
 import com.weather.forecast.ui.theme.*
 import com.weather.forecast.ui.viewmodel.WeatherUiState
 import com.weather.forecast.ui.viewmodel.WeatherViewModel
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.sin
 
 /**
  * Home Screen - Main weather display
@@ -41,6 +55,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    @Suppress("UNUSED_VARIABLE")
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
@@ -290,22 +305,42 @@ private fun WeatherContent(
             )
         }
 
-        // Weather Details
+        // Weather Details (2 rows)
         item {
             WeatherDetailsCard(current = weatherData.current)
         }
 
-        // Hourly Forecast
+        // Wind Info Card (compass + detailed wind)
+        item {
+            WindInfoCard(current = weatherData.current)
+        }
+
+        // Weather Potential / Alerts
+        weatherData.currentPotential?.let { potential ->
+            item {
+                WeatherPotentialCard(potential = potential)
+            }
+        }
+
+        // Precipitation Detail
+        if (weatherData.current.precipitation > 0 || weatherData.current.rain > 0 ||
+            weatherData.current.snowfall > 0 || weatherData.current.showers > 0) {
+            item {
+                PrecipitationDetailCard(current = weatherData.current)
+            }
+        }
+
+        // Hourly Forecast (enhanced)
         item {
             HourlyForecastSection(hourlyData = weatherData.hourly)
         }
 
-        // Daily Forecast
+        // Daily Forecast (enhanced with weather potential)
         item {
             DailyForecastSection(dailyData = weatherData.daily)
         }
 
-        // Sun Info (if available)
+        // Sun Info
         weatherData.daily.firstOrNull()?.let { today ->
             item {
                 SunInfoCard(sunrise = today.sunrise, sunset = today.sunset)
@@ -379,27 +414,54 @@ private fun WeatherDetailsCard(current: CurrentWeatherData) {
             containerColor = Color.White.copy(alpha = 0.2f)
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            WeatherDetailItem(
-                icon = Icons.Outlined.WaterDrop,
-                label = "Kelembaban",
-                value = current.humidityFormatted
-            )
-            WeatherDetailItem(
-                icon = Icons.Outlined.Air,
-                label = "Angin",
-                value = current.windSpeedFormatted
-            )
-            WeatherDetailItem(
-                icon = Icons.Outlined.Compress,
-                label = "Tekanan",
-                value = current.pressureFormatted
-            )
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Row 1: Kelembaban, Angin, Tekanan
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                WeatherDetailItem(
+                    icon = Icons.Outlined.WaterDrop,
+                    label = "Kelembaban",
+                    value = current.humidityFormatted
+                )
+                WeatherDetailItem(
+                    icon = Icons.Outlined.Air,
+                    label = "Angin",
+                    value = current.windSpeedFormatted
+                )
+                WeatherDetailItem(
+                    icon = Icons.Outlined.Compress,
+                    label = "Tekanan",
+                    value = current.pressureFormatted
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Divider(color = Color.White.copy(alpha = 0.15f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Row 2: Titik Embun, Hembusan Angin, Tutupan Awan
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                WeatherDetailItem(
+                    icon = Icons.Outlined.Thermostat,
+                    label = "Titik Embun",
+                    value = current.dewPointFormatted
+                )
+                WeatherDetailItem(
+                    icon = Icons.Outlined.Storm,
+                    label = "Hembusan",
+                    value = current.windGustsFormatted
+                )
+                WeatherDetailItem(
+                    icon = Icons.Outlined.Cloud,
+                    label = "Awan",
+                    value = "${current.cloudCover}%"
+                )
+            }
         }
     }
 }
@@ -430,6 +492,421 @@ private fun WeatherDetailItem(
         )
     }
 }
+
+// ──────────────────────────────────────────────────────────
+// Wind Info Card — Compass + Detail
+// ──────────────────────────────────────────────────────────
+
+@Composable
+private fun WindInfoCard(current: CurrentWeatherData) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.2f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Informasi Angin",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Wind Compass
+                Box(
+                    modifier = Modifier.size(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    WindCompass(
+                        windDirection = current.windDirection.toFloat(),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = current.windDirectionText,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${current.windDirection}°",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+
+                // Wind Details
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    WindDetailRow(
+                        label = "Kecepatan",
+                        value = current.windSpeedFormatted,
+                        icon = Icons.Outlined.Speed
+                    )
+                    WindDetailRow(
+                        label = "Hembusan",
+                        value = current.windGustsFormatted,
+                        icon = Icons.Outlined.Storm
+                    )
+                    WindDetailRow(
+                        label = "Arah",
+                        value = current.windDirectionFull,
+                        icon = Icons.Outlined.Navigation
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WindDetailRow(label: String, value: String, icon: ImageVector) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.7f),
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+/**
+ * Custom wind compass using Canvas
+ */
+@Composable
+private fun WindCompass(
+    windDirection: Float,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val centerX = size.width / 2
+        val centerY = size.height / 2
+        val radius = min(centerX, centerY) - 8f
+
+        // Outer circle
+        drawCircle(
+            color = Color.White.copy(alpha = 0.3f),
+            radius = radius,
+            center = Offset(centerX, centerY),
+            style = Stroke(width = 2f)
+        )
+
+        // Tick marks
+        for (i in 0 until 360 step 30) {
+            val isMajor = i % 90 == 0
+            val tickLength = if (isMajor) 12f else 6f
+            val angleRad = Math.toRadians(i.toDouble() - 90)
+            val startR = radius - tickLength
+            drawLine(
+                color = Color.White.copy(alpha = if (isMajor) 0.8f else 0.4f),
+                start = Offset(
+                    centerX + (startR * cos(angleRad)).toFloat(),
+                    centerY + (startR * sin(angleRad)).toFloat()
+                ),
+                end = Offset(
+                    centerX + (radius * cos(angleRad)).toFloat(),
+                    centerY + (radius * sin(angleRad)).toFloat()
+                ),
+                strokeWidth = if (isMajor) 2f else 1f
+            )
+        }
+
+        // Wind direction arrow
+        rotate(degrees = windDirection, pivot = Offset(centerX, centerY)) {
+            val arrowPath = Path().apply {
+                moveTo(centerX, centerY - radius + 18f)  // tip
+                lineTo(centerX - 6f, centerY - radius + 32f)
+                lineTo(centerX + 6f, centerY - radius + 32f)
+                close()
+            }
+            drawPath(arrowPath, color = Color(0xFFFF5252))
+
+            // Arrow line
+            drawLine(
+                color = Color(0xFFFF5252),
+                start = Offset(centerX, centerY - radius + 30f),
+                end = Offset(centerX, centerY),
+                strokeWidth = 3f
+            )
+            // Tail
+            drawLine(
+                color = Color.White.copy(alpha = 0.5f),
+                start = Offset(centerX, centerY),
+                end = Offset(centerX, centerY + radius - 30f),
+                strokeWidth = 2f
+            )
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Weather Potential Card — Risks & Alerts
+// ──────────────────────────────────────────────────────────
+
+@Composable
+private fun WeatherPotentialCard(potential: WeatherPotential) {
+    // Only show if there's at least one non-low risk
+    val hasRisk = potential.stormRisk > RiskLevel.LOW ||
+            potential.heavyRainRisk > RiskLevel.LOW ||
+            potential.hailRisk > RiskLevel.LOW ||
+            potential.strongWindRisk > RiskLevel.LOW ||
+            potential.tornadoRisk > RiskLevel.LOW
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.2f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Potensi Cuaca Ekstrem",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            if (!hasRisk) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Tidak ada potensi cuaca ekstrem saat ini",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+            } else {
+                // Risk indicators grid
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        RiskIndicator("Badai Petir", potential.stormRisk, "⛈")
+                        RiskIndicator("Hujan Lebat", potential.heavyRainRisk, "🌧")
+                        RiskIndicator("Hujan Es", potential.hailRisk, "🧊")
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        RiskIndicator("Angin Kencang", potential.strongWindRisk, "💨")
+                        RiskIndicator("Puting Beliung", potential.tornadoRisk, "🌪")
+                        // CAPE indicator
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.width(100.dp)
+                        ) {
+                            Text(
+                                text = "⚡",
+                                fontSize = 20.sp
+                            )
+                            Text(
+                                text = "CAPE",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                text = "${potential.maxCape.toInt()} J/kg",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Active alerts
+                if (potential.alerts.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Divider(color = Color.White.copy(alpha = 0.15f))
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Peringatan Aktif",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    potential.alerts.forEach { alert ->
+                        AlertItem(alert)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RiskIndicator(label: String, risk: RiskLevel, emoji: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(100.dp)
+    ) {
+        Text(text = emoji, fontSize = 20.sp)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
+        )
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color(risk.colorHex))
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = risk.labelId,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun AlertItem(alert: WeatherAlert) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(alert.risk.colorHex).copy(alpha = 0.2f))
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(Color(alert.risk.colorHex))
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = alert.type.labelId,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = alert.descriptionId,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 11.sp
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color(alert.risk.colorHex))
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = alert.risk.labelId,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Precipitation Detail Card
+// ──────────────────────────────────────────────────────────
+
+@Composable
+private fun PrecipitationDetailCard(current: CurrentWeatherData) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.2f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Detail Presipitasi",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                PrecipItem("Total", "${current.precipitation} mm", "🌧")
+                PrecipItem("Hujan", "${current.rain} mm", "💧")
+                PrecipItem("Hujan Deras", "${current.showers} mm", "⛈")
+                PrecipItem("Salju", "${current.snowfall} cm", "❄️")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrecipItem(label: String, value: String, emoji: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = emoji, fontSize = 20.sp)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.7f)
+        )
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Hourly Forecast (enhanced)
+// ──────────────────────────────────────────────────────────
 
 @Composable
 private fun HourlyForecastSection(hourlyData: List<HourlyWeatherData>) {
@@ -489,6 +966,23 @@ private fun HourlyForecastItem(hourly: HourlyWeatherData) {
                     text = hourly.precipitationProbabilityFormatted,
                     style = MaterialTheme.typography.bodySmall,
                     color = Rainy
+                )
+            }
+            // Wind direction arrow + speed
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.Navigation,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .size(12.dp)
+                        .rotate(hourly.windDirection.toFloat())
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    text = "${hourly.windSpeed.toInt()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f)
                 )
             }
         }
@@ -655,11 +1149,11 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
             .fillMaxWidth()
             .padding(top = 8.dp, bottom = 8.dp)
     ) {
-        // Info ringkas: sunrise, sunset, angin max
+        // Row 1: Sunrise, Sunset, Wind max
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
+                .padding(bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -706,6 +1200,95 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
             }
         }
 
+        // Row 2: Wind Direction, Gusts, Precipitation
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.Navigation,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .size(14.dp)
+                        .rotate(daily.windDirectionDominant.toFloat())
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Angin ${daily.windDirectionText}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.Storm,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Hembusan ${daily.windGustsMax.toInt()} km/h",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+            }
+            if (daily.precipitationSum > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Outlined.WaterDrop,
+                        contentDescription = null,
+                        tint = Rainy,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${daily.precipitationSum} mm",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+
+        // Weather Potential badges (for this day)
+        daily.weatherPotential?.let { potential ->
+            val hasRisk = potential.stormRisk > RiskLevel.LOW ||
+                    potential.heavyRainRisk > RiskLevel.LOW ||
+                    potential.hailRisk > RiskLevel.LOW ||
+                    potential.strongWindRisk > RiskLevel.LOW ||
+                    potential.tornadoRisk > RiskLevel.LOW
+
+            if (hasRisk) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (potential.stormRisk > RiskLevel.LOW) {
+                        DailyRiskBadge("⛈ ${potential.stormRisk.labelId}", potential.stormRisk)
+                    }
+                    if (potential.heavyRainRisk > RiskLevel.LOW) {
+                        DailyRiskBadge("🌧 ${potential.heavyRainRisk.labelId}", potential.heavyRainRisk)
+                    }
+                    if (potential.hailRisk > RiskLevel.LOW) {
+                        DailyRiskBadge("🧊 ${potential.hailRisk.labelId}", potential.hailRisk)
+                    }
+                    if (potential.strongWindRisk > RiskLevel.LOW) {
+                        DailyRiskBadge("💨 ${potential.strongWindRisk.labelId}", potential.strongWindRisk)
+                    }
+                    if (potential.tornadoRisk > RiskLevel.LOW) {
+                        DailyRiskBadge("🌪 ${potential.tornadoRisk.labelId}", potential.tornadoRisk)
+                    }
+                }
+            }
+        }
+
         // Prakiraan per jam — horizontal scroll
         if (daily.hourlyForecasts.isNotEmpty()) {
             Text(
@@ -728,6 +1311,23 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
                 color = Color.White.copy(alpha = 0.5f)
             )
         }
+    }
+}
+
+@Composable
+private fun DailyRiskBadge(text: String, risk: RiskLevel) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color(risk.colorHex).copy(alpha = 0.3f))
+            .padding(horizontal = 6.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White,
+            fontSize = 10.sp
+        )
     }
 }
 
@@ -766,27 +1366,38 @@ private fun DailyHourlyItem(hourly: HourlyWeatherData) {
                 style = MaterialTheme.typography.titleSmall,
                 color = Color.White
             )
-            // Probabilitas hujan (jika > 0)
+            // Probabilitas hujan
             if (hourly.precipitationProbability > 0) {
                 Text(
                     text = hourly.precipitationProbabilityFormatted,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Rainy
+                    color = Rainy,
+                    fontSize = 10.sp
                 )
             }
-            // Kecepatan angin
+            // Kelembaban
+            Text(
+                text = "${hourly.humidity}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 10.sp
+            )
+            // Wind direction arrow + speed
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    Icons.Outlined.Air,
+                    Icons.Outlined.Navigation,
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.size(12.dp)
+                    modifier = Modifier
+                        .size(10.dp)
+                        .rotate(hourly.windDirection.toFloat())
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 Text(
                     text = "${hourly.windSpeed.toInt()}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 10.sp
                 )
             }
         }

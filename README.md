@@ -28,13 +28,32 @@ Aplikasi prakiraan cuaca, kualitas udara, dan kualitas air real-time untuk Andro
 ## ✨ Fitur
 
 ### Cuaca Real-Time
-- ☀️ Kondisi cuaca saat ini (suhu, kelembaban, angin, tekanan)
-- 📊 Prakiraan per jam (24 jam ke depan)
+- ☀️ Kondisi cuaca saat ini (suhu, kelembaban, angin, tekanan, titik embun)
+- 📊 Prakiraan per jam (24 jam ke depan) dengan arah angin
 - 📅 Prakiraan 7 hari dengan detail per jam (tap untuk expand)
 - 🕐 Prakiraan cuaca per jam untuk setiap hari (interval 1 jam)
 - 🌅 Waktu sunrise & sunset
 - 📍 Deteksi lokasi otomatis
 - 🔍 Pencarian lokasi manual
+
+### Potensi Cuaca Ekstrem
+- ⛈️ Analisis risiko badai petir (berdasarkan CAPE)
+- 🌧️ Analisis risiko hujan lebat
+- 🧊 Analisis risiko hujan es (CAPE + freezing level)
+- 💨 Analisis risiko angin kencang (wind gusts)
+- 🌪️ Analisis risiko puting beliung/tornado (CAPE + wind shear)
+- ⚠️ Peringatan cuaca aktif dengan level risiko
+- 📈 Indikator CAPE (Convective Available Potential Energy)
+
+### Informasi Angin Real-Time
+- 🧭 Kompas arah angin visual (Canvas)
+- 💨 Kecepatan angin & hembusan (gusts)
+- 🧭 Arah angin dalam derajat & kardinal (Indonesia)
+
+### Detail Presipitasi
+- 🌧️ Breakdown: total, hujan, hujan deras, salju
+- ❄️ Prakiraan hujan es berdasarkan freezing level
+- ⏱️ Jam hujan per hari
 
 ### Sistem Notifikasi Lengkap
 - 📢 Notifikasi prakiraan harian (pagi)

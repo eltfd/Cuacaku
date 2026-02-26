@@ -12,6 +12,10 @@
 - Real-time weather display
 - Hourly & 7-day forecast
 - Expandable daily forecast with per-hour detail (24h interval)
+- Extreme weather potential analysis (storm, hail, tornado, strong wind)
+- Real-time wind compass (direction, speed, gusts)
+- Precipitation detail (rain, showers, snowfall breakdown)
+- CAPE-based storm/hail/tornado risk calculation
 - Air quality monitoring (AQI, pollutants, UV Index) with hourly & daily forecast
 - Water quality monitoring (marine conditions, river discharge, flood risk)
 - Bottom navigation: Cuaca / Udara / Air
