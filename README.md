@@ -30,7 +30,8 @@ Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data **100% grati
 ### Cuaca Real-Time
 - ☀️ Kondisi cuaca saat ini (suhu, kelembaban, angin, tekanan)
 - 📊 Prakiraan per jam (24 jam ke depan)
-- 📅 Prakiraan 7 hari
+- 📅 Prakiraan 7 hari dengan detail per jam (tap untuk expand)
+- 🕐 Prakiraan cuaca per jam untuk setiap hari (interval 1 jam)
 - 🌅 Waktu sunrise & sunset
 - 📍 Deteksi lokasi otomatis
 - 🔍 Pencarian lokasi manual
@@ -41,6 +42,12 @@ Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data **100% grati
 - 🌧️ Peringatan kemungkinan hujan
 - 🌡️ Peringatan suhu ekstrem
 - 🔔 Background updates setiap 1 jam
+
+### Auto Update
+- 🔄 Pengecekan update otomatis saat aplikasi dibuka
+- 📦 Download & install/update APK langsung dari GitHub Releases
+- 🔀 Android otomatis mendeteksi: UPDATE jika sudah terinstall, INSTALL jika belum
+- 📋 Dialog info versi terbaru, ukuran file, dan catatan rilis
 
 ### UI Modern
 - 🎨 Material Design 3 dengan Jetpack Compose
@@ -139,11 +146,12 @@ app/src/main/java/com/weather/forecast/
 │   ├── api/
 │   │   ├── WeatherApiService.kt    # Open-Meteo API interface
 │   │   ├── GeocodingApiService.kt  # Nominatim API interface
+│   │   ├── GitHubApiService.kt     # GitHub Releases API (auto-update)
 │   │   └── RetrofitClient.kt       # Retrofit configuration
 │   │
 │   ├── model/
 │   │   ├── WeatherResponse.kt      # API response models
-│   │   ├── WeatherData.kt          # UI-ready models
+│   │   ├── WeatherData.kt          # UI-ready models (termasuk hourly per day)
 │   │   ├── WeatherCondition.kt     # WMO weather codes
 │   │   └── GeocodingResponse.kt    # Geocoding models
 │   │
@@ -163,6 +171,9 @@ app/src/main/java/com/weather/forecast/
 ├── service/
 │   └── WeatherUpdateService.kt     # Foreground service
 │
+├── update/
+│   └── AppUpdateManager.kt         # Auto-update via GitHub Releases
+│
 ├── worker/
 │   └── WeatherUpdateWorker.kt      # Background updates
 │
@@ -177,7 +188,8 @@ app/src/main/java/com/weather/forecast/
     │   └── Shape.kt
     │
     ├── components/
-    │   └── WeatherIcon.kt          # Weather icon component
+    │   ├── WeatherIcon.kt          # Weather icon component
+    │   └── UpdateDialog.kt         # Update available dialog
     │
     ├── screens/
     │   ├── HomeScreen.kt           # Main weather screen
@@ -397,7 +409,49 @@ Release APK tersedia di [GitHub Releases](https://github.com/eltfd/Cuacaku/relea
 
 ```bash
 # Download via CLI
-gh release download v1.0.0 -p "app-release.apk"
+gh release download v1.1.0 -p "app-release.apk"
+```
+
+---
+
+## 🔄 Auto Update (In-App)
+
+Aplikasi memiliki sistem update otomatis yang memeriksa versi terbaru di GitHub Releases setiap kali dibuka.
+
+### Cara Kerja
+
+```
+App Launch → GitHub API (releases/latest)
+  → Bandingkan tag_name vs BuildConfig.VERSION_NAME
+  → Jika lebih baru → Tampilkan dialog update
+  → User klik "Update Sekarang"
+  → DownloadManager unduh APK
+  → PackageInstaller install/update
+```
+
+### Install vs Update (Otomatis)
+
+Android **secara otomatis** mendeteksi:
+
+| Kondisi | Hasil |
+|---------|-------|
+| `applicationId` sama + signing key cocok + sudah terinstall | **UPDATE** (data pengguna tetap ada) |
+| Belum pernah diinstall | **INSTALL baru** |
+| Signing key berbeda | **Ditolak** (keamanan Android) |
+
+### Komponen
+
+| File | Fungsi |
+|------|--------|
+| `GitHubApiService.kt` | API interface ke GitHub Releases |
+| `AppUpdateManager.kt` | Logic cek versi, download, install |
+| `UpdateDialog.kt` | UI dialog (Available/Downloading/Ready/Error) |
+| `file_paths.xml` | FileProvider config untuk URI APK |
+
+### Permissions
+
+```xml
+<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 ```
 
 ---
@@ -564,6 +618,7 @@ Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md) untuk solusi masalah umum, termas
 | Releases | https://github.com/eltfd/Cuacaku/releases |
 | CI Runs | https://github.com/eltfd/Cuacaku/actions |
 | Open-Meteo API | https://open-meteo.com/en/docs |
+| GitHub Releases API | https://docs.github.com/en/rest/releases |
 | Nominatim API | https://nominatim.org/release-docs/develop/api/Overview/ |
 | Compose BOM | https://developer.android.com/develop/ui/compose/bom |
 | Material3 | https://m3.material.io |

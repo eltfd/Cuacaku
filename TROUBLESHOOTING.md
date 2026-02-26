@@ -179,6 +179,59 @@ Untuk traceability, berikut urutan fix yang dilakukan selama setup awal CI/CD:
 | 3 | Keystore not found (double path) | Relative path resolved under `app/` module | Use `${{ github.workspace }}` absolute path | `ci: use absolute keystore path` |
 | 4 | "Releases requires a tag" | No `tag_name` in gh-release action | Pass `${{ github.event.inputs.tag }}` | `ci: pass dispatched tag` |
 | 5 | Release 403 Forbidden | `GITHUB_TOKEN` read-only | Add `permissions: contents: write` | `ci: grant contents:write` |
+| 6 | SIGNING_KEY secret "missing" | Base64 via stdin contained newlines/corruption | Use `gh secret set -b "$(...)"` with `tr -d '\n'` | Manual fix via CLI |
+
+---
+
+## 🔄 Auto Update Issues
+
+### 10. Update check gagal (tidak muncul dialog)
+
+**Kemungkinan penyebab:**
+- Tidak ada koneksi internet
+- Repository GitHub di-set private → API mengembalikan 404
+- Tidak ada release di GitHub Releases
+
+**Debug:**
+```bash
+# Cek apakah API bisa diakses
+curl -s https://api.github.com/repos/eltfd/Cuacaku/releases/latest | head -5
+
+# Cek log di device
+adb logcat | grep "AppUpdateManager"
+```
+
+**Catatan:** Jika repo private, GitHub Releases API memerlukan token autentikasi. Pastikan repo public atau tambahkan token di header request.
+
+---
+
+### 11. APK download selesai tapi install gagal
+
+**Symptom:** Download berhasil, tapi tidak muncul dialog install.
+
+**Kemungkinan penyebab:**
+- Permission `REQUEST_INSTALL_PACKAGES` belum diizinkan user
+- FileProvider tidak dikonfigurasi dengan benar
+
+**Fix:**
+1. Pastikan manifest memiliki:
+```xml
+<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+```
+2. Pastikan user mengaktifkan "Install unknown apps" di Settings → Apps → Cuacaku
+3. Cek `res/xml/file_paths.xml` ada dan terdaftar di manifest
+
+---
+
+### 12. Update gagal: "Signing key berbeda"
+
+**Symptom:** Android menolak update dengan pesan "App not installed" atau "Package signatures do not match".
+
+**Cause:** APK baru ditandatangani dengan signing key berbeda dari yang terinstall.
+
+**Fix:**
+- Pastikan semua release menggunakan keystore yang sama
+- Jika keystore hilang, user harus uninstall versi lama terlebih dahulu sebelum install versi baru (data akan hilang)
 
 ---
 

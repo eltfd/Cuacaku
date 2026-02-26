@@ -5,6 +5,43 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Ver
 
 ---
 
+## [1.1.0] - 2026-02-26
+
+**Tag:** `v1.1.0`  
+**Release:** https://github.com/eltfd/Cuacaku/releases/tag/v1.1.0  
+**APK:** `app-release.apk` (signed)
+
+### Added — Prakiraan Per Jam dalam Harian
+- `DailyWeatherData.hourlyForecasts` — setiap item harian sekarang berisi daftar 24 data per jam
+- `WeatherRepository.transformAllHourlyDataByDate()` — mengelompokkan semua data hourly berdasarkan tanggal
+- UI: Section "Prakiraan 7 Hari" sekarang bisa di-expand per hari
+- Tap hari untuk melihat prakiraan per jam (interval 1 jam): icon, suhu, probabilitas hujan, kecepatan angin
+- Info ringkas sunrise, sunset, dan angin max ditampilkan di panel expand
+- Animasi expand/collapse menggunakan `AnimatedVisibility`
+
+### Added — Auto Update via GitHub Releases
+- `GitHubApiService.kt` — API interface untuk mengambil release terbaru dari GitHub
+- `AppUpdateManager.kt` — mengelola pengecekan versi, download APK, dan trigger instalasi
+- `UpdateDialog.kt` — dialog Compose untuk state: Available, Downloading, ReadyToInstall, Error
+- Pengecekan otomatis saat app dibuka via `LaunchedEffect` di `MainActivity`
+- Download APK via Android `DownloadManager` dengan notifikasi progress
+- Install/update otomatis via `PackageInstaller` — Android mendeteksi apakah UPDATE atau INSTALL baru
+- `FileProvider` dikonfigurasi untuk sharing URI APK (Android 7.0+)
+- Permission `REQUEST_INSTALL_PACKAGES` ditambahkan di manifest
+
+### Changed
+- `versionCode` → 2
+- `versionName` → "1.1.0"
+- `MainActivity.kt` — ditambahkan integrasi `AppUpdateManager` dan `UpdateDialog`
+- `AndroidManifest.xml` — ditambahkan `FileProvider` dan permission baru
+
+### Documentation
+- README.md diperbarui: fitur baru, struktur proyek, section Auto Update
+- CHANGELOG.md diperbarui: entry v1.1.0
+- copilot-instructions.md diperbarui: folder dan fitur baru
+
+---
+
 ## [1.0.0] - 2026-02-26
 
 **Tag:** `v1.0.0`  
@@ -75,6 +112,7 @@ These are the incremental CI/CD fixes applied during initial setup. They are par
 
 | Version | Date | Tag | Notes |
 |---------|------|-----|-------|
+| 1.1.0 | 2026-02-26 | `v1.1.0` | Hourly forecast per day + auto-update system |
 | 1.0.0 | 2026-02-26 | `v1.0.0` | Initial release — full weather app with CI/CD |
 
 ---
@@ -85,6 +123,8 @@ These are the incremental CI/CD fixes applied during initial setup. They are par
 - [ ] Multi-location support
 - [ ] Hourly precipitation chart
 - [ ] Air quality index (AQI) from Open-Meteo
+- [x] ~~Hourly forecast detail per day~~ (done in v1.1.0)
+- [x] ~~In-app auto-update~~ (done in v1.1.0)
 - [ ] Localization (English / Bahasa Indonesia toggle)
 - [ ] Unit tests for Repository and ViewModel
 - [ ] Instrumented UI tests with Compose Testing
