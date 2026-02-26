@@ -4,7 +4,7 @@
 [![Release](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml/badge.svg)](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml)
 [![Latest Release](https://img.shields.io/github/v/release/eltfd/Cuacaku)](https://github.com/eltfd/Cuacaku/releases/latest)
 
-Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data **100% gratis dan open source**. Tidak memerlukan API key atau berlangganan apapun.
+Aplikasi prakiraan cuaca, kualitas udara, dan kualitas air real-time untuk Android dengan sumber data **100% gratis dan open source**. Tidak memerlukan API key atau berlangganan apapun.
 
 ## 📋 Daftar Isi
 
@@ -49,8 +49,26 @@ Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data **100% grati
 - 🔀 Android otomatis mendeteksi: UPDATE jika sudah terinstall, INSTALL jika belum
 - 📋 Dialog info versi terbaru, ukuran file, dan catatan rilis
 
+### Pemantauan Kualitas Udara
+- 💨 Indeks Kualitas Udara (AQI) real-time — US EPA & European AQI
+- 🔬 Detail polutan: PM2.5, PM10, O₃, CO, NO₂, SO₂, Debu, Ammonia
+- ☀️ UV Index
+- 📊 Prakiraan kualitas udara per jam (enriched dengan data angin & suhu)
+- 📅 Prakiraan kualitas udara harian (expandable dengan detail per jam)
+- 💡 Rekomendasi kesehatan berdasarkan level AQI
+- 🌬️ Data arah & kecepatan angin terintegrasi dari Weather API
+
+### Pemantauan Kualitas Air
+- 🌊 Kondisi laut real-time: tinggi gelombang, arah, periode
+- 🏄 Data swell (gelombang panjang): tinggi, arah, periode
+- 📊 Prakiraan kondisi laut harian (expandable dengan detail per jam)
+- 🏊 Skala Douglas untuk klasifikasi kondisi laut (8 level)
+- 🏞️ Data debit sungai (river discharge) dari GloFAS/ECMWF
+- ⚠️ Alert risiko banjir: Low, Moderate, High, Very High
+
 ### UI Modern
 - 🎨 Material Design 3 dengan Jetpack Compose
+- 🧭 Bottom Navigation Bar — 3 tab: Cuaca, Udara, Air
 - 🌙 Support dark mode
 - 🌈 Dynamic color (Android 12+)
 - 🔄 Pull-to-refresh
@@ -89,31 +107,31 @@ Aplikasi menggunakan **MVVM (Model-View-ViewModel)** pattern:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                        UI Layer                          │
-│  ┌─────────────────┐  ┌─────────────────┐               │
-│  │   HomeScreen    │  │  SettingsScreen │               │
-│  └────────┬────────┘  └────────┬────────┘               │
-│           │                    │                         │
-│           └──────────┬─────────┘                         │
-│                      ▼                                   │
-│           ┌─────────────────────┐                        │
-│           │   WeatherViewModel  │                        │
-│           └──────────┬──────────┘                        │
-└──────────────────────┼───────────────────────────────────┘
-                       │
-┌──────────────────────┼───────────────────────────────────┐
-│                Data Layer                                │
-│                      ▼                                   │
-│           ┌─────────────────────┐                        │
-│           │  WeatherRepository  │                        │
-│           └──────────┬──────────┘                        │
-│                      │                                   │
-│      ┌───────────────┼───────────────┐                   │
-│      ▼               ▼               ▼                   │
-│  ┌────────┐   ┌────────────┐   ┌───────────┐            │
-│  │ Weather│   │  Geocoding │   │Preferences│            │
-│  │   API  │   │    API     │   │  Manager  │            │
-│  └────────┘   └────────────┘   └───────────┘            │
-└──────────────────────────────────────────────────────────┘
+│  ┌─────────────┐  ┌────────────────┐  ┌──────────────┐  │
+│  │  HomeScreen  │  │AirQualityScreen│  │WaterQuality  │  │
+│  │             │  │                │  │    Screen     │  │
+│  └──────┬──────┘  └───────┬────────┘  └──────┬───────┘  │
+│         │                 │                   │          │
+│         └────────┬────────┴──────────┬────────┘          │
+│                  ▼                   ▼                    │
+│  ┌─────────────────────┐  ┌──────────────────────┐       │
+│  │   WeatherViewModel  │  │ EnvironmentViewModel │       │
+│           └──────────┬──────────┘  └──────────┬──────────┘ │
+│                      │                        │            │
+└──────────────────────┼────────────────────────┼────────────┘
+                       │                        │
+┌──────────────────────┼────────────────────────┼────────────┐
+│                Data Layer                                  │
+│                      ▼                        ▼            │
+│  ┌─────────────────────┐  ┌───────────────────────────┐    │
+│  │  WeatherRepository  │  │ AirQualityRepository      │    │
+│  └──────────┬──────────┘  │ WaterQualityRepository    │    │
+│             │             └────────────┬──────────────┘    │
+│  ┌──────────┼──────────┐  ┌────────────┼──────────────┐    │
+│  ▼          ▼          ▼  ▼            ▼              ▼    │
+│ Weather  Geocoding  Prefs AirQuality Marine        Flood   │
+│  API      API      Mgr    API        API           API     │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -133,6 +151,26 @@ Aplikasi menggunakan **MVVM (Model-View-ViewModel)** pattern:
 - **API Key**: TIDAK DIPERLUKAN
 - **Fitur**: Reverse geocoding & search
 
+### 3. Open-Meteo Air Quality API (Kualitas Udara)
+- **URL**: https://air-quality-api.open-meteo.com
+- **Biaya**: GRATIS
+- **API Key**: TIDAK DIPERLUKAN
+- **Data**: CAMS (Copernicus Atmosphere Monitoring Service)
+- **Parameter**: PM2.5, PM10, O₃, CO, NO₂, SO₂, Debu, Ammonia, UV Index, European AQI, US AQI
+
+### 4. Open-Meteo Marine API (Kondisi Laut)
+- **URL**: https://marine-api.open-meteo.com
+- **Biaya**: GRATIS
+- **API Key**: TIDAK DIPERLUKAN
+- **Parameter**: Wave height/direction/period, Swell height/direction/period
+
+### 5. Open-Meteo Flood API (Debit Sungai)
+- **URL**: https://flood-api.open-meteo.com
+- **Biaya**: GRATIS
+- **API Key**: TIDAK DIPERLUKAN
+- **Data**: GloFAS (ECMWF Global Flood Awareness System)
+- **Parameter**: River discharge (mean, median, max, min)
+
 ---
 
 ## 📁 Struktur Proyek
@@ -144,19 +182,29 @@ app/src/main/java/com/weather/forecast/
 │
 ├── data/
 │   ├── api/
-│   │   ├── WeatherApiService.kt    # Open-Meteo API interface
-│   │   ├── GeocodingApiService.kt  # Nominatim API interface
-│   │   ├── GitHubApiService.kt     # GitHub Releases API (auto-update)
-│   │   └── RetrofitClient.kt       # Retrofit configuration
+│   │   ├── WeatherApiService.kt       # Open-Meteo Weather API
+│   │   ├── GeocodingApiService.kt     # Nominatim API
+│   │   ├── GitHubApiService.kt        # GitHub Releases API
+│   │   ├── AirQualityApiService.kt    # Open-Meteo Air Quality API
+│   │   ├── MarineApiService.kt        # Open-Meteo Marine API
+│   │   ├── FloodApiService.kt         # Open-Meteo Flood API
+│   │   └── RetrofitClient.kt          # Retrofit configuration
 │   │
 │   ├── model/
-│   │   ├── WeatherResponse.kt      # API response models
-│   │   ├── WeatherData.kt          # UI-ready models (termasuk hourly per day)
-│   │   ├── WeatherCondition.kt     # WMO weather codes
-│   │   └── GeocodingResponse.kt    # Geocoding models
+│   │   ├── WeatherResponse.kt         # Weather API response
+│   │   ├── WeatherData.kt             # Weather UI models
+│   │   ├── WeatherCondition.kt        # WMO weather codes
+│   │   ├── GeocodingResponse.kt       # Geocoding models
+│   │   ├── AirQualityResponse.kt      # Air Quality API response
+│   │   ├── AirQualityData.kt          # Air Quality UI models + AqiLevel
+│   │   ├── MarineResponse.kt          # Marine API response
+│   │   ├── FloodResponse.kt           # Flood API response
+│   │   └── WaterQualityData.kt        # Water Quality UI models
 │   │
 │   ├── repository/
-│   │   └── WeatherRepository.kt    # Data source abstraction
+│   │   ├── WeatherRepository.kt       # Weather data source
+│   │   ├── AirQualityRepository.kt    # AQ + wind data enrichment
+│   │   └── WaterQualityRepository.kt  # Marine + Flood data
 │   │
 │   └── preferences/
 │       └── PreferencesManager.kt   # DataStore preferences
@@ -192,14 +240,17 @@ app/src/main/java/com/weather/forecast/
     │   └── UpdateDialog.kt         # Update available dialog
     │
     ├── screens/
-    │   ├── HomeScreen.kt           # Main weather screen
+    │   ├── HomeScreen.kt           # Weather screen
+    │   ├── AirQualityScreen.kt     # Air quality screen
+    │   ├── WaterQualityScreen.kt   # Water quality screen
     │   └── SettingsScreen.kt       # Settings screen
     │
     ├── viewmodel/
-    │   └── WeatherViewModel.kt     # UI state management
+    │   ├── WeatherViewModel.kt     # Weather UI state
+    │   └── EnvironmentViewModel.kt # AQ & Water UI state
     │
     └── navigation/
-        └── Navigation.kt           # Navigation setup
+        └── Navigation.kt           # Bottom nav + routing
 ```
 
 ---

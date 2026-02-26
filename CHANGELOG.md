@@ -5,6 +5,48 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Ver
 
 ---
 
+## [1.2.0] - 2026-02-27
+
+**Tag:** `v1.2.0`  
+**Release:** https://github.com/eltfd/Cuacaku/releases/tag/v1.2.0  
+**APK:** `app-release.apk` (signed)
+
+### Added — Pemantauan Kualitas Udara
+- `AirQualityApiService.kt` — interface ke Open-Meteo Air Quality API (CAMS data)
+- `AirQualityResponse.kt` — model respons API: AQI, PM2.5, PM10, O₃, CO, NO₂, SO₂, UV Index, Dust, Ammonia
+- `AirQualityData.kt` — model UI: `CurrentAirQualityData`, `HourlyAirQualityData`, `DailyAirQualityData`
+- `AqiLevel` enum — 6 level: Good, Moderate, Unhealthy for Sensitive, Unhealthy, Very Unhealthy, Hazardous
+- `AirQualityRepository.kt` — fetch AQ + weather wind data secara paralel, enrichment data angin ke prakiraan AQ
+- `AirQualityScreen.kt` — UI lengkap: AQI summary circle, detail polutan, prakiraan per jam, prakiraan harian (expandable), rekomendasi kesehatan
+
+### Added — Pemantauan Kualitas Air
+- `MarineApiService.kt` — interface ke Open-Meteo Marine API (gelombang, swell)
+- `FloodApiService.kt` — interface ke Open-Meteo Flood API (GloFAS/ECMWF)
+- `MarineResponse.kt` — model respons marine: wave height/direction/period, swell data
+- `FloodResponse.kt` — model respons flood: river discharge (mean, median, max, min)
+- `WaterQualityData.kt` — model UI: `MarineData`, `FloodData`, `SeaCondition` (Douglas Scale), `FloodRisk` (4 level)
+- `WaterQualityRepository.kt` — fetch marine + flood secara paralel, error satu tidak mempengaruhi yang lain
+- `WaterQualityScreen.kt` — UI lengkap: kondisi laut saat ini, prakiraan harian (expandable), data debit sungai
+
+### Added — Bottom Navigation
+- `Navigation.kt` — `Scaffold` + `NavigationBar` dengan 3 tab: Cuaca, Udara, Air
+- State preservation saat berganti tab (saveState/restoreState)
+- `BottomNavItem` enum dengan filled/outlined icon variants
+- `EnvironmentViewModel.kt` — shared ViewModel untuk AirQuality & WaterQuality screens
+
+### Changed
+- `versionCode` → 3
+- `versionName` → "1.2.0"
+- `RetrofitClient.kt` — ditambahkan 3 instance API baru: `airQualityApi`, `marineApi`, `floodApi`
+- `Navigation.kt` — dari simple NavHost menjadi bottom nav tiga tab
+
+### Documentation
+- README.md diperbarui: fitur baru, sumber data baru, arsitektur, struktur proyek
+- CHANGELOG.md diperbarui: entry v1.2.0
+- copilot-instructions.md diperbarui: sumber data, fitur, versi
+
+---
+
 ## [1.1.0] - 2026-02-26
 
 **Tag:** `v1.1.0`  

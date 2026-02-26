@@ -60,4 +60,40 @@ object RetrofitClient {
             .build()
             .create(GeocodingApiService::class.java)
     }
+
+    /**
+     * Air Quality API Service (Open-Meteo Air Quality)
+     */
+    val airQualityApi: AirQualityApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(AirQualityApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(AirQualityApiService::class.java)
+    }
+
+    /**
+     * Marine API Service (Open-Meteo Marine)
+     */
+    val marineApi: MarineApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(MarineApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(MarineApiService::class.java)
+    }
+
+    /**
+     * Flood API Service (Open-Meteo Flood / GloFAS)
+     */
+    val floodApi: FloodApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(FloodApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(FloodApiService::class.java)
+    }
 }
