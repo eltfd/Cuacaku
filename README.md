@@ -1,8 +1,8 @@
-# Weather Forecast App 🌤️
+# Cuacaku 🌤️
 
-[![Android CI](https://github.com/eltfd/weather-forecast-app/actions/workflows/android-ci.yml/badge.svg)](https://github.com/eltfd/weather-forecast-app/actions/workflows/android-ci.yml)
-[![Release](https://github.com/eltfd/weather-forecast-app/actions/workflows/release-sign.yml/badge.svg)](https://github.com/eltfd/weather-forecast-app/actions/workflows/release-sign.yml)
-[![Latest Release](https://img.shields.io/github/v/release/eltfd/weather-forecast-app)](https://github.com/eltfd/weather-forecast-app/releases/latest)
+[![Android CI](https://github.com/eltfd/Cuacaku/actions/workflows/android-ci.yml/badge.svg)](https://github.com/eltfd/Cuacaku/actions/workflows/android-ci.yml)
+[![Release](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml/badge.svg)](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml)
+[![Latest Release](https://img.shields.io/github/v/release/eltfd/Cuacaku)](https://github.com/eltfd/Cuacaku/releases/latest)
 
 Aplikasi prakiraan cuaca real-time untuk Android dengan sumber data **100% gratis dan open source**. Tidak memerlukan API key atau berlangganan apapun.
 
@@ -393,7 +393,7 @@ gh secret set RELEASE_STORE_PASSWORD -b "your-password"
 
 ### Download Release APK
 
-Release APK tersedia di [GitHub Releases](https://github.com/eltfd/weather-forecast-app/releases).
+Release APK tersedia di [GitHub Releases](https://github.com/eltfd/Cuacaku/releases).
 
 ```bash
 # Download via CLI
@@ -560,9 +560,9 @@ Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md) untuk solusi masalah umum, termas
 
 | Resource | Link |
 |----------|------|
-| Repository | https://github.com/eltfd/weather-forecast-app |
-| Releases | https://github.com/eltfd/weather-forecast-app/releases |
-| CI Runs | https://github.com/eltfd/weather-forecast-app/actions |
+| Repository | https://github.com/eltfd/Cuacaku |
+| Releases | https://github.com/eltfd/Cuacaku/releases |
+| CI Runs | https://github.com/eltfd/Cuacaku/actions |
 | Open-Meteo API | https://open-meteo.com/en/docs |
 | Nominatim API | https://nominatim.org/release-docs/develop/api/Overview/ |
 | Compose BOM | https://developer.android.com/develop/ui/compose/bom |

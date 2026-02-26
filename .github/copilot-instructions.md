@@ -1,4 +1,4 @@
-# Weather Forecast App - Development Guidelines
+# Cuacaku - Development Guidelines
 
 ## Project Overview
 - **Type**: Native Android (Kotlin)

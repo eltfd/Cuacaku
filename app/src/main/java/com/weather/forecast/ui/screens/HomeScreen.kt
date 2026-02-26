@@ -146,7 +146,7 @@ private fun WeatherTopBar(
 ) {
     val locationName = when (uiState) {
         is WeatherUiState.Success -> uiState.data.location.name
-        else -> "Weather Forecast"
+        else -> "Cuacaku"
     }
 
     if (showSearchBar) {

@@ -148,7 +148,7 @@ class WeatherUpdateService : Service() {
 
         return NotificationCompat.Builder(this, NotificationChannels.DAILY_FORECAST)
             .setSmallIcon(R.drawable.ic_weather_splash)
-            .setContentTitle("Weather Forecast")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText("Memperbarui data cuaca...")
             .setContentIntent(pendingIntent)
             .setOngoing(true)

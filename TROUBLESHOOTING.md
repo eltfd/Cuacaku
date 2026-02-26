@@ -184,7 +184,7 @@ Untuk traceability, berikut urutan fix yang dilakukan selama setup awal CI/CD:
 
 ## ❓ Masih Error?
 
-1. Cek [GitHub Actions logs](https://github.com/eltfd/weather-forecast-app/actions) untuk CI errors
+1. Cek [GitHub Actions logs](https://github.com/eltfd/Cuacaku/actions) untuk CI errors
 2. Cek `adb logcat` untuk runtime crashes
-3. Buka [issue](https://github.com/eltfd/weather-forecast-app/issues) dengan log error
+3. Buka [issue](https://github.com/eltfd/Cuacaku/issues) dengan log error
 4. Lihat [README.md](README.md) untuk setup lengkap

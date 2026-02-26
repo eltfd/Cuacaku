@@ -8,7 +8,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) + [Semantic Ver
 ## [1.0.0] - 2026-02-26
 
 **Tag:** `v1.0.0`  
-**Release:** https://github.com/eltfd/weather-forecast-app/releases/tag/v1.0.0  
+**Release:** https://github.com/eltfd/Cuacaku/releases/tag/v1.0.0  
 **APK:** `app-release.apk` (~2.0 MB, signed)
 
 ### Added — App Core

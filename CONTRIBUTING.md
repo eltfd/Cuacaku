@@ -1,6 +1,6 @@
 # Contributing
 
-Terima kasih atas minat Anda untuk berkontribusi pada Weather Forecast App! Panduan ini membantu menjaga kualitas dan konsistensi codebase.
+Terima kasih atas minat Anda untuk berkontribusi pada Cuacaku! Panduan ini membantu menjaga kualitas dan konsistensi codebase.
 
 ---
 
@@ -70,8 +70,8 @@ docs: update API reference for weather codes
 
 ### 1. Fork & Clone
 ```bash
-gh repo fork eltfd/weather-forecast-app --clone
-cd weather-forecast-app
+gh repo fork eltfd/Cuacaku --clone
+cd Cuacaku
 ```
 
 ### 2. Create Branch
@@ -188,7 +188,7 @@ Saat mengubah library:
 
 ## ❓ Butuh Bantuan?
 
-- Buka [issue](https://github.com/eltfd/weather-forecast-app/issues) untuk bug report atau feature request
+- Buka [issue](https://github.com/eltfd/Cuacaku/issues) untuk bug report atau feature request
 - Lihat [TROUBLESHOOTING.md](TROUBLESHOOTING.md) untuk solusi masalah umum
 - Cek [README.md](README.md) untuk panduan lengkap
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Weather Forecast</string>
+    <string name="app_name">Cuacaku</string>
     <string name="current_weather">Cuaca Saat Ini</string>
     <string name="hourly_forecast">Prakiraan Per Jam</string>
     <string name="daily_forecast">Prakiraan Harian</string>

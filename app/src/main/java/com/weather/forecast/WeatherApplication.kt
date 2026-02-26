@@ -7,7 +7,7 @@ import android.os.Build
 import com.weather.forecast.notification.NotificationChannels
 
 /**
- * Application class untuk Weather Forecast App
+ * Application class untuk Cuacaku App
  * 
  * Responsibilities:
  * - Initialize notification channels
