@@ -6,6 +6,7 @@ import com.weather.forecast.data.model.RiskLevel
 import com.weather.forecast.data.model.WeatherCondition
 import com.weather.forecast.data.preferences.PreferencesManager
 import com.weather.forecast.data.repository.DisasterRepository
+import com.weather.forecast.data.repository.SeismicRepository
 import com.weather.forecast.data.repository.WeatherRepository
 import com.weather.forecast.location.LocationManager
 import com.weather.forecast.notification.WeatherNotificationManager
@@ -30,6 +31,7 @@ class WeatherUpdateWorker(
 
     private val weatherRepository = WeatherRepository()
     private val disasterRepository = DisasterRepository(context)
+    private val seismicRepository = SeismicRepository(context)
     private val locationManager = LocationManager(context)
     private val notificationManager = WeatherNotificationManager(context)
     private val preferencesManager = PreferencesManager(context)
@@ -152,6 +154,52 @@ class WeatherUpdateWorker(
                     } catch (_: Exception) {
                         // Silently fail — disaster analysis is best-effort
                     }
+                }
+
+                // ── Seismic Monitoring Alert ─────────────────────────
+                // Check for significant earthquakes, tsunami risk,
+                // volcanic activity, and high wave warnings.
+                try {
+                    val seismicResult = seismicRepository.getSeismicMonitorData(
+                        location.latitude,
+                        location.longitude
+                    )
+
+                    seismicResult.onSuccess { seismicData ->
+                        val locationName = weatherData.location.name
+
+                        // Earthquake alerts — nearby M4.0+
+                        seismicData.nearbyEarthquakes
+                            .filter { it.magnitude >= 4.0 }
+                            .maxByOrNull { it.magnitude }
+                            ?.let { eq ->
+                                notificationManager.sendEarthquakeAlert(locationName, eq)
+                            }
+
+                        // Tsunami alerts
+                        if (seismicData.tsunamiRisk.isAtRisk) {
+                            notificationManager.sendTsunamiAlert(
+                                locationName, seismicData.tsunamiRisk
+                            )
+                        }
+
+                        // Volcano alerts — nearby with ADVISORY+
+                        seismicData.volcanicActivity
+                            .filter { it.isNearby && it.alertLevel.level >= 1 }
+                            .maxByOrNull { it.alertLevel.level }
+                            ?.let { volcano ->
+                                notificationManager.sendVolcanoAlert(locationName, volcano)
+                            }
+
+                        // High wave warnings — no vibration
+                        seismicData.highWaveWarning?.let { wave ->
+                            if (wave.warningLevel.level >= 2) {
+                                notificationManager.sendHighWaveAlert(locationName, wave)
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    // Silently fail — seismic monitoring is best-effort
                 }
             }
 

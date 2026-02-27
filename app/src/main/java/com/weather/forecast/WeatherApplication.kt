@@ -130,8 +130,71 @@ class WeatherApplication : Application() {
                 )
             }
 
+            // Earthquake Alerts Channel — seismic activity alerts
+            val earthquakeAlertChannel = NotificationChannel(
+                NotificationChannels.EARTHQUAKE_ALERTS,
+                "Peringatan Gempa / Earthquake Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Peringatan gempa bumi di sekitar lokasi Anda"
+                enableVibration(true)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+            }
+
+            // Tsunami Emergency Channel — bypass DND, SOS vibration
+            val tsunamiEmergencyChannel = NotificationChannel(
+                NotificationChannels.TSUNAMI_EMERGENCY,
+                "Darurat Tsunami / Tsunami Emergency",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Peringatan darurat tsunami — getaran SOS agresif, bypass DND"
+                enableVibration(true)
+                vibrationPattern = extremeVibrationPattern
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setBypassDnd(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setSound(
+                    android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI,
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .build()
+                )
+            }
+
+            // Volcano Alerts Channel
+            val volcanoAlertChannel = NotificationChannel(
+                NotificationChannels.VOLCANO_ALERTS,
+                "Peringatan Gunung Api / Volcano Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Peringatan aktivitas gunung berapi di sekitar lokasi Anda"
+                enableVibration(true)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+            }
+
+            // High Wave Alerts Channel — NO vibration (maritime safety, not disaster)
+            val highWaveAlertChannel = NotificationChannel(
+                NotificationChannels.HIGH_WAVE_ALERTS,
+                "Peringatan Gelombang Tinggi / High Wave Alerts",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Peringatan gelombang tinggi untuk keselamatan pelaut dan nelayan"
+                enableVibration(false)
+                enableLights(true)
+                lightColor = android.graphics.Color.BLUE
+            }
+
             notificationManager.createNotificationChannels(
-                listOf(alertChannel, dailyChannel, emergencyChannel, disasterAlertChannel, disasterEmergencyChannel)
+                listOf(
+                    alertChannel, dailyChannel, emergencyChannel,
+                    disasterAlertChannel, disasterEmergencyChannel,
+                    earthquakeAlertChannel, tsunamiEmergencyChannel,
+                    volcanoAlertChannel, highWaveAlertChannel
+                )
             )
         }
     }

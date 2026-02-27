@@ -22,6 +22,7 @@ import com.weather.forecast.ui.screens.AirQualityScreen
 import com.weather.forecast.ui.screens.DisasterForecastScreen
 import com.weather.forecast.ui.screens.DisasterMonitorScreen
 import com.weather.forecast.ui.screens.HomeScreen
+import com.weather.forecast.ui.screens.SeismicMonitorScreen
 import com.weather.forecast.ui.screens.SettingsScreen
 import com.weather.forecast.ui.screens.WaterQualityScreen
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
@@ -36,6 +37,7 @@ object Routes {
     const val WATER_QUALITY = "water_quality"
     const val DISASTER = "disaster"
     const val DISASTER_MONITOR = "disaster_monitor"
+    const val SEISMIC_MONITOR = "seismic_monitor"
     const val SETTINGS = "settings"
 }
 
@@ -73,8 +75,8 @@ enum class BottomNavItem(
         unselectedIcon = Icons.Outlined.Warning
     ),
     MONITOR(
-        route = Routes.DISASTER_MONITOR,
-        title = "Pantau",
+        route = Routes.SEISMIC_MONITOR,
+        title = "Seismik",
         selectedIcon = Icons.Filled.Radar,
         unselectedIcon = Icons.Outlined.Radar
     )
@@ -99,7 +101,7 @@ fun WeatherNavigation() {
     // Only show bottom bar on main screens (not settings)
     val showBottomBar = currentDestination?.route in listOf(
         Routes.HOME, Routes.AIR_QUALITY, Routes.WATER_QUALITY,
-        Routes.DISASTER, Routes.DISASTER_MONITOR
+        Routes.DISASTER, Routes.DISASTER_MONITOR, Routes.SEISMIC_MONITOR
     )
 
     CompositionLocalProvider(LocalStrings provides strings) {
@@ -117,7 +119,7 @@ fun WeatherNavigation() {
                                 BottomNavItem.AIR_QUALITY -> strings.navAir
                                 BottomNavItem.WATER_QUALITY -> strings.navWater
                                 BottomNavItem.DISASTER -> strings.navDisaster
-                                BottomNavItem.MONITOR -> strings.navMonitor
+                                BottomNavItem.MONITOR -> strings.navSeismic
                             }
 
                             NavigationBarItem(
@@ -178,6 +180,12 @@ fun WeatherNavigation() {
 
                 composable(Routes.DISASTER_MONITOR) {
                     DisasterMonitorScreen(
+                        viewModel = environmentViewModel
+                    )
+                }
+
+                composable(Routes.SEISMIC_MONITOR) {
+                    SeismicMonitorScreen(
                         viewModel = environmentViewModel
                     )
                 }

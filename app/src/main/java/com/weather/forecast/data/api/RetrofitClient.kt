@@ -132,4 +132,28 @@ object RetrofitClient {
             .build()
             .create(EonetApiService::class.java)
     }
+
+    /**
+     * USGS Earthquake Hazards API Service
+     */
+    val earthquakeApi: USGSEarthquakeApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(USGSEarthquakeApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(USGSEarthquakeApiService::class.java)
+    }
+
+    /**
+     * USGS Volcano Alert API Service
+     */
+    val volcanoApi: USGSVolcanoApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(USGSVolcanoApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(USGSVolcanoApiService::class.java)
+    }
 }

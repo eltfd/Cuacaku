@@ -7,11 +7,13 @@ import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.ActiveDisasterMonitor
 import com.weather.forecast.data.model.AirQualityData
 import com.weather.forecast.data.model.DisasterForecast
+import com.weather.forecast.data.model.SeismicMonitorData
 import com.weather.forecast.data.model.WaterQualityData
 import com.weather.forecast.data.preferences.PreferencesManager
 import com.weather.forecast.data.repository.AirQualityRepository
 import com.weather.forecast.data.repository.DisasterMonitorRepository
 import com.weather.forecast.data.repository.DisasterRepository
+import com.weather.forecast.data.repository.SeismicRepository
 import com.weather.forecast.data.repository.WaterQualityRepository
 import com.weather.forecast.location.LocationManager
 import kotlinx.coroutines.flow.*
@@ -43,6 +45,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     private val waterQualityRepository = WaterQualityRepository()
     private val disasterRepository = DisasterRepository(application)
     private val disasterMonitorRepository = DisasterMonitorRepository(application)
+    private val seismicRepository = SeismicRepository(application)
     private val locationManager = LocationManager(application)
     private val preferencesManager = PreferencesManager(application)
 
@@ -61,6 +64,10 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     // Disaster Monitor UI State (active/recovery disasters)
     private val _disasterMonitorState = MutableStateFlow<DisasterMonitorUiState>(DisasterMonitorUiState.Loading)
     val disasterMonitorState: StateFlow<DisasterMonitorUiState> = _disasterMonitorState.asStateFlow()
+
+    // Seismic Monitor UI State (earthquakes, tsunami, volcanoes, waves)
+    private val _seismicState = MutableStateFlow<SeismicUiState>(SeismicUiState.Loading)
+    val seismicState: StateFlow<SeismicUiState> = _seismicState.asStateFlow()
 
     // Track current location for refresh
     private var currentLatitude: Double? = null
@@ -109,6 +116,9 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
 
             // ── Phase 3: Low Priority (heaviest — reverse geocode + ReliefWeb) ──
             launch { loadDisasterMonitorData(location.first, location.second) }
+
+            // ── Phase 4: Seismic monitoring (earthquake, tsunami, volcano) ──
+            launch { loadSeismicData(location.first, location.second) }
         }
     }
 
@@ -184,6 +194,24 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    /**
+     * Load seismic monitoring data (earthquakes, tsunami, volcanoes, waves)
+     */
+    fun loadSeismicData() {
+        viewModelScope.launch {
+            val lat = currentLatitude
+            val lon = currentLongitude
+            if (lat != null && lon != null) {
+                loadSeismicData(lat, lon)
+            } else {
+                val location = getLocation() ?: return@launch
+                currentLatitude = location.first
+                currentLongitude = location.second
+                loadSeismicData(location.first, location.second)
+            }
+        }
+    }
+
     private suspend fun loadAirQualityData(latitude: Double, longitude: Double) {
         _airQualityState.value = AirQualityUiState.Loading
 
@@ -236,6 +264,19 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         }.onFailure { error ->
             _disasterMonitorState.value = DisasterMonitorUiState.Error(
                 message = error.message ?: AppLocaleManager.strings.failedLoadDisasterMonitor
+            )
+        }
+    }
+
+    private suspend fun loadSeismicData(latitude: Double, longitude: Double) {
+        _seismicState.value = SeismicUiState.Loading
+
+        val result = seismicRepository.getSeismicMonitorData(latitude, longitude)
+        result.onSuccess { data ->
+            _seismicState.value = SeismicUiState.Success(data)
+        }.onFailure { error ->
+            _seismicState.value = SeismicUiState.Error(
+                message = error.message ?: AppLocaleManager.strings.failedLoadSeismicData
             )
         }
     }
@@ -310,4 +351,13 @@ sealed class DisasterMonitorUiState {
     data class Success(val data: ActiveDisasterMonitor) : DisasterMonitorUiState()
     data object Empty : DisasterMonitorUiState()
     data class Error(val message: String) : DisasterMonitorUiState()
+}
+
+/**
+ * UI State untuk Seismic Monitor Screen (gempa, tsunami, gunung api, gelombang)
+ */
+sealed class SeismicUiState {
+    data object Loading : SeismicUiState()
+    data class Success(val data: SeismicMonitorData) : SeismicUiState()
+    data class Error(val message: String) : SeismicUiState()
 }

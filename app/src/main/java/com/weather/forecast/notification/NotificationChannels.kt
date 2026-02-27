@@ -16,6 +16,14 @@ object NotificationChannels {
     const val DISASTER_ALERTS = "disaster_alerts"
     /** Channel darurat bencana — EXTREME risk, bypass DND */
     const val DISASTER_EMERGENCY = "disaster_emergency"
+    /** Channel peringatan gempa bumi — seismic alerts */
+    const val EARTHQUAKE_ALERTS = "earthquake_alerts"
+    /** Channel darurat tsunami — bypass DND, SOS vibration */
+    const val TSUNAMI_EMERGENCY = "tsunami_emergency"
+    /** Channel peringatan gunung berapi */
+    const val VOLCANO_ALERTS = "volcano_alerts"
+    /** Channel peringatan gelombang tinggi — NO vibration (maritime safety) */
+    const val HIGH_WAVE_ALERTS = "high_wave_alerts"
 }
 
 /**
@@ -36,5 +44,13 @@ object NotificationIds {
     const val DISASTER_HIGH_ALERT = 1007
     /** Peringatan darurat bencana — EXTREME risk, getaran SOS */
     const val DISASTER_EXTREME_ALERT = 1008
+    /** Peringatan gempa bumi */
+    const val EARTHQUAKE_ALERT = 1009
+    /** Peringatan darurat tsunami — SOS vibration */
+    const val TSUNAMI_EMERGENCY_ALERT = 1010
+    /** Peringatan gunung berapi */
+    const val VOLCANO_ALERT = 1011
+    /** Peringatan gelombang tinggi — no vibration */
+    const val HIGH_WAVE_ALERT = 1012
     const val WEATHER_UPDATE_SERVICE = 2001
 }

@@ -24,6 +24,13 @@ import com.weather.forecast.data.model.WeatherCondition
 import com.weather.forecast.data.model.WeatherPotential
 import com.weather.forecast.data.model.DisasterPrediction
 import com.weather.forecast.data.model.RiskLevel as DisasterRiskLevel
+import com.weather.forecast.data.model.EarthquakeEvent
+import com.weather.forecast.data.model.TsunamiRiskAssessment
+import com.weather.forecast.data.model.TsunamiRiskLevel
+import com.weather.forecast.data.model.VolcanicEvent
+import com.weather.forecast.data.model.VolcanoAlertLevel
+import com.weather.forecast.data.model.HighWaveWarning
+import com.weather.forecast.data.model.WaveWarningLevel
 
 /**
  * Weather Notification Manager
@@ -499,6 +506,201 @@ class WeatherNotificationManager(private val context: Context) {
             .build()
 
         notificationManager.notify(NotificationIds.DISASTER_EXTREME_ALERT, notification)
+        vibrate(extremeVibrationPattern, isExtreme = true)
+    }
+
+    // ── Seismic & volcanic alerts ──────────────────────────────
+
+    /**
+     * Send earthquake alert notification.
+     * Nearby significant earthquakes trigger HIGH priority alerts with vibration.
+     */
+    fun sendEarthquakeAlert(
+        locationName: String,
+        earthquake: EarthquakeEvent
+    ) {
+        if (!hasNotificationPermission()) return
+        if (earthquake.magnitude < 4.0) return
+
+        val s = AppLocaleManager.strings
+        val title = s.notifEarthquakeTitle
+        val content = buildString {
+            append("📳 M${"%.1f".format(earthquake.magnitude)} — ${earthquake.place}\n")
+            append("${s.earthquakeDepth}: ${"%.1f".format(earthquake.depthKm)} km\n")
+            append("${s.distance}: ${"%.0f".format(earthquake.distanceFromUserKm)} km\n")
+            append("${s.intensity}: ${s.localized(earthquake.intensity.label, earthquake.intensity.labelId)}\n")
+            if (earthquake.tsunamiFlag) {
+                append("\n⚠️ ${s.tsunamiPotentialFlag}")
+            }
+        }
+
+        if (earthquake.magnitude >= 7.0 && earthquake.distanceFromUserKm <= 200) {
+            // EXTREME — major earthquake very close
+            sendExtremeSeismicNotification(title, content, "open_earthquake_alert")
+        } else {
+            val notification = createNotification(
+                channelId = NotificationChannels.EARTHQUAKE_ALERTS,
+                title = title,
+                content = content,
+                priority = NotificationCompat.PRIORITY_HIGH,
+                category = NotificationCompat.CATEGORY_ALARM,
+                vibrationPattern = highRiskVibrationPattern
+            )
+            notificationManager.notify(NotificationIds.EARTHQUAKE_ALERT, notification)
+            vibrate(highRiskVibrationPattern, isExtreme = false)
+        }
+    }
+
+    /**
+     * Send tsunami warning notification.
+     * Uses TSUNAMI_EMERGENCY channel with SOS vibration if WARNING level.
+     */
+    fun sendTsunamiAlert(
+        locationName: String,
+        risk: TsunamiRiskAssessment
+    ) {
+        if (!hasNotificationPermission()) return
+        if (risk.riskLevel < TsunamiRiskLevel.ADVISORY) return
+
+        val s = AppLocaleManager.strings
+        val title = when (risk.riskLevel) {
+            TsunamiRiskLevel.WARNING -> s.notifTsunamiWarningTitle
+            TsunamiRiskLevel.WATCH -> s.notifTsunamiWatchTitle
+            else -> s.notifTsunamiAdvisoryTitle
+        }
+
+        val content = buildString {
+            append("🌊 $locationName\n")
+            append("${risk.description}\n")
+            risk.estimatedArrivalMinutes?.let {
+                append("${s.estimatedArrival}: ~$it ${s.minutes}\n")
+            }
+            append("\n${risk.recommendation}")
+        }
+
+        if (risk.riskLevel == TsunamiRiskLevel.WARNING) {
+            sendExtremeSeismicNotification(title, content, "open_tsunami_alert")
+        } else {
+            val notification = createNotification(
+                channelId = NotificationChannels.TSUNAMI_EMERGENCY,
+                title = title,
+                content = content,
+                priority = NotificationCompat.PRIORITY_HIGH,
+                category = NotificationCompat.CATEGORY_ALARM,
+                vibrationPattern = highRiskVibrationPattern
+            )
+            notificationManager.notify(NotificationIds.TSUNAMI_EMERGENCY_ALERT, notification)
+            vibrate(highRiskVibrationPattern, isExtreme = false)
+        }
+    }
+
+    /**
+     * Send volcano alert notification.
+     */
+    fun sendVolcanoAlert(
+        locationName: String,
+        volcano: VolcanicEvent
+    ) {
+        if (!hasNotificationPermission()) return
+        if (volcano.alertLevel < VolcanoAlertLevel.ADVISORY) return
+
+        val s = AppLocaleManager.strings
+        val title = s.notifVolcanoTitle
+        val content = buildString {
+            append("🌋 ${volcano.name}\n")
+            append("${s.alertLevel}: ${s.localized(volcano.alertLevel.label, volcano.alertLevel.labelId)}\n")
+            append("${s.distance}: ${"%.0f".format(volcano.distanceFromUserKm)} km\n")
+            append("${volcano.description.take(150)}")
+        }
+
+        if (volcano.alertLevel == VolcanoAlertLevel.WARNING && volcano.distanceFromUserKm <= 100) {
+            sendExtremeSeismicNotification(title, content, "open_volcano_alert")
+        } else {
+            val notification = createNotification(
+                channelId = NotificationChannels.VOLCANO_ALERTS,
+                title = title,
+                content = content,
+                priority = NotificationCompat.PRIORITY_HIGH,
+                category = NotificationCompat.CATEGORY_ALARM,
+                vibrationPattern = highRiskVibrationPattern
+            )
+            notificationManager.notify(NotificationIds.VOLCANO_ALERT, notification)
+            vibrate(highRiskVibrationPattern, isExtreme = false)
+        }
+    }
+
+    /**
+     * Send high wave warning notification.
+     * Uses DEFAULT priority, NO vibration (not a disaster category).
+     */
+    fun sendHighWaveAlert(
+        locationName: String,
+        warning: HighWaveWarning
+    ) {
+        if (!hasNotificationPermission()) return
+        if (warning.warningLevel <= WaveWarningLevel.CALM) return
+
+        val s = AppLocaleManager.strings
+        val title = s.notifHighWaveTitle
+        val content = buildString {
+            append("🌊 $locationName\n")
+            append("${s.waveHeight}: ${"%.1f".format(warning.maxWaveHeightForecast)} m\n")
+            append("${s.localized(warning.warningLevel.label, warning.warningLevel.labelId)}\n")
+            append(warning.recommendation)
+        }
+
+        // NOTE: No vibration — high waves are maritime safety info, not disaster
+        val notification = createNotification(
+            channelId = NotificationChannels.HIGH_WAVE_ALERTS,
+            title = title,
+            content = content,
+            priority = NotificationCompat.PRIORITY_DEFAULT
+        )
+        notificationManager.notify(NotificationIds.HIGH_WAVE_ALERT, notification)
+    }
+
+    /**
+     * Extreme seismic emergency — SOS vibration, bypass DND, fullscreen intent.
+     */
+    private fun sendExtremeSeismicNotification(
+        title: String,
+        content: String,
+        extraKey: String
+    ) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(extraKey, true)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context, 5, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val fullScreenIntent = PendingIntent.getActivity(
+            context, 6, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(
+            context,
+            NotificationChannels.TSUNAMI_EMERGENCY
+        )
+            .setSmallIcon(R.drawable.ic_weather_splash)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(pendingIntent)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setVibrate(extremeVibrationPattern)
+            .setLights(android.graphics.Color.RED, 500, 200)
+            .setAutoCancel(true)
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        notificationManager.notify(NotificationIds.TSUNAMI_EMERGENCY_ALERT, notification)
         vibrate(extremeVibrationPattern, isExtreme = true)
     }
 

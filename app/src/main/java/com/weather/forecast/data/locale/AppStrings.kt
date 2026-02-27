@@ -852,6 +852,139 @@ class AppStrings(val locale: AppLocale) {
     val seaCondCalm = s("Gelombang < 0.1 m", "Waves < 0.1 m")
     val seaCondVeryHigh = s("Gelombang > 9 m", "Waves > 9 m")
 
+    // ═══════════════════════════════════════════════════════════════
+    //  SEISMIC & VOLCANIC MONITORING STRINGS
+    // ═══════════════════════════════════════════════════════════════
+
+    // ── Navigation / Screen titles ──
+    val navSeismic = s("Seismik", "Seismic")
+    val seismicMonitorTitle = s("Pemantau Seismik", "Seismic Monitor")
+    val earthquakeMonitor = s("Pemantau Gempa", "Earthquake Monitor")
+    val tsunamiMonitor = s("Pemantau Tsunami", "Tsunami Monitor")
+    val volcanoMonitor = s("Pemantau Gunung Api", "Volcano Monitor")
+    val highWaveWarningTitle = s("Peringatan Gelombang", "Wave Warning")
+    val impactAreaTitle = s("Area Terdampak", "Impact Areas")
+
+    // ── Earthquake fields ──
+    val earthquakeDepth = s("Kedalaman", "Depth")
+    val earthquakeMagnitude = s("Magnitudo", "Magnitude")
+    val earthquakeTime = s("Waktu", "Time")
+    val earthquakeDistance = s("Jarak", "Distance")
+    val earthquakeIntensity = s("Intensitas", "Intensity")
+    val earthquakeFelt = s("Terasa oleh", "Felt by")
+    val earthquakePeople = s("orang", "people")
+    val distance = s("Jarak", "Distance")
+    val intensity = s("Intensitas", "Intensity")
+    val alertLevel = s("Level Peringatan", "Alert Level")
+    val nearbyEarthquakes = s("Gempa Terdekat", "Nearby Earthquakes")
+    val significantEarthquakes = s("Gempa Signifikan", "Significant Earthquakes")
+    val recentEarthquakes = s("Gempa Terkini", "Recent Earthquakes")
+    val noEarthquakesDetected = s("Tidak ada gempa terdeteksi", "No earthquakes detected")
+    val earthquakeDetails = s("Detail Gempa", "Earthquake Details")
+    val earthquakeReviewed = s("Diverifikasi", "Reviewed")
+    val earthquakeAutomatic = s("Otomatis", "Automatic")
+    fun earthquakeAgo(time: String) = s("$time yang lalu", "$time ago")
+    val minutesAgo = s("menit", "minutes")
+    val hoursAgo = s("jam", "hours")
+    val daysAgo = s("hari", "days")
+    val justNow = s("Baru saja", "Just now")
+    val estimatedMMI = s("Perkiraan Intensitas MMI di Lokasi Anda", "Estimated MMI Intensity at Your Location")
+    val impactRadius = s("Radius Dampak", "Impact Radius")
+
+    // ── Tsunami ──
+    val tsunamiRisk = s("Risiko Tsunami", "Tsunami Risk")
+    val tsunamiNoRisk = s("Tidak ada risiko tsunami saat ini", "No tsunami risk at this time")
+    val tsunamiNoRiskAdvice = s("Tidak ada gempa bawah laut signifikan terdeteksi", "No significant submarine earthquakes detected")
+    val tsunamiInfoDesc = s("Gempa besar terdeteksi, namun risiko tsunami rendah", "Large earthquake detected, but tsunami risk is low")
+    val tsunamiInfoAdvice = s("Pantau informasi resmi dari BMKG/pihak berwenang", "Monitor official information from authorities")
+    val tsunamiAdvisoryDesc = s("Potensi tsunami ringan terdeteksi dari gempa bawah laut", "Potential minor tsunami detected from submarine earthquake")
+    val tsunamiAdvisoryAdvice = s("Jauhi pantai dan perairan dangkal. Ikuti arahan BMKG", "Stay away from beaches and shallow waters. Follow official guidance")
+    val tsunamiWatchDesc = s("Risiko tsunami SIGNIFIKAN dari gempa bawah laut kuat", "SIGNIFICANT tsunami risk from strong submarine earthquake")
+    val tsunamiWatchAdvice = s("SEGERA jauhi pantai! Menuju ke tempat tinggi. Ikuti jalur evakuasi tsunami", "IMMEDIATELY move away from coast! Head to high ground. Follow tsunami evacuation routes")
+    val tsunamiWarningDesc = s("PERINGATAN TSUNAMI! Gempa sangat kuat di bawah laut terdeteksi", "TSUNAMI WARNING! Very strong submarine earthquake detected")
+    val tsunamiWarningAdvice = s("🚨 EVAKUASI SEGERA ke tempat tinggi! Jangan tunggu peringatan resmi. Setiap detik berharga!", "🚨 EVACUATE IMMEDIATELY to high ground! Don't wait for official warnings. Every second counts!")
+    val tsunamiPotentialFlag = s("USGS menandai potensi tsunami", "USGS flagged tsunami potential")
+    val tsunamiTriggeredBy = s("Dipicu oleh gempa", "Triggered by earthquake")
+    val estimatedArrival = s("Perkiraan Tiba", "Est. Arrival")
+    val minutes = s("menit", "min")
+
+    // ── Tsunami risk factors ──
+    val tsunamiFactorMagnitude = s("Magnitudo Gempa", "Earthquake Magnitude")
+    val tsunamiFactorDepth = s("Kedalaman", "Depth")
+    val tsunamiFactorDistance = s("Jarak dari User", "Distance from User")
+    val tsunamiFactorUSGSFlag = s("Flag Tsunami USGS", "USGS Tsunami Flag")
+    val riskFactors = s("Faktor Risiko", "Risk Factors")
+
+    // ── Volcano ──
+    val volcanoActivity = s("Aktivitas Gunung Api", "Volcanic Activity")
+    val nearbyVolcanoes = s("Gunung Api Terdekat", "Nearby Volcanoes")
+    val volcanoName = s("Nama", "Name")
+    val volcanoElevation = s("Ketinggian", "Elevation")
+    val volcanoLastEruption = s("Erupsi Terakhir", "Last Eruption")
+    val volcanoType = s("Tipe", "Type")
+    val volcanoAlertLevel = s("Level Peringatan", "Alert Level")
+    val volcanoColorCode = s("Kode Warna", "Color Code")
+    val volcanoSource = s("Sumber", "Source")
+    val volcanoNoActivity = s("Tidak ada aktivitas vulkanik signifikan", "No significant volcanic activity")
+    val volcanoNearbyList = s("Gunung api dalam radius 300 km", "Volcanoes within 300 km radius")
+    val volcanoActive = s("Aktif", "Active")
+    val volcanoNormal = s("Normal", "Normal")
+    val volcanoDangerZone = s("Zona Bahaya", "Danger Zone")
+
+    // ── High Wave Warning ──
+    val highWaveWarning = s("Peringatan Gelombang Tinggi", "High Wave Warning")
+    val waveHeight = s("Tinggi Gelombang", "Wave Height")
+    val swellHeight = s("Tinggi Swell", "Swell Height")
+    val maxWaveForecast = s("Maks. Gelombang Prakiraan", "Max. Wave Forecast")
+    val peakWaveTime = s("Waktu Puncak Gelombang", "Peak Wave Time")
+    val waveHighDesc = s("Laut sangat ganas! Gelombang sangat tinggi berbahaya bagi semua kapal", "Extremely rough seas! Very high waves dangerous for all vessels")
+    val waveVeryRoughDesc = s("Laut ganas! Gelombang tinggi, berbahaya untuk kapal kecil", "Rough seas! High waves, dangerous for small vessels")
+    val waveRoughDesc = s("Gelombang cukup tinggi, hati-hati bagi nelayan dan kapal kecil", "Moderate-high waves, caution for fishermen and small boats")
+    val waveModerateDesc = s("Gelombang sedang, kondisi laut cukup aman untuk berlayar", "Moderate waves, sea conditions fairly safe for sailing")
+    val waveCalmDesc = s("Laut tenang, aman untuk berlayar", "Calm seas, safe for sailing")
+    val waveHighAdvice = s("⛔ JANGAN melaut! Semua kapal dianjurkan tetap di pelabuhan", "⛔ DO NOT set sail! All vessels advised to stay in port")
+    val waveVeryRoughAdvice = s("⚠️ Kapal kecil & nelayan DILARANG melaut. Kapal besar berhati-hati", "⚠️ Small vessels & fishermen PROHIBITED from sailing. Large vessels use caution")
+    val waveRoughAdvice = s("Nelayan dan kapal kecil harap berhati-hati. Pantau prakiraan gelombang", "Fishermen and small boats exercise caution. Monitor wave forecast")
+    val waveModerateAdvice = s("Kondisi cukup aman. Tetap pantau prakiraan cuaca laut", "Conditions fairly safe. Continue monitoring marine weather forecast")
+    val waveCalmAdvice = s("Aman untuk berlayar. Selamat melaut!", "Safe for sailing. Have a safe voyage!")
+    val waveHourlyForecast = s("Prakiraan Gelombang Per Jam", "Hourly Wave Forecast")
+    val maritimeSafety = s("🚢 Keselamatan Maritim", "🚢 Maritime Safety")
+    val marineConditions = s("Kondisi Laut", "Marine Conditions")
+
+    // ── Impact Area ──
+    val impactAreas = s("Area Terdampak Bencana", "Disaster Impact Areas")
+    val noImpactAreas = s("Tidak ada area terdampak aktif", "No active impact areas")
+    val impactZones = s("Zona Dampak", "Impact Zones")
+    val userInImpactZone = s("⚠️ Anda berada di zona dampak!", "⚠️ You are in the impact zone!")
+    val userSafeFromImpact = s("✅ Anda di luar zona dampak", "✅ You are outside the impact zone")
+    val viewImpactAreas = s("Lihat Area Terdampak", "View Impact Areas")
+    val totalActiveEvents = s("Total Event Aktif", "Total Active Events")
+    val activeThreats = s("Ancaman Aktif", "Active Threats")
+    val noActiveThreats = s("Tidak ada ancaman aktif", "No active threats")
+
+    // ── Notification titles ──
+    val notifEarthquakeTitle = s("⚠️ Peringatan Gempa Bumi", "⚠️ Earthquake Alert")
+    val notifTsunamiWarningTitle = s("🚨 DARURAT TSUNAMI!", "🚨 TSUNAMI EMERGENCY!")
+    val notifTsunamiWatchTitle = s("⚠️ Siaga Tsunami", "⚠️ Tsunami Watch")
+    val notifTsunamiAdvisoryTitle = s("ℹ️ Peringatan Dini Tsunami", "ℹ️ Tsunami Advisory")
+    val notifVolcanoTitle = s("🌋 Peringatan Gunung Api", "🌋 Volcano Alert")
+    val notifHighWaveTitle = s("🌊 Peringatan Gelombang Tinggi", "🌊 High Wave Warning")
+
+    // ── General ──
+    val lastUpdated = s("Terakhir diperbarui", "Last updated")
+    val loading = s("Memuat...", "Loading...")
+    val failedLoadSeismicData = s("Gagal memuat data seismik", "Failed to load seismic data")
+    val seismicDataNote = s(
+        "Data gempa dari USGS (real-time). Risiko tsunami dihitung dari parameter gempa bawah laut. Data gunung api dari USGS & NASA EONET.",
+        "Earthquake data from USGS (real-time). Tsunami risk calculated from submarine earthquake parameters. Volcano data from USGS & NASA EONET."
+    )
+    val waveDataNote = s(
+        "Data gelombang dari Open-Meteo Marine API. Peringatan ini untuk keselamatan pelaut & nelayan.",
+        "Wave data from Open-Meteo Marine API. This warning is for maritime safety of sailors & fishermen."
+    )
+    val km = s("km", "km")
+    val meters = s("m", "m")
+
     companion object {
         val ID = AppStrings(AppLocale.ID)
         val EN = AppStrings(AppLocale.EN)
