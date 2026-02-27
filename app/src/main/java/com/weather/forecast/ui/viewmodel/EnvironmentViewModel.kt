@@ -3,11 +3,13 @@ package com.weather.forecast.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.weather.forecast.data.model.ActiveDisasterMonitor
 import com.weather.forecast.data.model.AirQualityData
 import com.weather.forecast.data.model.DisasterForecast
 import com.weather.forecast.data.model.WaterQualityData
 import com.weather.forecast.data.preferences.PreferencesManager
 import com.weather.forecast.data.repository.AirQualityRepository
+import com.weather.forecast.data.repository.DisasterMonitorRepository
 import com.weather.forecast.data.repository.DisasterRepository
 import com.weather.forecast.data.repository.WaterQualityRepository
 import com.weather.forecast.location.LocationManager
@@ -29,6 +31,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     private val airQualityRepository = AirQualityRepository()
     private val waterQualityRepository = WaterQualityRepository()
     private val disasterRepository = DisasterRepository(application)
+    private val disasterMonitorRepository = DisasterMonitorRepository(application)
     private val locationManager = LocationManager(application)
     private val preferencesManager = PreferencesManager(application)
 
@@ -43,6 +46,10 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     // Disaster UI State
     private val _disasterState = MutableStateFlow<DisasterUiState>(DisasterUiState.Loading)
     val disasterState: StateFlow<DisasterUiState> = _disasterState.asStateFlow()
+
+    // Disaster Monitor UI State (active/recovery disasters)
+    private val _disasterMonitorState = MutableStateFlow<DisasterMonitorUiState>(DisasterMonitorUiState.Loading)
+    val disasterMonitorState: StateFlow<DisasterMonitorUiState> = _disasterMonitorState.asStateFlow()
 
     // Track current location for refresh
     private var currentLatitude: Double? = null
@@ -74,6 +81,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             launch { loadAirQualityData(location.first, location.second) }
             launch { loadWaterQualityData(location.first, location.second) }
             launch { loadDisasterData(location.first, location.second) }
+            launch { loadDisasterMonitorData(location.first, location.second) }
         }
     }
 
@@ -109,6 +117,24 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
                 currentLatitude = location.first
                 currentLongitude = location.second
                 loadWaterQualityData(location.first, location.second)
+            }
+        }
+    }
+
+    /**
+     * Load disaster monitor data saja
+     */
+    fun loadDisasterMonitorData() {
+        viewModelScope.launch {
+            val lat = currentLatitude
+            val lon = currentLongitude
+            if (lat != null && lon != null) {
+                loadDisasterMonitorData(lat, lon)
+            } else {
+                val location = getLocation() ?: return@launch
+                currentLatitude = location.first
+                currentLongitude = location.second
+                loadDisasterMonitorData(location.first, location.second)
             }
         }
     }
@@ -170,6 +196,23 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    private suspend fun loadDisasterMonitorData(latitude: Double, longitude: Double) {
+        _disasterMonitorState.value = DisasterMonitorUiState.Loading
+
+        val result = disasterMonitorRepository.getActiveDisasters(latitude, longitude)
+        result.onSuccess { data ->
+            if (data.disasters.isEmpty()) {
+                _disasterMonitorState.value = DisasterMonitorUiState.Empty
+            } else {
+                _disasterMonitorState.value = DisasterMonitorUiState.Success(data)
+            }
+        }.onFailure { error ->
+            _disasterMonitorState.value = DisasterMonitorUiState.Error(
+                message = error.message ?: "Gagal memuat data pemantauan bencana"
+            )
+        }
+    }
+
     /**
      * Get location dari GPS atau preferences
      */
@@ -198,6 +241,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             _airQualityState.value = AirQualityUiState.Error("Lokasi tidak tersedia")
             _waterQualityState.value = WaterQualityUiState.Error("Lokasi tidak tersedia")
             _disasterState.value = DisasterUiState.Error("Lokasi tidak tersedia")
+            _disasterMonitorState.value = DisasterMonitorUiState.Error("Lokasi tidak tersedia")
             null
         }
     }
@@ -228,4 +272,14 @@ sealed class DisasterUiState {
     data object Loading : DisasterUiState()
     data class Success(val data: DisasterForecast) : DisasterUiState()
     data class Error(val message: String) : DisasterUiState()
+}
+
+/**
+ * UI State untuk Disaster Monitor Screen (bencana aktif/recovery)
+ */
+sealed class DisasterMonitorUiState {
+    data object Loading : DisasterMonitorUiState()
+    data class Success(val data: ActiveDisasterMonitor) : DisasterMonitorUiState()
+    data object Empty : DisasterMonitorUiState()
+    data class Error(val message: String) : DisasterMonitorUiState()
 }

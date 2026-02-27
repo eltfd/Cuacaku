@@ -96,4 +96,16 @@ object RetrofitClient {
             .build()
             .create(FloodApiService::class.java)
     }
+
+    /**
+     * ReliefWeb API Service (UN OCHA Disaster Data)
+     */
+    val reliefWebApi: ReliefWebApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(ReliefWebApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ReliefWebApiService::class.java)
+    }
 }
