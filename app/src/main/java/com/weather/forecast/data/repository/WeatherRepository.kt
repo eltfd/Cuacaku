@@ -57,6 +57,12 @@ class WeatherRepository {
             val response = geocodingApi.reverseGeocode(latitude, longitude)
             val name = response.address?.getLocationName() ?: "Unknown"
             val fullName = response.address?.getFullLocation() ?: response.displayName
+
+            // Update app locale based on detected country
+            response.address?.countryCode?.let { countryCode ->
+                com.weather.forecast.data.locale.AppLocaleManager.updateCountry(countryCode)
+            }
+
             Pair(name, fullName)
         } catch (e: Exception) {
             Pair("Lat: $latitude", "Lon: $longitude")

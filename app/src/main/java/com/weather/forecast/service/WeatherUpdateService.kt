@@ -8,6 +8,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.weather.forecast.MainActivity
 import com.weather.forecast.R
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.WeatherCondition
 import com.weather.forecast.data.preferences.PreferencesManager
 import com.weather.forecast.data.repository.WeatherRepository
@@ -87,7 +88,10 @@ class WeatherUpdateService : Service() {
                     notificationManager.sendSevereWeatherAlert(
                         locationName = weatherData.location.name,
                         weatherCode = weatherData.current.weatherCode,
-                        description = weatherData.current.weatherCondition.descriptionId
+                        description = AppLocaleManager.strings.localized(
+                            weatherData.current.weatherCondition.description,
+                            weatherData.current.weatherCondition.descriptionId
+                        )
                     )
                 }
 
@@ -149,7 +153,7 @@ class WeatherUpdateService : Service() {
         return NotificationCompat.Builder(this, NotificationChannels.DAILY_FORECAST)
             .setSmallIcon(R.drawable.ic_weather_splash)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText("Memperbarui data cuaca...")
+            .setContentText(AppLocaleManager.strings.notifUpdatingWeather)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()

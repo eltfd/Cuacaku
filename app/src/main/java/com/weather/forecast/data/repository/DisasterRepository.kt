@@ -7,6 +7,7 @@ import com.weather.forecast.data.ai.DisasterNeuralNetwork
 import com.weather.forecast.data.ai.IncrementalLearningEngine
 import com.weather.forecast.data.ai.WeatherFeatureExtractor
 import com.weather.forecast.data.api.RetrofitClient
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.*
 import kotlinx.coroutines.*
 import java.time.LocalDate
@@ -96,7 +97,7 @@ class DisasterRepository(context: Context) {
 
                 if (weather == null) {
                     return@withContext Result.failure(
-                        Exception("Gagal memuat data cuaca untuk analisis bencana")
+                        Exception(AppLocaleManager.strings.failedLoadDisasterForecast)
                     )
                 }
 

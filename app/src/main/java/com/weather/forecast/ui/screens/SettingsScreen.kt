@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.ui.viewmodel.WeatherViewModel
 
 /**
@@ -26,6 +27,7 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val preferences by viewModel.userPreferences.collectAsState()
+    val s = LocalStrings.current
 
     // Notification permission for Android 13+
     val notificationPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -37,7 +39,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Pengaturan") },
+                title = { Text(s.settingsTitle) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -53,11 +55,11 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             // Notification Settings Section
-            SettingsSection(title = "Notifikasi") {
+            SettingsSection(title = s.notifications) {
                 // Master notification toggle
                 SwitchSettingItem(
-                    title = "Aktifkan Notifikasi",
-                    subtitle = "Izinkan aplikasi mengirim notifikasi cuaca",
+                    title = s.enableNotifications,
+                    subtitle = s.enableNotificationsDesc,
                     checked = preferences.notificationsEnabled,
                     onCheckedChange = { enabled ->
                         if (enabled && notificationPermission != null && !notificationPermission.status.isGranted) {
@@ -72,8 +74,8 @@ fun SettingsScreen(
 
                     // Daily forecast notification
                     SwitchSettingItem(
-                        title = "Notifikasi Harian",
-                        subtitle = "Terima prakiraan cuaca setiap pagi",
+                        title = s.dailyForecast,
+                        subtitle = s.dailyForecastDesc,
                         checked = preferences.dailyNotificationEnabled,
                         onCheckedChange = { 
                             viewModel.updateNotificationSettings(dailyEnabled = it)
@@ -84,8 +86,8 @@ fun SettingsScreen(
 
                     // Severe weather alert
                     SwitchSettingItem(
-                        title = "Peringatan Cuaca Ekstrem",
-                        subtitle = "Notifikasi saat cuaca berbahaya (badai, hujan lebat)",
+                        title = s.severeWeatherAlert,
+                        subtitle = s.severeWeatherAlertDesc,
                         checked = preferences.severeWeatherAlert,
                         onCheckedChange = {
                             viewModel.updateNotificationSettings(severeWeatherAlert = it)
@@ -96,8 +98,8 @@ fun SettingsScreen(
 
                     // Rain alert
                     SwitchSettingItem(
-                        title = "Peringatan Hujan",
-                        subtitle = "Notifikasi saat kemungkinan hujan tinggi",
+                        title = s.rainAlert,
+                        subtitle = s.rainAlertDesc,
                         checked = preferences.rainAlert,
                         onCheckedChange = {
                             viewModel.updateNotificationSettings(rainAlert = it)
@@ -108,8 +110,8 @@ fun SettingsScreen(
 
                     // Temperature alert
                     SwitchSettingItem(
-                        title = "Peringatan Suhu Ekstrem",
-                        subtitle = "Notifikasi saat suhu sangat tinggi atau rendah",
+                        title = s.extremeTempAlert,
+                        subtitle = s.extremeTempAlertDesc,
                         checked = preferences.temperatureAlert,
                         onCheckedChange = {
                             viewModel.updateNotificationSettings(temperatureAlert = it)
@@ -121,23 +123,23 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // About Section
-            SettingsSection(title = "Tentang") {
+            SettingsSection(title = s.about) {
                 InfoItem(
-                    title = "Sumber Data",
-                    subtitle = "Open-Meteo API (Gratis, tanpa API key)"
+                    title = s.dataSource,
+                    subtitle = s.openMeteoDesc
                 )
                 
                 Divider(modifier = Modifier.padding(horizontal = 16.dp))
                 
                 InfoItem(
-                    title = "Geocoding",
-                    subtitle = "Nominatim / OpenStreetMap (Gratis)"
+                    title = s.geocoding,
+                    subtitle = s.nominatimDesc
                 )
                 
                 Divider(modifier = Modifier.padding(horizontal = 16.dp))
                 
                 InfoItem(
-                    title = "Versi Aplikasi",
+                    title = s.appVersion,
                     subtitle = "1.0.0"
                 )
             }

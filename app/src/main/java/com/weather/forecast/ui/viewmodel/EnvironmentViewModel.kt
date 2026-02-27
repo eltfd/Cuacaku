@@ -3,6 +3,7 @@ package com.weather.forecast.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.ActiveDisasterMonitor
 import com.weather.forecast.data.model.AirQualityData
 import com.weather.forecast.data.model.DisasterForecast
@@ -191,7 +192,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             _airQualityState.value = AirQualityUiState.Success(data)
         }.onFailure { error ->
             _airQualityState.value = AirQualityUiState.Error(
-                message = error.message ?: "Failed to load air quality data"
+                message = error.message ?: AppLocaleManager.strings.failedLoadAirQuality
             )
         }
     }
@@ -204,7 +205,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             _waterQualityState.value = WaterQualityUiState.Success(data)
         }.onFailure { error ->
             _waterQualityState.value = WaterQualityUiState.Error(
-                message = error.message ?: "Failed to load water quality data"
+                message = error.message ?: AppLocaleManager.strings.failedLoadWaterQuality
             )
         }
     }
@@ -217,7 +218,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             _disasterState.value = DisasterUiState.Success(data)
         }.onFailure { error ->
             _disasterState.value = DisasterUiState.Error(
-                message = error.message ?: "Failed to load disaster forecast"
+                message = error.message ?: AppLocaleManager.strings.failedLoadDisasterForecast
             )
         }
     }
@@ -234,7 +235,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             }
         }.onFailure { error ->
             _disasterMonitorState.value = DisasterMonitorUiState.Error(
-                message = error.message ?: "Failed to load disaster monitoring data"
+                message = error.message ?: AppLocaleManager.strings.failedLoadDisasterMonitor
             )
         }
     }
@@ -264,10 +265,11 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         return if (prefs.lastLatitude != null && prefs.lastLongitude != null) {
             Pair(prefs.lastLatitude, prefs.lastLongitude)
         } else {
-            _airQualityState.value = AirQualityUiState.Error("Location not available")
-            _waterQualityState.value = WaterQualityUiState.Error("Location not available")
-            _disasterState.value = DisasterUiState.Error("Location not available")
-            _disasterMonitorState.value = DisasterMonitorUiState.Error("Location not available")
+            val msg = AppLocaleManager.strings.locationNotAvailable
+            _airQualityState.value = AirQualityUiState.Error(msg)
+            _waterQualityState.value = WaterQualityUiState.Error(msg)
+            _disasterState.value = DisasterUiState.Error(msg)
+            _disasterMonitorState.value = DisasterMonitorUiState.Error(msg)
             null
         }
     }

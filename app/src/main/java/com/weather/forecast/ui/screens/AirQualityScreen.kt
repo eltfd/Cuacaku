@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
 import com.weather.forecast.ui.viewmodel.AirQualityUiState
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
@@ -65,7 +66,7 @@ private fun AqLoadingContent() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Memuat data kualitas udara...")
+            Text(LocalStrings.current.loadingAirQuality)
         }
     }
 }
@@ -92,7 +93,7 @@ private fun AqErrorContent(message: String, onRetry: () -> Unit) {
             Button(onClick = onRetry) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Coba Lagi")
+                Text(LocalStrings.current.retry)
             }
         }
     }
@@ -150,8 +151,9 @@ private fun AqiSummaryCard(current: CurrentAirQualityData) {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        val s = LocalStrings.current
         Text(
-            text = "Kualitas Udara",
+            text = s.airQuality,
             style = MaterialTheme.typography.titleMedium,
             color = Color.White.copy(alpha = 0.8f)
         )
@@ -187,7 +189,7 @@ private fun AqiSummaryCard(current: CurrentAirQualityData) {
 
         // AQI Level label
         Text(
-            text = current.aqiLevel.labelId,
+            text = s.localized(current.aqiLevel.label, current.aqiLevel.labelId),
             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
             color = Color.White
         )
@@ -195,7 +197,7 @@ private fun AqiSummaryCard(current: CurrentAirQualityData) {
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = current.aqiLevel.descriptionId,
+            text = s.localized(current.aqiLevel.description, current.aqiLevel.descriptionId),
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White.copy(alpha = 0.8f),
             textAlign = TextAlign.Center,
@@ -239,8 +241,9 @@ private fun PollutantDetailsCard(current: CurrentAirQualityData) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val s = LocalStrings.current
             Text(
-                text = "Detail Polutan",
+                text = s.pollutantDetail,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -275,7 +278,7 @@ private fun PollutantDetailsCard(current: CurrentAirQualityData) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    PollutantItem(label = "Debu", value = current.dustFormatted, icon = Icons.Outlined.Air)
+                    PollutantItem(label = LocalStrings.current.dust, value = current.dustFormatted, icon = Icons.Outlined.Air)
                 }
             }
         }
@@ -325,7 +328,7 @@ private fun HourlyAqiForecastSection(hourlyData: List<HourlyAirQualityData>) {
             .padding(vertical = 8.dp)
     ) {
         Text(
-            text = "Prakiraan AQI Per Jam",
+            text = LocalStrings.current.hourlyAQIForecast,
             style = MaterialTheme.typography.titleMedium,
             color = Color.White,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -399,7 +402,7 @@ private fun HourlyAqiItem(data: HourlyAirQualityData) {
                     color = Color.White.copy(alpha = 0.6f)
                 )
                 Text(
-                    text = data.windDirectionText,
+                    text = LocalStrings.current.windDirectionShort(data.windDirection),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
@@ -422,7 +425,7 @@ private fun DailyAqiForecastSection(dailyData: List<DailyAirQualityData>) {
             .padding(vertical = 8.dp)
     ) {
         Text(
-            text = "Prakiraan Kualitas Udara Harian",
+            text = LocalStrings.current.dailyAirQualityForecast,
             style = MaterialTheme.typography.titleMedium,
             color = Color.White,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -504,9 +507,10 @@ private fun DailyAqiItem(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // Expand arrow
+                val s = LocalStrings.current
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Tutup" else "Buka",
+                    contentDescription = if (isExpanded) s.close else s.open,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier
                         .size(24.dp)
@@ -538,6 +542,7 @@ private fun DailyAqiDetailContent(data: DailyAirQualityData) {
         )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            val s = LocalStrings.current
             // Summary row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -557,7 +562,7 @@ private fun DailyAqiDetailContent(data: DailyAirQualityData) {
                 }
                 if (data.avgWindSpeed > 0) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Angin", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                        Text(s.wind, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                         Text("${data.avgWindSpeed.toInt()} km/h", style = MaterialTheme.typography.bodyMedium, color = Color.White)
                     }
                 }
@@ -568,7 +573,7 @@ private fun DailyAqiDetailContent(data: DailyAirQualityData) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Per Jam",
+                    text = s.hourly,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f),
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -621,6 +626,7 @@ private fun HourlyAqiCompactItem(data: HourlyAirQualityData) {
 
 @Composable
 private fun HealthRecommendationCard(aqiLevel: AqiLevel) {
+    val s = LocalStrings.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -639,7 +645,7 @@ private fun HealthRecommendationCard(aqiLevel: AqiLevel) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Rekomendasi Kesehatan",
+                    text = s.healthRecommendations,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White
                 )
@@ -673,41 +679,43 @@ private fun HealthRecommendationCard(aqiLevel: AqiLevel) {
 
 private data class Recommendation(val icon: ImageVector, val text: String)
 
+@Composable
 private fun getRecommendations(level: AqiLevel): List<Recommendation> {
+    val s = LocalStrings.current
     return when (level) {
         AqiLevel.GOOD -> listOf(
-            Recommendation(Icons.Outlined.DirectionsRun, "Aman untuk aktivitas luar ruangan"),
-            Recommendation(Icons.Outlined.OpenInNew, "Buka jendela untuk ventilasi segar"),
-            Recommendation(Icons.Outlined.Park, "Nikmati udara segar di luar")
+            Recommendation(Icons.Outlined.DirectionsRun, s.aqiGoodRec1),
+            Recommendation(Icons.Outlined.OpenInNew, s.aqiGoodRec2),
+            Recommendation(Icons.Outlined.Park, s.aqiGoodRec3)
         )
         AqiLevel.MODERATE -> listOf(
-            Recommendation(Icons.Outlined.DirectionsRun, "Aktivitas luar ruangan masih aman"),
-            Recommendation(Icons.Outlined.Masks, "Kelompok sensitif sebaiknya mengurangi aktivitas berat"),
-            Recommendation(Icons.Outlined.Air, "Perhatikan kualitas udara jika memiliki gangguan pernapasan")
+            Recommendation(Icons.Outlined.DirectionsRun, s.aqiModerateRec1),
+            Recommendation(Icons.Outlined.Masks, s.aqiModerateRec2),
+            Recommendation(Icons.Outlined.Air, s.aqiModerateRec3)
         )
         AqiLevel.UNHEALTHY_SENSITIVE -> listOf(
-            Recommendation(Icons.Outlined.Masks, "Gunakan masker saat di luar"),
-            Recommendation(Icons.Outlined.ReduceCapacity, "Kurangi aktivitas fisik berat di luar"),
-            Recommendation(Icons.Outlined.Home, "Anak-anak dan lansia sebaiknya di dalam ruangan"),
-            Recommendation(Icons.Outlined.Air, "Gunakan air purifier jika tersedia")
+            Recommendation(Icons.Outlined.Masks, s.aqiUSensRec1),
+            Recommendation(Icons.Outlined.ReduceCapacity, s.aqiUSensRec2),
+            Recommendation(Icons.Outlined.Home, s.aqiUSensRec3),
+            Recommendation(Icons.Outlined.Air, s.aqiUSensRec4)
         )
         AqiLevel.UNHEALTHY -> listOf(
-            Recommendation(Icons.Outlined.Masks, "Wajib gunakan masker N95 di luar"),
-            Recommendation(Icons.Outlined.Home, "Batasi aktivitas di luar ruangan"),
-            Recommendation(Icons.Outlined.Air, "Tutup jendela, gunakan air purifier"),
-            Recommendation(Icons.Outlined.LocalHospital, "Waspada gejala pernapasan")
+            Recommendation(Icons.Outlined.Masks, s.aqiUnhealthyRec1),
+            Recommendation(Icons.Outlined.Home, s.aqiUnhealthyRec2),
+            Recommendation(Icons.Outlined.Air, s.aqiUnhealthyRec3),
+            Recommendation(Icons.Outlined.LocalHospital, s.aqiUnhealthyRec4)
         )
         AqiLevel.VERY_UNHEALTHY -> listOf(
-            Recommendation(Icons.Outlined.Warning, "Hindari aktivitas di luar ruangan"),
-            Recommendation(Icons.Outlined.Home, "Tetap di dalam ruangan"),
-            Recommendation(Icons.Outlined.Masks, "Gunakan masker N95 jika harus keluar"),
-            Recommendation(Icons.Outlined.LocalHospital, "Segera ke dokter jika mengalami sesak napas")
+            Recommendation(Icons.Outlined.Warning, s.aqiVeryUnhealthyRec1),
+            Recommendation(Icons.Outlined.Home, s.aqiVeryUnhealthyRec2),
+            Recommendation(Icons.Outlined.Masks, s.aqiVeryUnhealthyRec3),
+            Recommendation(Icons.Outlined.LocalHospital, s.aqiVeryUnhealthyRec4)
         )
         AqiLevel.HAZARDOUS -> listOf(
-            Recommendation(Icons.Outlined.Dangerous, "BAHAYA: Jangan keluar rumah"),
-            Recommendation(Icons.Outlined.Home, "Tutup semua jendela dan pintu"),
-            Recommendation(Icons.Outlined.Air, "Nyalakan air purifier pada level maksimum"),
-            Recommendation(Icons.Outlined.LocalHospital, "Hubungi layanan kesehatan jika mengalami gangguan pernapasan")
+            Recommendation(Icons.Outlined.Dangerous, s.aqiHazardousRec1),
+            Recommendation(Icons.Outlined.Home, s.aqiHazardousRec2),
+            Recommendation(Icons.Outlined.Air, s.aqiHazardousRec3),
+            Recommendation(Icons.Outlined.LocalHospital, s.aqiHazardousRec4)
         )
     }
 }

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
 import com.weather.forecast.ui.components.*
 import com.weather.forecast.ui.theme.*
@@ -163,9 +164,10 @@ private fun WeatherTopBar(
     onSearchBarToggle: (Boolean) -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    val s = LocalStrings.current
     val locationName = when (uiState) {
         is WeatherUiState.Success -> uiState.data.location.name
-        else -> "Cuacaku"
+        else -> s.homeTitle
     }
 
     if (showSearchBar) {
@@ -175,7 +177,7 @@ private fun WeatherTopBar(
             onSearch = {},
             active = true,
             onActiveChange = onSearchBarToggle,
-            placeholder = { Text("Cari lokasi...") },
+            placeholder = { Text(s.searchPlaceholder) },
             leadingIcon = {
                 IconButton(onClick = { onSearchBarToggle(false) }) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -229,7 +231,8 @@ private fun LoadingContent() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Memuat data cuaca...")
+            val s = LocalStrings.current
+            Text(s.loadingWeather)
         }
     }
 }
@@ -267,13 +270,15 @@ private fun ErrorContent(
                 Button(onClick = onRequestPermission) {
                     Icon(Icons.Default.MyLocation, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Berikan Izin Lokasi")
+                    val s = LocalStrings.current
+                    Text(s.grantLocationPermission)
                 }
             } else {
                 Button(onClick = onRetry) {
                     Icon(Icons.Default.Refresh, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Coba Lagi")
+                    val s = LocalStrings.current
+                    Text(s.retry)
                 }
             }
         }
@@ -377,8 +382,9 @@ private fun CurrentWeatherCard(
         )
 
         // Feels like
+        val s = LocalStrings.current
         Text(
-            text = "Terasa seperti ${current.apparentTemperatureFormatted}",
+            text = s.feelsLike(current.apparentTemperatureFormatted),
             style = MaterialTheme.typography.bodyLarge,
             color = Color.White.copy(alpha = 0.8f)
         )
@@ -387,7 +393,7 @@ private fun CurrentWeatherCard(
 
         // Weather condition
         Text(
-            text = current.weatherCondition.descriptionId,
+            text = s.localized(current.weatherCondition.description, current.weatherCondition.descriptionId),
             style = MaterialTheme.typography.titleLarge,
             color = Color.White
         )
@@ -414,25 +420,26 @@ private fun WeatherDetailsCard(current: CurrentWeatherData) {
             containerColor = Color.White.copy(alpha = 0.2f)
         )
     ) {
+        val s = LocalStrings.current
         Column(modifier = Modifier.padding(16.dp)) {
-            // Row 1: Kelembaban, Angin, Tekanan
+            // Row 1
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 WeatherDetailItem(
                     icon = Icons.Outlined.WaterDrop,
-                    label = "Kelembaban",
+                    label = s.humidity,
                     value = current.humidityFormatted
                 )
                 WeatherDetailItem(
                     icon = Icons.Outlined.Air,
-                    label = "Angin",
+                    label = s.wind,
                     value = current.windSpeedFormatted
                 )
                 WeatherDetailItem(
                     icon = Icons.Outlined.Compress,
-                    label = "Tekanan",
+                    label = s.pressure,
                     value = current.pressureFormatted
                 )
             }
@@ -441,24 +448,24 @@ private fun WeatherDetailsCard(current: CurrentWeatherData) {
             Divider(color = Color.White.copy(alpha = 0.15f))
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Row 2: Titik Embun, Hembusan Angin, Tutupan Awan
+            // Row 2
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 WeatherDetailItem(
                     icon = Icons.Outlined.Thermostat,
-                    label = "Titik Embun",
+                    label = s.dewPoint,
                     value = current.dewPointFormatted
                 )
                 WeatherDetailItem(
                     icon = Icons.Outlined.Storm,
-                    label = "Hembusan",
+                    label = s.gusts,
                     value = current.windGustsFormatted
                 )
                 WeatherDetailItem(
                     icon = Icons.Outlined.Cloud,
-                    label = "Awan",
+                    label = s.clouds,
                     value = "${current.cloudCover}%"
                 )
             }
@@ -508,8 +515,9 @@ private fun WindInfoCard(current: CurrentWeatherData) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val s = LocalStrings.current
             Text(
-                text = "Informasi Angin",
+                text = s.windInfo,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -531,7 +539,7 @@ private fun WindInfoCard(current: CurrentWeatherData) {
                     )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = current.windDirectionText,
+                            text = s.windDirectionShort(current.windDirection),
                             style = MaterialTheme.typography.titleLarge,
                             color = Color.White,
                             fontWeight = FontWeight.Bold
@@ -549,18 +557,18 @@ private fun WindInfoCard(current: CurrentWeatherData) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     WindDetailRow(
-                        label = "Kecepatan",
+                        label = s.speed,
                         value = current.windSpeedFormatted,
                         icon = Icons.Outlined.Speed
                     )
                     WindDetailRow(
-                        label = "Hembusan",
+                        label = s.gusts,
                         value = current.windGustsFormatted,
                         icon = Icons.Outlined.Storm
                     )
                     WindDetailRow(
-                        label = "Arah",
-                        value = current.windDirectionFull,
+                        label = s.direction,
+                        value = s.windDirectionFull(current.windDirection),
                         icon = Icons.Outlined.Navigation
                     )
                 }
@@ -686,8 +694,9 @@ private fun WeatherPotentialCard(potential: WeatherPotential) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val s = LocalStrings.current
             Text(
-                text = "Potensi Cuaca Ekstrem",
+                text = s.extremeWeather,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -706,7 +715,7 @@ private fun WeatherPotentialCard(potential: WeatherPotential) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Tidak ada potensi cuaca ekstrem saat ini",
+                        text = s.noExtremeWeather,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f)
                     )
@@ -718,16 +727,16 @@ private fun WeatherPotentialCard(potential: WeatherPotential) {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        RiskIndicator("Badai Petir", potential.stormRisk, "⛈")
-                        RiskIndicator("Hujan Lebat", potential.heavyRainRisk, "🌧")
-                        RiskIndicator("Hujan Es", potential.hailRisk, "🧊")
+                        RiskIndicator(s.thunderstorm, potential.stormRisk, "⛈")
+                        RiskIndicator(s.heavyRain, potential.heavyRainRisk, "🌧")
+                        RiskIndicator(s.hail, potential.hailRisk, "🧊")
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        RiskIndicator("Angin Kencang", potential.strongWindRisk, "💨")
-                        RiskIndicator("Puting Beliung", potential.tornadoRisk, "🌪")
+                        RiskIndicator(s.strongWind, potential.strongWindRisk, "💨")
+                        RiskIndicator(s.tornado, potential.tornadoRisk, "🌪")
                         // CAPE indicator
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -759,7 +768,7 @@ private fun WeatherPotentialCard(potential: WeatherPotential) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Peringatan Aktif",
+                        text = s.activeWarnings,
                         style = MaterialTheme.typography.labelMedium,
                         color = Color.White.copy(alpha = 0.7f),
                         modifier = Modifier.padding(bottom = 4.dp)
@@ -775,6 +784,7 @@ private fun WeatherPotentialCard(potential: WeatherPotential) {
 
 @Composable
 private fun RiskIndicator(label: String, risk: RiskLevel, emoji: String) {
+    val s = LocalStrings.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(100.dp)
@@ -793,7 +803,7 @@ private fun RiskIndicator(label: String, risk: RiskLevel, emoji: String) {
                 .padding(horizontal = 8.dp, vertical = 2.dp)
         ) {
             Text(
-                text = risk.labelId,
+                text = s.localized(risk.label, risk.labelId),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
@@ -805,6 +815,7 @@ private fun RiskIndicator(label: String, risk: RiskLevel, emoji: String) {
 
 @Composable
 private fun AlertItem(alert: WeatherAlert) {
+    val s = LocalStrings.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -823,13 +834,13 @@ private fun AlertItem(alert: WeatherAlert) {
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = alert.type.labelId,
+                text = s.localized(alert.type.label, alert.type.labelId),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = alert.descriptionId,
+                text = s.localized(alert.description, alert.descriptionId),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 11.sp
@@ -842,7 +853,7 @@ private fun AlertItem(alert: WeatherAlert) {
                 .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             Text(
-                text = alert.risk.labelId,
+                text = s.localized(alert.risk.label, alert.risk.labelId),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White,
                 fontSize = 10.sp,
@@ -867,8 +878,9 @@ private fun PrecipitationDetailCard(current: CurrentWeatherData) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val s = LocalStrings.current
             Text(
-                text = "Detail Presipitasi",
+                text = s.precipitationDetail,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -877,10 +889,10 @@ private fun PrecipitationDetailCard(current: CurrentWeatherData) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                PrecipItem("Total", "${current.precipitation} mm", "🌧")
-                PrecipItem("Hujan", "${current.rain} mm", "💧")
-                PrecipItem("Hujan Deras", "${current.showers} mm", "⛈")
-                PrecipItem("Salju", "${current.snowfall} cm", "❄️")
+                PrecipItem(s.total, "${current.precipitation} mm", "🌧")
+                PrecipItem(s.rain, "${current.rain} mm", "💧")
+                PrecipItem(s.showers, "${current.showers} mm", "⛈")
+                PrecipItem(s.snow, "${current.snowfall} cm", "❄️")
             }
         }
     }
@@ -915,8 +927,9 @@ private fun HourlyForecastSection(hourlyData: List<HourlyWeatherData>) {
             .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
+        val s = LocalStrings.current
         Text(
-            text = "Prakiraan Per Jam",
+            text = s.hourlyForecast,
             style = MaterialTheme.typography.titleMedium,
             color = Color.White,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -1007,8 +1020,9 @@ private fun DailyForecastSection(dailyData: List<DailyWeatherData>) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val s = LocalStrings.current
             Text(
-                text = "Prakiraan 7 Hari",
+                text = s.sevenDayForecast,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -1114,9 +1128,10 @@ private fun DailyForecastItem(
                     color = Color.White.copy(alpha = 0.7f)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
+                val s = LocalStrings.current
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Tutup" else "Buka prakiraan per jam",
+                    contentDescription = if (isExpanded) s.close else s.hourlyDetailForecast,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier
                         .size(20.dp)
@@ -1218,7 +1233,7 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Angin ${daily.windDirectionText}",
+                    text = "${LocalStrings.current.wind} ${LocalStrings.current.windDirectionShort(daily.windDirectionDominant)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.8f)
                 )
@@ -1232,7 +1247,7 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Hembusan ${daily.windGustsMax.toInt()} km/h",
+                    text = "${LocalStrings.current.gusts} ${daily.windGustsMax.toInt()} km/h",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.8f)
                 )
@@ -1264,6 +1279,7 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
                     potential.tornadoRisk > RiskLevel.LOW
 
             if (hasRisk) {
+                val s = LocalStrings.current
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1271,19 +1287,19 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     if (potential.stormRisk > RiskLevel.LOW) {
-                        DailyRiskBadge("⛈ ${potential.stormRisk.labelId}", potential.stormRisk)
+                        DailyRiskBadge("⛈ ${s.localized(potential.stormRisk.label, potential.stormRisk.labelId)}", potential.stormRisk)
                     }
                     if (potential.heavyRainRisk > RiskLevel.LOW) {
-                        DailyRiskBadge("🌧 ${potential.heavyRainRisk.labelId}", potential.heavyRainRisk)
+                        DailyRiskBadge("🌧 ${s.localized(potential.heavyRainRisk.label, potential.heavyRainRisk.labelId)}", potential.heavyRainRisk)
                     }
                     if (potential.hailRisk > RiskLevel.LOW) {
-                        DailyRiskBadge("🧊 ${potential.hailRisk.labelId}", potential.hailRisk)
+                        DailyRiskBadge("🧊 ${s.localized(potential.hailRisk.label, potential.hailRisk.labelId)}", potential.hailRisk)
                     }
                     if (potential.strongWindRisk > RiskLevel.LOW) {
-                        DailyRiskBadge("💨 ${potential.strongWindRisk.labelId}", potential.strongWindRisk)
+                        DailyRiskBadge("💨 ${s.localized(potential.strongWindRisk.label, potential.strongWindRisk.labelId)}", potential.strongWindRisk)
                     }
                     if (potential.tornadoRisk > RiskLevel.LOW) {
-                        DailyRiskBadge("🌪 ${potential.tornadoRisk.labelId}", potential.tornadoRisk)
+                        DailyRiskBadge("🌪 ${s.localized(potential.tornadoRisk.label, potential.tornadoRisk.labelId)}", potential.tornadoRisk)
                     }
                 }
             }
@@ -1292,7 +1308,7 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
         // Prakiraan per jam — horizontal scroll
         if (daily.hourlyForecasts.isNotEmpty()) {
             Text(
-                text = "Prakiraan Tiap Jam",
+                text = LocalStrings.current.hourlyDetailForecast,
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.padding(bottom = 6.dp)
@@ -1306,7 +1322,7 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
             }
         } else {
             Text(
-                text = "Data per jam tidak tersedia",
+                text = LocalStrings.current.hourlyDataUnavailable,
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.5f)
             )
@@ -1429,7 +1445,7 @@ private fun SunInfoCard(sunrise: String, sunset: String) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Terbit",
+                    text = LocalStrings.current.sunrise,
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f)
                 )
@@ -1449,7 +1465,7 @@ private fun SunInfoCard(sunrise: String, sunset: String) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Terbenam",
+                    text = LocalStrings.current.sunset,
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f)
                 )

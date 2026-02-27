@@ -3,6 +3,7 @@ package com.weather.forecast.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.SearchResult
 import com.weather.forecast.data.model.WeatherData
 import com.weather.forecast.data.preferences.PreferencesManager
@@ -82,7 +83,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
                 if (location == null) {
                     _uiState.value = WeatherUiState.Error(
-                        message = "Tidak dapat mendapatkan lokasi",
+                        message = AppLocaleManager.strings.locationNotAvailable,
                         isLocationError = true
                     )
                     return@launch
@@ -91,12 +92,12 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                 fetchWeatherForLocation(location.latitude, location.longitude)
             } catch (e: SecurityException) {
                 _uiState.value = WeatherUiState.Error(
-                    message = "Izin lokasi diperlukan",
+                    message = AppLocaleManager.strings.locationPermissionRequired,
                     isLocationError = true
                 )
             } catch (e: Exception) {
                 _uiState.value = WeatherUiState.Error(
-                    message = e.message ?: "Terjadi kesalahan",
+                    message = e.message ?: AppLocaleManager.strings.unknownError,
                     isLocationError = false
                 )
             }
@@ -120,7 +121,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
             )
         }.onFailure { error ->
             _uiState.value = WeatherUiState.Error(
-                message = error.message ?: "Gagal memuat data cuaca",
+                message = error.message ?: AppLocaleManager.strings.failedLoadWeather,
                 isLocationError = false
             )
         }

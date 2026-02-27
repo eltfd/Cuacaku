@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.weather.forecast.data.api.RetrofitClient
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -440,14 +441,15 @@ class DisasterMonitorRepository(private val context: Context) {
             val dischargeStr = "%.1f".format(currentDischarge)
             val maxStr = "%.1f".format(maxDischarge)
 
+            val s = AppLocaleManager.strings
             ActiveDisaster(
                 id = "local-flood-${"%.2f".format(latitude)}-${"%.2f".format(longitude)}",
-                title = "Flood Risk (High River Discharge)",
+                title = s.floodRiskTitle,
                 type = ActiveDisasterType.FLOOD,
                 phase = phase,
                 locations = listOf(
                     AffectedLocation(
-                        name = "Your Location",
+                        name = s.yourLocation,
                         latitude = latitude,
                         longitude = longitude,
                         radiusKm = 25.0
@@ -456,9 +458,9 @@ class DisasterMonitorRepository(private val context: Context) {
                 severity = severity,
                 startDate = System.currentTimeMillis(),
                 lastUpdate = System.currentTimeMillis(),
-                currentSituation = "Nearby river discharge: $dischargeStr m³/s (max: $maxStr m³/s). " +
-                        if (phase == DisasterPhase.RECOVERY) "Discharge decreasing, stay alert."
-                        else "Discharge very high, flood risk!",
+                currentSituation = s.riverDischargeDesc(dischargeStr, maxStr) +
+                        if (phase == DisasterPhase.RECOVERY) s.dischargeDecreasing
+                        else s.dischargeVeryHigh,
                 recoveryProgress = if (phase == DisasterPhase.RECOVERY) {
                     (1f - (currentDischarge / maxDischarge).toFloat()).coerceIn(0.1f, 0.8f)
                 } else 0f,
@@ -502,7 +504,7 @@ class DisasterMonitorRepository(private val context: Context) {
                         current.copy(
                             phase = DisasterPhase.RECOVERY,
                             recoveryProgress = 0.3f,
-                            currentSituation = "${current.currentSituation}\n⏳ No updates in 7+ days, likely in recovery."
+                            currentSituation = "${current.currentSituation}${AppLocaleManager.strings.noUpdateRecovery(7)}"
                         )
                     } else current
                 }
@@ -512,7 +514,7 @@ class DisasterMonitorRepository(private val context: Context) {
                             phase = DisasterPhase.RESOLVED,
                             recoveryProgress = 1.0f,
                             resolvedDate = now,
-                            currentSituation = "Recovery complete (no updates in ${DisasterDisplayConfig.STALE_RECOVERY_DAYS}+ days)."
+                            currentSituation = AppLocaleManager.strings.recoveryComplete(DisasterDisplayConfig.STALE_RECOVERY_DAYS)
                         )
                     } else current
                 }
@@ -554,7 +556,7 @@ class DisasterMonitorRepository(private val context: Context) {
                         DisasterTimelineEvent(
                             timestamp = System.currentTimeMillis(),
                             phase = newDisaster.phase,
-                            description = "Status changed: ${existing.phase.labelId} → ${newDisaster.phase.labelId}",
+                            description = AppLocaleManager.strings.statusChanged(existing.phase.labelId, newDisaster.phase.labelId),
                             icon = newDisaster.phase.icon
                         )
                     )
@@ -651,10 +653,11 @@ class DisasterMonitorRepository(private val context: Context) {
         phase: DisasterPhase,
         daysSinceEvent: Int
     ): String {
+        val s = AppLocaleManager.strings
         val phaseDesc = when (phase) {
-            DisasterPhase.ACTIVE -> "Disaster is ongoing."
-            DisasterPhase.RECOVERY -> "Area is in recovery ($daysSinceEvent days since event)."
-            DisasterPhase.RESOLVED -> "Conditions have returned to normal."
+            DisasterPhase.ACTIVE -> s.disasterIsOngoing
+            DisasterPhase.RECOVERY -> s.areaInRecovery(daysSinceEvent)
+            DisasterPhase.RESOLVED -> s.conditionsNormal
         }
         return "$title\n$phaseDesc"
     }
@@ -672,7 +675,7 @@ class DisasterMonitorRepository(private val context: Context) {
                 DisasterTimelineEvent(
                     timestamp = eventDate,
                     phase = DisasterPhase.ACTIVE,
-                    description = "Disaster reported: $title",
+                    description = AppLocaleManager.strings.disasterReported(title),
                     icon = "🚨"
                 )
             )
@@ -683,7 +686,7 @@ class DisasterMonitorRepository(private val context: Context) {
                 DisasterTimelineEvent(
                     timestamp = changedDate,
                     phase = phase,
-                    description = "Latest update",
+                    description = AppLocaleManager.strings.latestUpdateLabel,
                     icon = "📋"
                 )
             )
@@ -696,8 +699,8 @@ class DisasterMonitorRepository(private val context: Context) {
         if (description.isNullOrBlank()) return null
         return DisasterImpact(
             aidStatus = when {
-                "response" in description.lowercase() -> "Aid response in progress"
-                "relief" in description.lowercase() -> "Relief operations active"
+                "response" in description.lowercase() -> AppLocaleManager.strings.aidInProgress
+                "relief" in description.lowercase() -> AppLocaleManager.strings.reliefActive
                 else -> null
             }
         )

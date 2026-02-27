@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
 import com.weather.forecast.ui.viewmodel.WaterQualityUiState
@@ -65,7 +66,7 @@ private fun WqLoadingContent() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Memuat data kualitas air...")
+            Text(LocalStrings.current.loadingWaterQuality)
         }
     }
 }
@@ -92,7 +93,7 @@ private fun WqErrorContent(message: String, onRetry: () -> Unit) {
             Button(onClick = onRetry) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Coba Lagi")
+                Text(LocalStrings.current.retry)
             }
         }
     }
@@ -132,10 +133,9 @@ private fun WaterQualityContent(data: WaterQualityData) {
             item {
                 SectionTitle(
                     icon = Icons.Outlined.Sailing,
-                    title = "Kondisi Laut"
+                    title = LocalStrings.current.seaConditions
                 )
             }
-
             // Current marine conditions
             marine.current?.let { current ->
                 item {
@@ -164,7 +164,7 @@ private fun WaterQualityContent(data: WaterQualityData) {
                 item {
                     SectionTitle(
                         icon = Icons.Outlined.Water,
-                        title = "Tinggi Muka Air Sungai"
+                        title = LocalStrings.current.riverWaterLevel
                     )
                 }
 
@@ -215,14 +215,15 @@ private fun WaterQualityHeader() {
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        val s = LocalStrings.current
         Text(
-            text = "Kualitas Air",
+            text = s.waterQuality,
             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
             color = Color.White
         )
 
         Text(
-            text = "Laut, Sungai & Danau",
+            text = s.seaLakeRiver,
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White.copy(alpha = 0.7f)
         )
@@ -267,6 +268,7 @@ private fun CurrentMarineCard(current: CurrentMarineData) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val s = LocalStrings.current
             // Sea condition badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -274,7 +276,7 @@ private fun CurrentMarineCard(current: CurrentMarineData) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Kondisi Saat Ini",
+                    text = s.currentConditions,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White
                 )
@@ -285,7 +287,7 @@ private fun CurrentMarineCard(current: CurrentMarineData) {
                         .padding(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = current.seaCondition.labelId,
+                        text = s.localized(current.seaCondition.label, current.seaCondition.labelId),
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -301,17 +303,17 @@ private fun CurrentMarineCard(current: CurrentMarineData) {
             ) {
                 MarineDetailItem(
                     icon = Icons.Outlined.Waves,
-                    label = "Gelombang",
+                    label = s.waves,
                     value = current.waveHeightFormatted
                 )
                 MarineDetailItem(
                     icon = Icons.Outlined.Explore,
-                    label = "Arah",
+                    label = s.direction,
                     value = current.waveDirectionText
                 )
                 MarineDetailItem(
                     icon = Icons.Outlined.Timer,
-                    label = "Periode",
+                    label = s.period,
                     value = current.wavePeriodFormatted
                 )
             }
@@ -325,17 +327,17 @@ private fun CurrentMarineCard(current: CurrentMarineData) {
             ) {
                 MarineDetailItem(
                     icon = Icons.Outlined.Waves,
-                    label = "Swell",
+                    label = s.swell,
                     value = current.swellHeightFormatted
                 )
                 MarineDetailItem(
                     icon = Icons.Outlined.Explore,
-                    label = "Arah Swell",
+                    label = s.swellDirection,
                     value = degreesToDirection(current.swellWaveDirection)
                 )
                 MarineDetailItem(
                     icon = Icons.Outlined.Timer,
-                    label = "Periode Swell",
+                    label = s.swellPeriod,
                     value = "%.1f s".format(current.swellWavePeriod)
                 )
             }
@@ -391,7 +393,7 @@ private fun WaterLevelSummaryCard(summary: WaterLevelSummary) {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Perkiraan Tinggi Muka Air",
+                    text = LocalStrings.current.waterLevelForecast,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
                 )
@@ -403,7 +405,7 @@ private fun WaterLevelSummaryCard(summary: WaterLevelSummary) {
             if (summary.hasMarineData) {
                 WaterLevelTrendRow(
                     emoji = "🌊",
-                    label = "Gelombang Laut",
+                    label = LocalStrings.current.seaWaves,
                     currentValue = "%.1f m".format(summary.currentWaveHeight),
                     tomorrowValue = "%.1f m".format(summary.tomorrowWaveHeight),
                     changePercent = summary.waveChangePercent,
@@ -417,7 +419,7 @@ private fun WaterLevelSummaryCard(summary: WaterLevelSummary) {
             if (summary.hasFloodData) {
                 WaterLevelTrendRow(
                     emoji = "🏞️",
-                    label = "Debit Sungai",
+                    label = LocalStrings.current.riverDischarge,
                     currentValue = "%.1f m³/s".format(summary.currentDischarge),
                     tomorrowValue = "%.1f m³/s".format(summary.tomorrowDischarge),
                     changePercent = summary.dischargeChangePercent,
@@ -429,8 +431,7 @@ private fun WaterLevelSummaryCard(summary: WaterLevelSummary) {
 
             // Keterangan
             Text(
-                text = "Perkiraan berdasarkan data 7 hari ke depan. " +
-                    "Tren dihitung dari perbandingan paruh pertama vs paruh kedua prakiraan.",
+                text = LocalStrings.current.forecastDisclaimer,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.5f)
             )
@@ -447,6 +448,7 @@ private fun WaterLevelTrendRow(
     changePercent: Double,
     trend: WaterLevelTrend
 ) {
+    val s = LocalStrings.current
     val trendColor = Color(trend.colorHex)
     val changeSign = if (changePercent >= 0) "+" else ""
     val changeText = "${changeSign}${"%.1f".format(changePercent)}%"
@@ -472,7 +474,7 @@ private fun WaterLevelTrendRow(
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "${trend.icon} ${trend.labelId}",
+                    text = "${trend.icon} ${s.localized(trend.label, trend.labelId)}",
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
                 )
@@ -488,15 +490,15 @@ private fun WaterLevelTrendRow(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column {
-                Text("Hari ini", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(s.today, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                 Text(currentValue, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Besok", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(s.tomorrow, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                 Text(tomorrowValue, style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = Color.White)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text("Perubahan", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                Text(s.change, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                 Text(
                     text = changeText,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
@@ -524,7 +526,7 @@ private fun WaveHeightTrendCard(dailyData: List<DailyMarineData>) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Tren Gelombang 7 Hari",
+                text = LocalStrings.current.waveTrend7Days,
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
@@ -617,7 +619,7 @@ private fun RiverLevelTrendCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Tren Muka Air Sungai",
+                    text = LocalStrings.current.riverWaterTrend,
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
                 )
@@ -629,7 +631,7 @@ private fun RiverLevelTrendCard(
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = "${overallTrend.icon} ${overallTrend.labelId}",
+                        text = "${overallTrend.icon} ${LocalStrings.current.localized(overallTrend.label, overallTrend.labelId)}",
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -697,8 +699,7 @@ private fun RiverLevelTrendCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Debit sungai (m³/s) — semakin tinggi debit, semakin tinggi muka air. " +
-                    "Warna bar menunjukkan tingkat risiko banjir.",
+                text = LocalStrings.current.riverDischargeDisclaimer,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.5f)
             )
@@ -718,7 +719,7 @@ private fun DailyMarineForecastSection(dailyData: List<DailyMarineData>) {
             .padding(vertical = 8.dp)
     ) {
         Text(
-            text = "Prakiraan Laut 7 Hari",
+            text = LocalStrings.current.seaForecast7Days,
             style = MaterialTheme.typography.titleMedium,
             color = Color.White,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -781,7 +782,7 @@ private fun DailyMarineItem(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = data.seaCondition.labelId,
+                        text = LocalStrings.current.localized(data.seaCondition.label, data.seaCondition.labelId),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -805,9 +806,10 @@ private fun DailyMarineItem(
 
                 Spacer(modifier = Modifier.width(4.dp))
 
+                val s = LocalStrings.current
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isExpanded) "Tutup" else "Buka",
+                    contentDescription = if (isExpanded) s.close else s.open,
                     tint = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier
                         .size(24.dp)
@@ -838,20 +840,21 @@ private fun DailyMarineDetailContent(data: DailyMarineData) {
         )
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            val s = LocalStrings.current
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Gelombang Max", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                    Text(s.waveMax, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                     Text(data.waveHeightMaxFormatted, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Arah", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                    Text(s.direction, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                     Text(data.waveDirectionText, style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Swell Max", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                    Text(s.swellMax, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                     Text("%.1f m".format(data.swellWaveHeightMax), style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
             }
@@ -861,7 +864,7 @@ private fun DailyMarineDetailContent(data: DailyMarineData) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Per Jam",
+                    text = s.hourly,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f),
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -966,7 +969,7 @@ private fun RiverDischargeItem(data: DailyFloodData) {
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Rata-rata: ${data.dischargeMeanFormatted}",
+                        text = LocalStrings.current.average(data.dischargeMeanFormatted),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.6f)
                     )
@@ -992,7 +995,7 @@ private fun RiverDischargeItem(data: DailyFloodData) {
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = data.floodRisk.labelId,
+                    text = LocalStrings.current.localized(data.floodRisk.label, data.floodRisk.labelId),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
                 )
@@ -1019,6 +1022,7 @@ private fun NoDataCard() {
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val s = LocalStrings.current
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = null,
@@ -1027,14 +1031,14 @@ private fun NoDataCard() {
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Data tidak tersedia untuk lokasi ini",
+                text = s.noDataForLocation,
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color.White,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Data laut hanya tersedia untuk lokasi dekat pantai. Data sungai mungkin tidak tersedia di semua daerah.",
+                text = s.dataOnlyNearCoast,
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -1054,6 +1058,7 @@ private fun DataSourceCard() {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            val s = LocalStrings.current
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Outlined.Info,
@@ -1063,14 +1068,14 @@ private fun DataSourceCard() {
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Sumber Data",
+                    text = s.dataSource,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Laut: Open-Meteo Marine API\nSungai: GloFAS (Global Flood Awareness System, ECMWF)\nData diperbarui setiap jam",
+                text = s.waterDataSourceDetail,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.5f)
             )

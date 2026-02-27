@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
 import com.weather.forecast.ui.viewmodel.DisasterUiState
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
@@ -79,13 +80,14 @@ private fun DisasterLoadingContent() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = Color.White)
             Spacer(modifier = Modifier.height(16.dp))
+            val s = LocalStrings.current
             Text(
-                text = "Menganalisis potensi bencana...",
+                text = s.analyzingDisasters,
                 color = Color.White.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                text = "AI sedang memproses data cuaca, laut & sungai",
+                text = s.aiProcessing,
                 color = Color.White.copy(alpha = 0.5f),
                 style = MaterialTheme.typography.labelSmall
             )
@@ -115,10 +117,11 @@ private fun DisasterErrorContent(message: String, onRetry: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp)
         ) {
+            val s = LocalStrings.current
             Text("⚠️", fontSize = 48.sp)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Gagal Memuat Analisis",
+                text = s.failedToLoadAnalysis,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
@@ -131,7 +134,7 @@ private fun DisasterErrorContent(message: String, onRetry: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Button(onClick = onRetry) {
-                Text("Coba Lagi")
+                Text(s.retry)
             }
         }
     }
@@ -174,7 +177,7 @@ private fun DisasterForecastContent(data: DisasterForecast) {
 
         // ═══ Today's Predictions ═══
         item {
-            SectionTitle(text = "Analisis Hari Ini", icon = "🔍")
+            SectionTitle(text = LocalStrings.current.todayAnalysis, icon = "🔍")
         }
 
         items(data.todayPredictions) { prediction ->
@@ -184,7 +187,7 @@ private fun DisasterForecastContent(data: DisasterForecast) {
         // ═══ 7-Day Disaster Heatmap ═══
         item {
             Spacer(modifier = Modifier.height(16.dp))
-            SectionTitle(text = "Prakiraan 7 Hari", icon = "📅")
+            SectionTitle(text = LocalStrings.current.sevenDayForecast, icon = "📅")
         }
 
         item {
@@ -216,12 +219,13 @@ private fun DisasterHeader(riskLevel: RiskLevel) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
+        val s = LocalStrings.current
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("🛡️", fontSize = 28.sp)
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(
-                    text = "Prakiraan Bencana",
+                    text = s.disasterForecast,
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = Color.White
                 )
@@ -252,7 +256,7 @@ private fun DisasterHeader(riskLevel: RiskLevel) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Status: ${riskLevel.labelId}",
+                text = "Status: ${s.localized(riskLevel.label, riskLevel.labelId)}",
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
@@ -291,7 +295,7 @@ private fun AiSummaryCard(
                     Text("🧠", fontSize = 20.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Analisis Neural Network",
+                        text = LocalStrings.current.neuralNetworkAnalysis,
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -320,17 +324,18 @@ private fun AiSummaryCard(
             // Model info row
             if (aiModelVersion.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
+                val s = LocalStrings.current
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    AiInfoChip(label = "Model", value = aiModelVersion.substringBefore("-incremental"))
+                    AiInfoChip(label = s.model, value = aiModelVersion.substringBefore("-incremental"))
                     AiInfoChip(
-                        label = "Data",
+                        label = s.data,
                         value = "${"%.0f".format(aiDataCompleteness * 100)}%"
                     )
                     if (learningSteps > 0) {
-                        AiInfoChip(label = "Learned", value = "${learningSteps}x")
+                        AiInfoChip(label = s.learned, value = "${learningSteps}x")
                     }
                 }
 
@@ -341,9 +346,9 @@ private fun AiSummaryCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        AiInfoChip(label = "Sampel", value = "$learningSamples")
+                        AiInfoChip(label = s.samples, value = "$learningSamples")
                         if (storageUsed.isNotEmpty()) {
-                            AiInfoChip(label = "Storage", value = storageUsed)
+                            AiInfoChip(label = s.storage, value = storageUsed)
                         }
                     }
                 }
@@ -430,7 +435,7 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = prediction.type.labelId,
+                        text = LocalStrings.current.localized(prediction.type.label, prediction.type.labelId),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -452,7 +457,7 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = prediction.riskLevel.labelId,
+                        text = LocalStrings.current.localized(prediction.riskLevel.label, prediction.riskLevel.labelId),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
@@ -470,20 +475,21 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
                     .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                val s = LocalStrings.current
                 Text(
-                    text = "Skor: ${"%.0f".format(prediction.riskScore * 100)}%",
+                    text = s.score("%.0f".format(prediction.riskScore * 100)),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
                 if (prediction.aiRawScore > 0.0) {
                     Text(
-                        text = "NN: ${"%.0f".format(prediction.aiRawScore * 100)}%",
+                        text = s.nnScore("%.0f".format(prediction.aiRawScore * 100)),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF00E676).copy(alpha = 0.7f)
                     )
                 }
                 Text(
-                    text = "Keyakinan: ${"%.0f".format(prediction.confidence * 100)}%",
+                    text = s.confidence("%.0f".format(prediction.confidence * 100)),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
@@ -508,7 +514,7 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
                     if (prediction.factors.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Faktor Analisis:",
+                            text = LocalStrings.current.analysisFactors,
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = Color.White.copy(alpha = 0.7f)
                         )
@@ -638,7 +644,7 @@ private fun WeeklyDisasterHeatmap(weekly: List<DailyDisasterSummary>) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Peta Risiko 7 Hari",
+                text = LocalStrings.current.riskMap7Days,
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
@@ -685,7 +691,7 @@ private fun WeeklyDisasterHeatmap(weekly: List<DailyDisasterSummary>) {
                         Text(type.icon, fontSize = 10.sp)
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
-                            text = type.labelId,
+                            text = LocalStrings.current.localized(type.label, type.labelId),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 8.sp,
@@ -731,13 +737,14 @@ private fun WeeklyDisasterHeatmap(weekly: List<DailyDisasterSummary>) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                HeatmapLegendItem(color = Color(0xFF4CAF50), label = "Rendah")
+                val s = LocalStrings.current
+                HeatmapLegendItem(color = Color(0xFF4CAF50), label = s.low)
                 Spacer(modifier = Modifier.width(8.dp))
-                HeatmapLegendItem(color = Color(0xFFFF9800), label = "Sedang")
+                HeatmapLegendItem(color = Color(0xFFFF9800), label = s.moderate)
                 Spacer(modifier = Modifier.width(8.dp))
-                HeatmapLegendItem(color = Color(0xFFFF5722), label = "Tinggi")
+                HeatmapLegendItem(color = Color(0xFFFF5722), label = s.high)
                 Spacer(modifier = Modifier.width(8.dp))
-                HeatmapLegendItem(color = Color(0xFFD32F2F), label = "Ekstrem")
+                HeatmapLegendItem(color = Color(0xFFD32F2F), label = s.extreme)
             }
         }
     }
@@ -813,7 +820,7 @@ private fun DailyDisasterCard(day: DailyDisasterSummary) {
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = day.highestRisk.labelId,
+                        text = LocalStrings.current.localized(day.highestRisk.label, day.highestRisk.labelId),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White,
                         fontSize = 10.sp
@@ -842,6 +849,7 @@ private fun DailyDisasterCard(day: DailyDisasterSummary) {
                 ) {
                     day.predictions.forEach { pred ->
                         val predColor = Color(pred.riskLevel.colorHex)
+                        val s = LocalStrings.current
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -851,7 +859,7 @@ private fun DailyDisasterCard(day: DailyDisasterSummary) {
                             Text(pred.type.icon, fontSize = 14.sp)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = pred.type.labelId,
+                                text = s.localized(pred.type.label, pred.type.labelId),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color.White,
                                 modifier = Modifier.weight(1f)
@@ -905,7 +913,7 @@ private fun DisasterFooter() {
                 Text("ℹ️", fontSize = 14.sp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Tentang Analisis",
+                    text = LocalStrings.current.aboutAnalysis,
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White.copy(alpha = 0.6f)
                 )

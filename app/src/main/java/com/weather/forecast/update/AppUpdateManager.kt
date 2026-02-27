@@ -13,6 +13,7 @@ import androidx.core.content.FileProvider
 import com.weather.forecast.BuildConfig
 import com.weather.forecast.data.api.GitHubApiService
 import com.weather.forecast.data.api.GitHubRelease
+import com.weather.forecast.data.locale.AppLocaleManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -166,7 +167,7 @@ class AppUpdateManager(private val context: Context) {
             } catch (e: Exception) {
                 Log.e(TAG, "Gagal memeriksa update: ${e.message}", e)
                 _updateState.value = UpdateState.Error(
-                    message = "Gagal memeriksa update: ${e.localizedMessage ?: "Unknown error"}"
+                    message = AppLocaleManager.strings.updateCheckFailed(e.localizedMessage ?: "Unknown error")
                 )
                 false
             }
@@ -206,8 +207,8 @@ class AppUpdateManager(private val context: Context) {
 
             // Buat request download
             val request = DownloadManager.Request(Uri.parse(state.downloadUrl)).apply {
-                setTitle("Update Cuacaku v${state.latestVersion}")
-                setDescription("Mengunduh pembaruan aplikasi...")
+                setTitle(AppLocaleManager.strings.updateDownloadTitle(state.latestVersion))
+                setDescription(AppLocaleManager.strings.updateDownloading)
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, APK_FILE_NAME)
                 setMimeType(APK_MIME_TYPE)
@@ -250,7 +251,7 @@ class AppUpdateManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Gagal memulai download: ${e.message}", e)
             _updateState.value = UpdateState.Error(
-                message = "Gagal mengunduh update: ${e.localizedMessage ?: "Unknown error"}"
+                message = AppLocaleManager.strings.updateDownloadFailed(e.localizedMessage ?: "Unknown error")
             )
         }
     }
@@ -279,7 +280,7 @@ class AppUpdateManager(private val context: Context) {
 
             if (!apkFile.exists()) {
                 Log.e(TAG, "File APK tidak ditemukan: ${apkFile.absolutePath}")
-                _updateState.value = UpdateState.Error(message = "File update tidak ditemukan")
+                _updateState.value = UpdateState.Error(message = AppLocaleManager.strings.updateFileNotFound)
                 return
             }
 
@@ -305,7 +306,7 @@ class AppUpdateManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Gagal menginstall APK: ${e.message}", e)
             _updateState.value = UpdateState.Error(
-                message = "Gagal menginstall update: ${e.localizedMessage ?: "Unknown error"}"
+                message = AppLocaleManager.strings.updateInstallFailed(e.localizedMessage ?: "Unknown error")
             )
         }
     }

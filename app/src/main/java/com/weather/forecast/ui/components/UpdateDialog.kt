@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.update.UpdateState
 
 /**
@@ -86,6 +87,7 @@ private fun UpdateAvailableDialog(
     onUpdate: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val s = LocalStrings.current
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -98,7 +100,7 @@ private fun UpdateAvailableDialog(
         },
         title = {
             Text(
-                text = "Pembaruan Tersedia",
+                text = s.updateAvailable,
                 textAlign = TextAlign.Center
             )
         },
@@ -107,13 +109,12 @@ private fun UpdateAvailableDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Info versi
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Versi terbaru",
+                        text = s.latestVersion,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -124,13 +125,12 @@ private fun UpdateAvailableDialog(
                     )
                 }
 
-                // Ukuran file
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Ukuran",
+                        text = s.size,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -141,11 +141,10 @@ private fun UpdateAvailableDialog(
                     )
                 }
 
-                // Catatan rilis (jika ada)
                 if (state.releaseNotes.isNotBlank()) {
                     Divider(modifier = Modifier.padding(vertical = 4.dp))
                     Text(
-                        text = "Catatan Rilis:",
+                        text = s.releaseNotes,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -166,12 +165,12 @@ private fun UpdateAvailableDialog(
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Update Sekarang")
+                Text(s.updateNow)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Nanti")
+                Text(s.later)
             }
         }
     )
@@ -183,8 +182,9 @@ private fun UpdateAvailableDialog(
  */
 @Composable
 private fun DownloadingDialog() {
+    val s = LocalStrings.current
     AlertDialog(
-        onDismissRequest = { /* Non-dismissable saat download */ },
+        onDismissRequest = { },
         icon = {
             CircularProgressIndicator(
                 modifier = Modifier.size(48.dp),
@@ -193,14 +193,13 @@ private fun DownloadingDialog() {
         },
         title = {
             Text(
-                text = "Mengunduh Pembaruan",
+                text = s.downloadingUpdate,
                 textAlign = TextAlign.Center
             )
         },
         text = {
             Text(
-                text = "Mohon tunggu, file pembaruan sedang diunduh...\n" +
-                        "Anda dapat melihat progres di panel notifikasi.",
+                text = s.downloadingUpdateDesc,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -214,6 +213,7 @@ private fun DownloadingDialog() {
  */
 @Composable
 private fun ReadyToInstallDialog(onDismiss: () -> Unit) {
+    val s = LocalStrings.current
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -226,16 +226,13 @@ private fun ReadyToInstallDialog(onDismiss: () -> Unit) {
         },
         title = {
             Text(
-                text = "Siap Dipasang",
+                text = s.readyToInstall,
                 textAlign = TextAlign.Center
             )
         },
         text = {
             Text(
-                text = "File pembaruan telah diunduh.\n" +
-                        "Ikuti petunjuk di layar untuk menyelesaikan pembaruan.\n\n" +
-                        "Aplikasi akan otomatis melakukan UPDATE jika sudah terinstall, " +
-                        "atau INSTALL baru jika belum ada.",
+                text = s.readyToInstallDesc,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -256,6 +253,7 @@ private fun ErrorDialog(
     message: String,
     onDismiss: () -> Unit
 ) {
+    val s = LocalStrings.current
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -268,7 +266,7 @@ private fun ErrorDialog(
         },
         title = {
             Text(
-                text = "Gagal Memperbarui",
+                text = s.updateFailed,
                 textAlign = TextAlign.Center
             )
         },
@@ -281,7 +279,7 @@ private fun ErrorDialog(
         },
         confirmButton = {
             Button(onClick = onDismiss) {
-                Text("Tutup")
+                Text(s.close)
             }
         }
     )

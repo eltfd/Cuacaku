@@ -4,6 +4,7 @@ import com.weather.forecast.data.ai.DisasterNeuralNetwork
 import com.weather.forecast.data.ai.WeatherFeatureExtractor
 import com.weather.forecast.data.ai.WeatherFeatures
 import com.weather.forecast.data.ai.WeightDeltas
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.*
 
 /**
@@ -193,7 +194,7 @@ object DisasterAnalysisEngine {
         score += precipScore * 0.35
         dataPoints++
         factors.add(ContributingFactor(
-            name = "Curah Hujan",
+            name = AppLocaleManager.strings.factorRainfall,
             value = "%.1f mm".format(totalPrecip),
             contribution = precipScore,
             isElevating = precipScore > 0.3
@@ -211,7 +212,7 @@ object DisasterAnalysisEngine {
         score += intensityScore * 0.25
         dataPoints++
         factors.add(ContributingFactor(
-            name = "Intensitas Hujan Maks",
+            name = AppLocaleManager.strings.factorRainIntensity,
             value = "%.1f mm/jam".format(maxRainHourly),
             contribution = intensityScore,
             isElevating = intensityScore > 0.3
@@ -231,7 +232,7 @@ object DisasterAnalysisEngine {
             score += dischargeScore * 0.25
             dataPoints++
             factors.add(ContributingFactor(
-                name = "Debit Sungai",
+                name = AppLocaleManager.strings.factorRiverDischarge,
                 value = "%.1f m³/s (%.1fx rata-rata)".format(floodDaily.riverDischarge, ratio),
                 contribution = dischargeScore,
                 isElevating = dischargeScore > 0.3
@@ -250,8 +251,8 @@ object DisasterAnalysisEngine {
         score += atmosphereScore * 0.15
         dataPoints++
         factors.add(ContributingFactor(
-            name = "Atmosfer",
-            value = "Kelembaban ${avgHumidity.toInt()}%, Tekanan ${avgPressure.toInt()} hPa",
+            name = AppLocaleManager.strings.factorAtmosphere,
+            value = AppLocaleManager.strings.factorAtmosphereDesc(avgHumidity.toInt().toString(), avgPressure.toInt().toString()),
             contribution = atmosphereScore,
             isElevating = atmosphereScore > 0.3
         ))
@@ -299,7 +300,7 @@ object DisasterAnalysisEngine {
         score += waveScore * 0.40
         dataPoints++
         factors.add(ContributingFactor(
-            name = "Tinggi Gelombang",
+            name = AppLocaleManager.strings.factorWaveHeight,
             value = "%.1f m".format(maxWave),
             contribution = waveScore,
             isElevating = waveScore > 0.3
@@ -316,7 +317,7 @@ object DisasterAnalysisEngine {
         score += swellScore * 0.20
         if (swellHeight > 0) dataPoints++
         factors.add(ContributingFactor(
-            name = "Swell (Gelombang Laut Lepas)",
+            name = AppLocaleManager.strings.factorSwell,
             value = "%.1f m".format(swellHeight),
             contribution = swellScore,
             isElevating = swellScore > 0.3
@@ -335,7 +336,7 @@ object DisasterAnalysisEngine {
         score += windScore * 0.20
         dataPoints++
         factors.add(ContributingFactor(
-            name = "Angin & Gust",
+            name = AppLocaleManager.strings.factorWindGust,
             value = "%.0f / %.0f km/h".format(windSpeed, windGusts),
             contribution = windScore,
             isElevating = windScore > 0.3
@@ -353,7 +354,7 @@ object DisasterAnalysisEngine {
         score += pressureScore * 0.20
         dataPoints++
         factors.add(ContributingFactor(
-            name = "Tekanan Udara",
+            name = AppLocaleManager.strings.factorAirPressure,
             value = "${pressure.toInt()} hPa",
             contribution = pressureScore,
             isElevating = pressureScore > 0.3
@@ -404,7 +405,7 @@ object DisasterAnalysisEngine {
         }
         score += pressureScore * 0.30
         factors.add(ContributingFactor(
-            name = "Tekanan Minimum",
+            name = AppLocaleManager.strings.factorMinPressure,
             value = "${effectivePressure.toInt()} hPa",
             contribution = pressureScore,
             isElevating = pressureScore > 0.3
@@ -432,7 +433,7 @@ object DisasterAnalysisEngine {
         }
         score += windCycloneScore * 0.35
         factors.add(ContributingFactor(
-            name = "Kecepatan Angin",
+            name = AppLocaleManager.strings.factorWindSpeed,
             value = "%.0f km/h (gust %.0f)".format(maxWindSpeed, maxGusts),
             contribution = windCycloneScore,
             isElevating = windCycloneScore > 0.3
@@ -452,7 +453,7 @@ object DisasterAnalysisEngine {
         }
         score += capeScore * 0.15
         factors.add(ContributingFactor(
-            name = "CAPE",
+            name = AppLocaleManager.strings.factorCAPE,
             value = "${maxCape.toInt()} J/kg",
             contribution = capeScore,
             isElevating = capeScore > 0.3
@@ -468,7 +469,7 @@ object DisasterAnalysisEngine {
         }
         score += precipCycloneScore * 0.20
         factors.add(ContributingFactor(
-            name = "Curah Hujan",
+            name = AppLocaleManager.strings.factorRainfall,
             value = "%.1f mm".format(totalPrecip),
             contribution = precipCycloneScore,
             isElevating = precipCycloneScore > 0.3
@@ -513,7 +514,7 @@ object DisasterAnalysisEngine {
         }
         score += capeScore * 0.35
         factors.add(ContributingFactor(
-            name = "CAPE",
+            name = AppLocaleManager.strings.factorCAPE,
             value = "${maxCape.toInt()} J/kg",
             contribution = capeScore,
             isElevating = capeScore > 0.3
@@ -531,8 +532,8 @@ object DisasterAnalysisEngine {
         }
         score += wmoScore * 0.25
         factors.add(ContributingFactor(
-            name = "Indikator WMO",
-            value = if (hasThunderstormCode) "Badai petir terdeteksi" else "Tidak ada indikasi",
+            name = AppLocaleManager.strings.factorWMO,
+            value = if (hasThunderstormCode) AppLocaleManager.strings.wmoDetected else AppLocaleManager.strings.wmoNone,
             contribution = wmoScore,
             isElevating = wmoScore > 0.3
         ))
@@ -553,7 +554,7 @@ object DisasterAnalysisEngine {
         }
         score += shearScore * 0.20
         factors.add(ContributingFactor(
-            name = "Wind Shear",
+            name = AppLocaleManager.strings.factorWindShear,
             value = "%.0f km/h".format(windShear),
             contribution = shearScore,
             isElevating = shearScore > 0.3
@@ -570,7 +571,7 @@ object DisasterAnalysisEngine {
         }
         score += hailScore * 0.20
         factors.add(ContributingFactor(
-            name = "Potensi Hujan Es",
+            name = AppLocaleManager.strings.factorHailPotential,
             value = "Freezing ${(minFreezing / 1000).toInt()} km, CAPE ${maxCape.toInt()}",
             contribution = hailScore,
             isElevating = hailScore > 0.3
@@ -611,7 +612,7 @@ object DisasterAnalysisEngine {
         }
         score += precipScore * 0.30
         factors.add(ContributingFactor(
-            name = "Curah Hujan Hari Ini",
+            name = AppLocaleManager.strings.factorRainfallToday,
             value = "%.1f mm".format(todayPrecip),
             contribution = precipScore,
             isElevating = precipScore > 0.3
@@ -628,7 +629,7 @@ object DisasterAnalysisEngine {
         }
         score += durationScore * 0.25
         factors.add(ContributingFactor(
-            name = "Durasi Hujan",
+            name = AppLocaleManager.strings.factorRainDuration,
             value = "$rainHours jam",
             contribution = durationScore,
             isElevating = durationScore > 0.3
@@ -647,7 +648,7 @@ object DisasterAnalysisEngine {
         }
         score += antecedentScore * 0.30
         factors.add(ContributingFactor(
-            name = "Akumulasi Hujan 3 Hari",
+            name = AppLocaleManager.strings.factorRain3Day,
             value = "%.0f mm".format(antecedentRain),
             contribution = antecedentScore,
             isElevating = antecedentScore > 0.3
@@ -663,7 +664,7 @@ object DisasterAnalysisEngine {
         }
         score += humidityScore * 0.15
         factors.add(ContributingFactor(
-            name = "Kelembaban Rata-rata",
+            name = AppLocaleManager.strings.factorAvgHumidity,
             value = "${avgHumidity.toInt()}%",
             contribution = humidityScore,
             isElevating = humidityScore > 0.3
@@ -706,7 +707,7 @@ object DisasterAnalysisEngine {
         }
         score += prolongedScore * 0.35
         factors.add(ContributingFactor(
-            name = "Akumulasi Hujan 7 Hari",
+            name = AppLocaleManager.strings.factorRain7Day,
             value = "%.0f mm".format(weeklyPrecip),
             contribution = prolongedScore,
             isElevating = prolongedScore > 0.3
@@ -727,7 +728,7 @@ object DisasterAnalysisEngine {
         }
         score += dischargeScore * 0.25
         factors.add(ContributingFactor(
-            name = "Rasio Debit Sungai",
+            name = AppLocaleManager.strings.factorDischargeRatio,
             value = "%.1fx rata-rata".format(avgDischargeRatio),
             contribution = dischargeScore,
             isElevating = dischargeScore > 0.3
@@ -743,7 +744,7 @@ object DisasterAnalysisEngine {
         }
         score += durationDayScore * 0.25
         factors.add(ContributingFactor(
-            name = "Hari Hujan Berturut",
+            name = AppLocaleManager.strings.factorConsecutiveRain,
             value = "$consecutiveRainDays hari",
             contribution = durationDayScore,
             isElevating = durationDayScore > 0.3
@@ -759,7 +760,7 @@ object DisasterAnalysisEngine {
         }
         score += humidScore * 0.15
         factors.add(ContributingFactor(
-            name = "Kelembaban",
+            name = AppLocaleManager.strings.factorHumidity,
             value = "${avgHumidity.toInt()}%",
             contribution = humidScore,
             isElevating = humidScore > 0.3
@@ -811,7 +812,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.FLOOD, riskScore = score, riskLevel = riskLevel,
             confidence = 0.7, factors = emptyList(),
-            description = "Curah hujan %.0f mm".format(totalPrecip),
+            description = AppLocaleManager.strings.floodAnalysis("%.0f".format(totalPrecip)),
             recommendation = ""
         )
     }
@@ -841,7 +842,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.TIDAL_FLOOD, riskScore = score, riskLevel = riskLevel,
             confidence = if (marine != null) 0.7 else 0.3, factors = emptyList(),
-            description = "Gelombang %.1f m, swell %.1f m".format(wave, swell),
+            description = AppLocaleManager.strings.tidalFloodAnalysis("%.1f".format(wave), "%.1f".format(swell)),
             recommendation = ""
         )
     }
@@ -874,7 +875,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.CYCLONE, riskScore = score, riskLevel = riskLevel,
             confidence = 0.7, factors = emptyList(),
-            description = "Angin %.0f km/h, tekanan %d hPa".format(maxWind, pressure.toInt()),
+            description = AppLocaleManager.strings.cycloneAnalysis("%.0f".format(maxWind), pressure.toInt().toString()),
             recommendation = ""
         )
     }
@@ -905,7 +906,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.THUNDERSTORM, riskScore = score, riskLevel = riskLevel,
             confidence = 0.8, factors = emptyList(),
-            description = "CAPE ${maxCape.toInt()} J/kg" + if (hasTs) " ⛈ Badai petir" else "",
+            description = AppLocaleManager.strings.thunderstormAnalysis(maxCape.toInt().toString()) + if (hasTs) "" else "",
             recommendation = ""
         )
     }
@@ -937,7 +938,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.LANDSLIDE, riskScore = score, riskLevel = riskLevel,
             confidence = 0.6, factors = emptyList(),
-            description = "Hujan %.0f mm, akumulasi %.0f mm".format(todayPrecip, antecedentRain),
+            description = AppLocaleManager.strings.landslideAnalysis("%.0f".format(todayPrecip), "%.0f".format(antecedentRain)),
             recommendation = ""
         )
     }
@@ -969,7 +970,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.GROUND_SUBSIDENCE, riskScore = score, riskLevel = riskLevel,
             confidence = 0.5, factors = emptyList(),
-            description = "Akumulasi %.0f mm / %d hari hujan".format(cumulPrecip, rDays),
+            description = AppLocaleManager.strings.subsidenceAnalysis("%.0f".format(cumulPrecip), rDays),
             recommendation = ""
         )
     }
@@ -987,153 +988,44 @@ object DisasterAnalysisEngine {
         }
     }
 
-    // ── Description Builders ──
+    // ── Description Builders (delegating to AppStrings) ──
+
+    private fun riskInt(risk: RiskLevel) = when (risk) {
+        RiskLevel.EXTREME -> 3; RiskLevel.HIGH -> 2; RiskLevel.MODERATE -> 1; RiskLevel.LOW -> 0
+    }
 
     private fun buildFloodDescription(risk: RiskLevel, precip: Double, maxRain: Double, flood: DailyFloodData?): String {
-        return buildString {
-            when (risk) {
-                RiskLevel.EXTREME -> append("🔴 BAHAYA BANJIR — ")
-                RiskLevel.HIGH -> append("🟠 Waspada banjir — ")
-                RiskLevel.MODERATE -> append("🟡 Potensi banjir — ")
-                RiskLevel.LOW -> append("🟢 Risiko banjir rendah — ")
-            }
-            append("Curah hujan prakiraan %.0f mm dengan intensitas hingga %.0f mm/jam. ".format(precip, maxRain))
-            if (flood != null && flood.dischargeMean > 0) {
-                val ratio = flood.riverDischarge / flood.dischargeMean
-                append("Debit sungai %.1fx dari rata-rata normal.".format(ratio))
-            }
+        val ratioStr = flood?.let {
+            if (it.dischargeMean > 0) "%.1f".format(it.riverDischarge / it.dischargeMean) else null
         }
+        return AppLocaleManager.strings.floodDesc(riskInt(risk), "%.0f".format(precip), "%.0f".format(maxRain), ratioStr)
     }
 
-    private fun buildFloodRecommendation(risk: RiskLevel): String {
-        return when (risk) {
-            RiskLevel.EXTREME -> "Segera evakuasi jika berada di daerah rawan banjir. Hindari aliran sungai dan daerah rendah."
-            RiskLevel.HIGH -> "Siapkan tas darurat dan jalur evakuasi. Pantau ketinggian air secara berkala."
-            RiskLevel.MODERATE -> "Waspadai genangan air. Hindari berkendara saat hujan lebat di daerah rendah."
-            RiskLevel.LOW -> "Kondisi normal. Tetap waspada jika hujan turun terus-menerus."
-        }
-    }
+    private fun buildFloodRecommendation(risk: RiskLevel) = AppLocaleManager.strings.floodRec(riskInt(risk))
 
-    private fun buildTidalFloodDescription(risk: RiskLevel, wave: Double, swell: Double, hasMarine: Boolean): String {
-        return buildString {
-            when (risk) {
-                RiskLevel.EXTREME -> append("🔴 BAHAYA BANJIR ROB — ")
-                RiskLevel.HIGH -> append("🟠 Waspada banjir rob — ")
-                RiskLevel.MODERATE -> append("🟡 Potensi banjir rob — ")
-                RiskLevel.LOW -> append("🟢 Risiko banjir rob rendah — ")
-            }
-            if (hasMarine) {
-                append("Gelombang hingga %.1f m dengan swell %.1f m. ".format(wave, swell))
-                append("Daerah pesisir dan pelabuhan perlu waspada.")
-            } else {
-                append("Data laut tidak tersedia untuk lokasi ini. Analisis berdasarkan data angin dan tekanan.")
-            }
-        }
-    }
+    private fun buildTidalFloodDescription(risk: RiskLevel, wave: Double, swell: Double, hasMarine: Boolean) =
+        AppLocaleManager.strings.tidalFloodDesc(riskInt(risk), "%.1f".format(wave), "%.1f".format(swell), hasMarine)
 
-    private fun buildTidalFloodRecommendation(risk: RiskLevel, hasMarine: Boolean): String {
-        if (!hasMarine) return "Data laut tidak tersedia. Pantau informasi BMKG untuk peringatan gelombang tinggi."
-        return when (risk) {
-            RiskLevel.EXTREME -> "Jauhi pantai dan pelabuhan. Nelayan dilarang melaut. Evakuasi pemukiman pesisir."
-            RiskLevel.HIGH -> "Hindari aktivitas di pantai. Nelayan berhati-hati. Waspadai air pasang."
-            RiskLevel.MODERATE -> "Waspada saat di pesisir. Nelayan perhatikan prakiraan gelombang."
-            RiskLevel.LOW -> "Kondisi laut relatif aman. Tetap perhatikan prakiraan cuaca maritim."
-        }
-    }
+    private fun buildTidalFloodRecommendation(risk: RiskLevel, hasMarine: Boolean) =
+        AppLocaleManager.strings.tidalFloodRec(riskInt(risk), hasMarine)
 
-    private fun buildCycloneDescription(risk: RiskLevel, pressure: Double, wind: Double, gusts: Double): String {
-        return buildString {
-            when (risk) {
-                RiskLevel.EXTREME -> append("🔴 BAHAYA SIKLON — ")
-                RiskLevel.HIGH -> append("🟠 Waspada siklon/badai — ")
-                RiskLevel.MODERATE -> append("🟡 Indikasi cuaca siklonik — ")
-                RiskLevel.LOW -> append("🟢 Tidak ada indikasi siklon — ")
-            }
-            append("Tekanan %d hPa, angin %.0f km/h (gust %.0f km/h). ".format(
-                pressure.toInt(), wind, gusts
-            ))
-            if (risk >= RiskLevel.HIGH) {
-                append("Kondisi atmosfer menunjukkan pola siklonik.")
-            }
-        }
-    }
+    private fun buildCycloneDescription(risk: RiskLevel, pressure: Double, wind: Double, gusts: Double) =
+        AppLocaleManager.strings.cycloneDesc(riskInt(risk), pressure.toInt().toString(), "%.0f".format(wind), "%.0f".format(gusts))
 
-    private fun buildCycloneRecommendation(risk: RiskLevel): String {
-        return when (risk) {
-            RiskLevel.EXTREME -> "DARURAT! Segera cari perlindungan. Ikuti instruksi evakuasi. Jauhi pantai dan bangunan rapuh."
-            RiskLevel.HIGH -> "Amankan properti, siapkan kebutuhan darurat. Pantau informasi BMKG secara intens."
-            RiskLevel.MODERATE -> "Perhatikan perkembangan cuaca. Hindari aktivitas luar ruangan yang berisiko."
-            RiskLevel.LOW -> "Kondisi normal. Tidak ada indikasi gangguan siklonik signifikan."
-        }
-    }
+    private fun buildCycloneRecommendation(risk: RiskLevel) = AppLocaleManager.strings.cycloneRec(riskInt(risk))
 
-    private fun buildThunderstormDescription(risk: RiskLevel, cape: Double, gusts: Double, hasTs: Boolean): String {
-        return buildString {
-            when (risk) {
-                RiskLevel.EXTREME -> append("🔴 BADAI PETIR HEBAT — ")
-                RiskLevel.HIGH -> append("🟠 Waspada badai petir — ")
-                RiskLevel.MODERATE -> append("🟡 Potensi badai petir — ")
-                RiskLevel.LOW -> append("🟢 Risiko badai petir rendah — ")
-            }
-            append("CAPE ${cape.toInt()} J/kg, gust hingga %.0f km/h. ".format(gusts))
-            if (hasTs) append("Kode cuaca mengindikasikan badai petir aktif.")
-        }
-    }
+    private fun buildThunderstormDescription(risk: RiskLevel, cape: Double, gusts: Double, hasTs: Boolean) =
+        AppLocaleManager.strings.thunderstormDesc(riskInt(risk), cape.toInt().toString(), "%.0f".format(gusts), hasTs)
 
-    private fun buildThunderstormRecommendation(risk: RiskLevel): String {
-        return when (risk) {
-            RiskLevel.EXTREME -> "Segera masuk bangunan! Jauhi pohon tinggi, tiang listrik, dan tempat terbuka."
-            RiskLevel.HIGH -> "Hindari aktivitas luar ruangan. Cabut peralatan elektronik dari stop kontak."
-            RiskLevel.MODERATE -> "Waspadai petir saat berada di luar. Siapkan perlindungan."
-            RiskLevel.LOW -> "Kondisi relatif aman. Tetap waspada jika langit mendung gelap."
-        }
-    }
+    private fun buildThunderstormRecommendation(risk: RiskLevel) = AppLocaleManager.strings.thunderstormRec(riskInt(risk))
 
-    private fun buildLandslideDescription(risk: RiskLevel, precip: Double, antecedent: Double, hours: Int): String {
-        return buildString {
-            when (risk) {
-                RiskLevel.EXTREME -> append("🔴 BAHAYA LONGSOR — ")
-                RiskLevel.HIGH -> append("🟠 Waspada longsor — ")
-                RiskLevel.MODERATE -> append("🟡 Potensi longsor — ")
-                RiskLevel.LOW -> append("🟢 Risiko longsor rendah — ")
-            }
-            append("Curah hujan %.0f mm selama $hours jam. ".format(precip))
-            if (antecedent > 50) {
-                append("Akumulasi 3 hari: %.0f mm — tanah mulai jenuh air.".format(antecedent))
-            }
-        }
-    }
+    private fun buildLandslideDescription(risk: RiskLevel, precip: Double, antecedent: Double, hours: Int) =
+        AppLocaleManager.strings.landslideDesc(riskInt(risk), "%.0f".format(precip), "%.0f".format(antecedent), hours)
 
-    private fun buildLandslideRecommendation(risk: RiskLevel): String {
-        return when (risk) {
-            RiskLevel.EXTREME -> "SEGERA EVAKUASI jika berada di lereng/perbukitan! Jauhi tebing dan aliran air."
-            RiskLevel.HIGH -> "Siaga evakuasi. Perhatikan retakan tanah. Jauhi lereng curam saat hujan."
-            RiskLevel.MODERATE -> "Waspadai tanda-tanda longsor: tanah retak, air keruh, suara gemuruh dari bukit."
-            RiskLevel.LOW -> "Kondisi normal. Perhatikan jika hujan terus-menerus selama beberapa hari."
-        }
-    }
+    private fun buildLandslideRecommendation(risk: RiskLevel) = AppLocaleManager.strings.landslideRec(riskInt(risk))
 
-    private fun buildSubsidenceDescription(risk: RiskLevel, weeklyPrecip: Double, rainDays: Int): String {
-        return buildString {
-            when (risk) {
-                RiskLevel.EXTREME -> append("🔴 WASPADA AMBLASAN — ")
-                RiskLevel.HIGH -> append("🟠 Potensi tanah amblas — ")
-                RiskLevel.MODERATE -> append("🟡 Indikasi tanah amblas — ")
-                RiskLevel.LOW -> append("🟢 Risiko amblas rendah — ")
-            }
-            append("Akumulasi hujan 7 hari: %.0f mm, $rainDays hari hujan berturut-turut. ".format(weeklyPrecip))
-            if (risk >= RiskLevel.MODERATE) {
-                append("Genangan berkepanjangan dapat melemahkan struktur tanah.")
-            }
-        }
-    }
+    private fun buildSubsidenceDescription(risk: RiskLevel, weeklyPrecip: Double, rainDays: Int) =
+        AppLocaleManager.strings.subsidenceDesc(riskInt(risk), "%.0f".format(weeklyPrecip), rainDays)
 
-    private fun buildSubsidenceRecommendation(risk: RiskLevel): String {
-        return when (risk) {
-            RiskLevel.EXTREME -> "Hindari jalan yang tergenang lama. Periksa fondasi bangunan. Laporkan retakan tanah."
-            RiskLevel.HIGH -> "Waspadai genangan yang tidak surut. Perhatikan penurunan permukaan tanah."
-            RiskLevel.MODERATE -> "Pantau genangan air di sekitar rumah. Pastikan drainase berfungsi baik."
-            RiskLevel.LOW -> "Kondisi normal. Pastikan saluran air tidak tersumbat."
-        }
-    }
+    private fun buildSubsidenceRecommendation(risk: RiskLevel) = AppLocaleManager.strings.subsidenceRec(riskInt(risk))
 }

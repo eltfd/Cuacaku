@@ -15,6 +15,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.weather.forecast.MainActivity
 import com.weather.forecast.R
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.CurrentWeatherData
 import com.weather.forecast.data.model.DailyWeatherData
 import com.weather.forecast.data.model.RiskLevel
@@ -115,14 +116,15 @@ class WeatherNotificationManager(private val context: Context) {
     ) {
         if (!hasNotificationPermission()) return
 
-        val title = "Prakiraan Cuaca Hari Ini"
+        val s = AppLocaleManager.strings
+        val title = s.notifDailyTitle
         val content = buildString {
             append("$locationName: ${current.temperatureFormatted}")
-            append(" • ${current.weatherCondition.descriptionId}")
+            append(" • ${s.localized(current.weatherCondition.description, current.weatherCondition.descriptionId)}")
             today?.let {
-                append("\nMaks: ${it.temperatureMaxFormatted} / Min: ${it.temperatureMinFormatted}")
+                append("\n${s.notifMaxMin(it.temperatureMaxFormatted, it.temperatureMinFormatted)}")
                 if (it.precipitationProbabilityMax > 30) {
-                    append(" • Hujan: ${it.precipitationProbabilityFormatted}")
+                    append(" • ${s.notifRain(it.precipitationProbabilityFormatted)}")
                 }
             }
         }
@@ -145,8 +147,9 @@ class WeatherNotificationManager(private val context: Context) {
         if (!hasNotificationPermission()) return
         if (!WeatherCondition.isSevereWeather(weatherCode)) return
 
-        val title = "⚠️ Peringatan Cuaca Ekstrem"
-        val content = "$locationName: $description. Harap berhati-hati!"
+        val s = AppLocaleManager.strings
+        val title = s.notifSevereWeather
+        val content = s.notifSevereWeatherDesc(locationName, description)
 
         val notification = createNotification(
             channelId = NotificationChannels.WEATHER_ALERTS,
@@ -166,8 +169,9 @@ class WeatherNotificationManager(private val context: Context) {
         if (!hasNotificationPermission()) return
         if (precipitationProbability < 50) return
 
-        val title = "🌧️ Peringatan Hujan"
-        val content = "$locationName: Kemungkinan hujan $precipitationProbability% sekitar $expectedTime"
+        val s = AppLocaleManager.strings
+        val title = s.notifRainWarning
+        val content = "$locationName: ${s.notifRainDesc(precipitationProbability.toString() + "%", expectedTime)}"
 
         val notification = createNotification(
             channelId = NotificationChannels.WEATHER_ALERTS,
@@ -186,9 +190,10 @@ class WeatherNotificationManager(private val context: Context) {
     ) {
         if (!hasNotificationPermission()) return
 
-        val title = if (isHigh) "🌡️ Suhu Tinggi" else "❄️ Suhu Rendah"
-        val content = "$locationName: Suhu saat ini ${temperature.toInt()}°C. " +
-            if (isHigh) "Hindari paparan sinar matahari langsung." else "Gunakan pakaian hangat."
+        val s = AppLocaleManager.strings
+        val title = if (isHigh) s.notifHighTemp else s.notifLowTemp
+        val content = "$locationName: ${s.notifTempDesc(temperature.toInt().toString())} " +
+            if (isHigh) s.notifSunProtection else s.notifWarmClothes
 
         val notification = createNotification(
             channelId = NotificationChannels.WEATHER_ALERTS,
@@ -251,16 +256,17 @@ class WeatherNotificationManager(private val context: Context) {
         alerts: List<WeatherAlert>,
         potential: WeatherPotential
     ) {
-        val alertSummary = alerts.joinToString(", ") { it.descriptionId }
+        val s = AppLocaleManager.strings
+        val alertSummary = alerts.joinToString(", ") { s.localized(it.description, it.descriptionId) }
 
-        val title = "⚠️ Peringatan Cuaca Risiko Tinggi"
+        val title = s.notifHighRiskWarning
         val content = buildString {
             append("$locationName — ")
             append(alertSummary)
             if (potential.maxWindGusts > 0) {
-                append("\nAngin hingga ${potential.maxWindGusts.toInt()} km/h")
+                append("\n${s.notifWindWarning(potential.maxWindGusts.toInt().toString())}")
             }
-            append("\nHarap berhati-hati dan pantau perkembangan cuaca.")
+            append("\n${s.notifWeatherMonitor}")
         }
 
         val notification = createNotification(
@@ -294,22 +300,23 @@ class WeatherNotificationManager(private val context: Context) {
         val extremeAlerts = alerts.filter { it.risk == RiskLevel.EXTREME }
         val highAlerts = alerts.filter { it.risk == RiskLevel.HIGH }
 
+        val s = AppLocaleManager.strings
         val alertSummary = (extremeAlerts + highAlerts).joinToString(", ") {
-            "${it.type.labelId} (${it.risk.labelId})"
+            "${s.localized(it.type.label, it.type.labelId)} (${s.localized(it.risk.label, it.risk.labelId)})"
         }
 
-        val title = "🚨 DARURAT CUACA EKSTREM"
+        val title = s.notifEmergencyWeather
         val content = buildString {
-            append("$locationName — SITUASI GAWAT DARURAT\n")
+            append("$locationName — ${s.notifEmergencyTitle}\n")
             append(alertSummary)
             append("\n")
             if (potential.maxWindGusts > 0) {
-                append("Angin hingga ${potential.maxWindGusts.toInt()} km/h. ")
+                append("${s.notifEmergencyWind(potential.maxWindGusts.toInt().toString())} ")
             }
             if (potential.maxCape > 0) {
                 append("CAPE: ${potential.maxCape.toInt()} J/kg. ")
             }
-            append("\n⚠️ SEGERA CARI PERLINDUNGAN ATAU MENGUNGSI!")
+            append("\n${s.notifSeekShelter}")
         }
 
         val intent = Intent(context, MainActivity::class.java).apply {
