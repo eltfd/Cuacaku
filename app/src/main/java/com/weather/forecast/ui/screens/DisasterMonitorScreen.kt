@@ -348,7 +348,7 @@ private fun MonitorHeader(data: ActiveDisasterMonitor, onRefresh: () -> Unit) {
             IconButton(onClick = onRefresh) {
                 Icon(
                     Icons.Default.Refresh,
-                    contentDescription = "Refresh",
+                    contentDescription = s.refresh,
                     tint = Color.White.copy(alpha = 0.7f)
                 )
             }

@@ -355,18 +355,8 @@ enum class FloodRisk(
 // ===================== HELPER =====================
 
 /**
- * Convert derajat ke arah mata angin
+ * Convert derajat ke arah mata angin (locale-aware)
  */
 fun degreesToDirection(degrees: Int): String {
-    return when {
-        degrees in 0..22 || degrees in 338..360 -> "U"
-        degrees in 23..67 -> "TL"
-        degrees in 68..112 -> "T"
-        degrees in 113..157 -> "TG"
-        degrees in 158..202 -> "S"
-        degrees in 203..247 -> "BD"
-        degrees in 248..292 -> "B"
-        degrees in 293..337 -> "BL"
-        else -> "-"
-    }
+    return com.weather.forecast.data.locale.AppLocaleManager.strings.windDirectionShort(degrees)
 }

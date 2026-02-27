@@ -771,6 +771,87 @@ class AppStrings(val locale: AppLocale) {
     val soilTemperature = s("Suhu Tanah", "Soil Temperature")
     val landslideRiskFactors = s("Faktor Risiko Longsor", "Landslide Risk Factors")
 
+    // ═══ Terrain soil status ═══
+    val soilSaturated = s("Jenuh", "Saturated")
+    val soilWet = s("Basah", "Wet")
+    val soilNormal = s("Normal", "Normal")
+    val terrainDataSourceLabel = s("Open-Elevation SRTM + Open-Meteo Soil", "Open-Elevation SRTM + Open-Meteo Soil")
+    val rainfallTodayShort = s("🌧️ Hari Ini", "🌧️ Today")
+    val rain3DayShort = s("📊 3 Hari", "📊 3-Day")
+    val maxPerHourShort = s("⚡ Maks/jam", "⚡ Max/hr")
+    val elevationGridLabel = s("📍 Grid Elevasi (SRTM 30m)", "📍 Elevation Grid (SRTM 30m)")
+    val aboveSeaLevel = s("dpl", "ASL")
+
+    // ═══ Disaster Forecast Screen ═══
+    val nnSubtitle = s("Neural Network + Analisis Berbasis Aturan", "Neural Network + Rule-Based Ensemble")
+    val aboutAnalysisDescV2 = s(
+        "Analisis menggunakan Neural Network (MLP 22→32→16→6) " +
+                "dengan domain-informed initialization + incremental learning. " +
+                "Model belajar otomatis dari data harian (maks 50 sampel, ~16 KB). " +
+                "Data > 30 hari otomatis dihapus. Terrain analysis via Open-Elevation (SRTM 30m), " +
+                "soil moisture via Open-Meteo, event monitoring via NASA EONET v3. " +
+                "Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017), " +
+                "Sahoo et al. (ICML 2018). " +
+                "Data dari Open-Meteo, Marine API, GloFAS/ECMWF. " +
+                "Prakiraan bersifat indikatif — ikuti peringatan resmi BMKG.",
+        "Analysis uses Neural Network (MLP 22→32→16→6) " +
+                "with domain-informed initialization + incremental learning. " +
+                "Model auto-learns from daily data (max 50 samples, ~16 KB). " +
+                "Data older than 30 days is auto-deleted. Terrain analysis via Open-Elevation (SRTM 30m), " +
+                "soil moisture via Open-Meteo, event monitoring via NASA EONET v3. " +
+                "References: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017), " +
+                "Sahoo et al. (ICML 2018). " +
+                "Data from Open-Meteo, Marine API, GloFAS/ECMWF. " +
+                "Forecast is indicative — follow official warnings from meteorological agencies."
+    )
+    val aiEngineLineV2 = s(
+        "AI Engine: MLP-v1.2 + Incremental Learning • Open-Meteo • GloFAS • NASA EONET",
+        "AI Engine: MLP-v1.2 + Incremental Learning • Open-Meteo • GloFAS • NASA EONET"
+    )
+
+    // ═══ DisasterAnalysisEngine summary ═══
+    val summaryAllClear = s(
+        "✅ Kondisi aman — tidak terdeteksi potensi bencana signifikan dalam 24 jam ke depan. Tetap pantau pembaruan cuaca secara berkala.",
+        "✅ All clear — no significant disaster potential detected in the next 24 hours. Continue to monitor weather updates regularly."
+    )
+    fun summaryWarning(types: String, risk: String) = s(
+        "⚠️ PERINGATAN: Terdeteksi potensi $types dengan risiko $risk. ",
+        "⚠️ WARNING: Potential $types detected with $risk risk. "
+    )
+    fun summaryAlsoWatch(types: String) = s(
+        "Perhatikan juga potensi $types (risiko sedang). ",
+        "Also watch for $types potential (moderate risk). "
+    )
+    val summaryStayAlert = s(
+        "Harap waspada dan ikuti arahan pihak berwenang.",
+        "Stay alert and follow instructions from authorities."
+    )
+
+    // ═══ DisasterType bilingual descriptions ═══
+    val descFlood = s("Banjir akibat curah hujan tinggi dan debit sungai meningkat", "Flooding due to high rainfall and increased river discharge")
+    val descTidalFlood = s("Banjir rob akibat gelombang tinggi dan pasang air laut", "Tidal flooding due to high waves and sea level rise")
+    val descCyclone = s("Siklon tropis atau angin topan dengan angin kencang & tekanan rendah", "Tropical cyclone or typhoon with strong winds & low pressure")
+    val descThunderstorm = s("Badai petir disertai hujan lebat, angin kencang, dan kemungkinan hujan es", "Severe thunderstorm with heavy rain, strong winds, and possible hail")
+    val descLandslide = s("Potensi longsor akibat hujan terus-menerus yang meresap ke tanah", "Landslide potential from continuous rain seeping into the soil")
+    val descSubsidence = s("Potensi amblasan tanah akibat genangan air berkepanjangan", "Ground subsidence potential from prolonged waterlogging")
+
+    // ═══ ActiveDisasterType bilingual labels ═══
+    val activeFlood = s("Banjir", "Flood")
+    val activeFlashFlood = s("Banjir Bandang", "Flash Flood")
+    val activeLandslide = s("Tanah Longsor", "Landslide")
+    val activeTidalFlood = s("Banjir Rob", "Tidal Flood")
+    val activeCyclone = s("Siklon Tropis", "Tropical Cyclone")
+    val activeEarthquake = s("Gempa Bumi", "Earthquake")
+    val activeVolcanic = s("Erupsi Gunung Api", "Volcanic Eruption")
+    val activeTsunami = s("Tsunami", "Tsunami")
+    val activeDrought = s("Kekeringan", "Drought")
+    val activeOther = s("Bencana Lainnya", "Other Disaster")
+
+    // ═══ SeaCondition bilingual descriptions ═══
+    fun seaCondDesc(minH: String, maxH: String) = s("Gelombang $minH-$maxH m", "Waves $minH-$maxH m")
+    val seaCondCalm = s("Gelombang < 0.1 m", "Waves < 0.1 m")
+    val seaCondVeryHigh = s("Gelombang > 9 m", "Waves > 9 m")
+
     companion object {
         val ID = AppStrings(AppLocale.ID)
         val EN = AppStrings(AppLocale.EN)

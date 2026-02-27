@@ -104,25 +104,24 @@ object DisasterAnalysisEngine {
      * Buat ringkasan narasi AI
      */
     fun generateSummary(predictions: List<DisasterPrediction>): String {
+        val s = AppLocaleManager.strings
         val highRisks = predictions.filter { it.riskLevel >= RiskLevel.HIGH }
         val moderateRisks = predictions.filter { it.riskLevel == RiskLevel.MODERATE }
 
         return buildString {
             if (highRisks.isEmpty() && moderateRisks.isEmpty()) {
-                append("✅ Kondisi aman — tidak terdeteksi potensi bencana signifikan dalam 24 jam ke depan. ")
-                append("Tetap pantau pembaruan cuaca secara berkala.")
+                append(s.summaryAllClear)
             } else {
                 if (highRisks.isNotEmpty()) {
-                    append("⚠️ PERINGATAN: Terdeteksi potensi ")
-                    append(highRisks.joinToString(", ") { it.type.labelId })
-                    append(" dengan risiko ${highRisks.first().riskLevel.labelId}. ")
+                    val types = highRisks.joinToString(", ") { s.localized(it.type.label, it.type.labelId) }
+                    val risk = s.localized(highRisks.first().riskLevel.label, highRisks.first().riskLevel.labelId)
+                    append(s.summaryWarning(types, risk))
                 }
                 if (moderateRisks.isNotEmpty()) {
-                    append("Perhatikan juga potensi ")
-                    append(moderateRisks.joinToString(", ") { it.type.labelId })
-                    append(" (risiko sedang). ")
+                    val types = moderateRisks.joinToString(", ") { s.localized(it.type.label, it.type.labelId) }
+                    append(s.summaryAlsoWatch(types))
                 }
-                append("Harap waspada dan ikuti arahan pihak berwenang.")
+                append(s.summaryStayAlert)
             }
         }
     }

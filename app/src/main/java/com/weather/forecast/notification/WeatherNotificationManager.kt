@@ -450,13 +450,13 @@ class WeatherNotificationManager(private val context: Context) {
             append("🚨 $locationName — ${s.notifDisasterExtremeHeader}\n\n")
             extremeRisks.forEach { pred ->
                 append("🔴 ${pred.type.icon} ${s.localized(pred.type.label, pred.type.labelId)}: ")
-                append("EXTREME (${("%.0f".format(pred.confidence * 100))}%)\n")
+                append("${s.localized(pred.riskLevel.label, pred.riskLevel.labelId)} (${("%.0f".format(pred.confidence * 100))}%)\n")
                 append("   ${pred.description.take(120)}\n\n")
             }
             if (highRisks.isNotEmpty()) {
                 highRisks.forEach { pred ->
                     append("🟠 ${pred.type.icon} ${s.localized(pred.type.label, pred.type.labelId)}: ")
-                    append("HIGH (${("%.0f".format(pred.confidence * 100))}%)\n")
+                    append("${s.localized(pred.riskLevel.label, pred.riskLevel.labelId)} (${("%.0f".format(pred.confidence * 100))}%)\n")
                 }
                 append("\n")
             }

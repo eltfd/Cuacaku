@@ -83,19 +83,20 @@ data class AffectedLocation(
  */
 enum class ActiveDisasterType(
     val label: String,
+    val labelId: String,
     val icon: String,
     val colorHex: Long
 ) {
-    FLOOD("Flood", "🌊", 0xFF1565C0),
-    FLASH_FLOOD("Flash Flood", "⚡🌊", 0xFF0D47A1),
-    LANDSLIDE("Landslide", "⛰️", 0xFF795548),
-    TIDAL_FLOOD("Tidal Flood", "🌊🌙", 0xFF00838F),
-    CYCLONE("Tropical Cyclone", "🌀", 0xFF880E4F),
-    EARTHQUAKE("Earthquake", "📳", 0xFFD84315),
-    VOLCANIC("Volcanic Eruption", "🌋", 0xFFBF360C),
-    TSUNAMI("Tsunami", "🌊💨", 0xFF01579B),
-    DROUGHT("Drought", "☀️🔥", 0xFFE65100),
-    OTHER("Other Disaster", "⚠️", 0xFF616161)
+    FLOOD("Flood", "Banjir", "🌊", 0xFF1565C0),
+    FLASH_FLOOD("Flash Flood", "Banjir Bandang", "⚡🌊", 0xFF0D47A1),
+    LANDSLIDE("Landslide", "Tanah Longsor", "⛰️", 0xFF795548),
+    TIDAL_FLOOD("Tidal Flood", "Banjir Rob", "🌊🌙", 0xFF00838F),
+    CYCLONE("Tropical Cyclone", "Siklon Tropis", "🌀", 0xFF880E4F),
+    EARTHQUAKE("Earthquake", "Gempa Bumi", "📳", 0xFFD84315),
+    VOLCANIC("Volcanic Eruption", "Erupsi Gunung Api", "🌋", 0xFFBF360C),
+    TSUNAMI("Tsunami", "Tsunami", "🌊💨", 0xFF01579B),
+    DROUGHT("Drought", "Kekeringan", "☀️🔥", 0xFFE65100),
+    OTHER("Other Disaster", "Bencana Lainnya", "⚠️", 0xFF616161)
 }
 
 /**

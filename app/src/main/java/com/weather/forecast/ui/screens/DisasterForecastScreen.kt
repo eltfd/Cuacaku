@@ -238,7 +238,7 @@ private fun DisasterHeader(riskLevel: RiskLevel) {
                     color = Color.White
                 )
                 Text(
-                    text = "Neural Network + Rule-Based Ensemble",
+                    text = s.nnSubtitle,
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White.copy(alpha = 0.6f)
                 )
@@ -264,7 +264,7 @@ private fun DisasterHeader(riskLevel: RiskLevel) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Status: ${s.localized(riskLevel.label, riskLevel.labelId)}",
+                text = s.statusLabel(s.localized(riskLevel.label, riskLevel.labelId)),
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
@@ -448,7 +448,7 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
                         color = Color.White
                     )
                     Text(
-                        text = prediction.type.description,
+                        text = LocalStrings.current.localized(prediction.type.descriptionEn, prediction.type.description),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.5f),
                         maxLines = 1
@@ -936,7 +936,7 @@ private fun TerrainAnalysisCard(terrainData: LandslideTerrainData) {
                         color = Color.White
                     )
                     Text(
-                        text = "Open-Elevation SRTM + Open-Meteo Soil",
+                        text = s.terrainDataSourceLabel,
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.5f)
                     )
@@ -978,9 +978,9 @@ private fun TerrainAnalysisCard(terrainData: LandslideTerrainData) {
                     label = s.soilSaturation,
                     value = satPct,
                     subLabel = when {
-                        terrainData.soilSaturationIndex > 0.8 -> "Jenuh / Saturated"
-                        terrainData.soilSaturationIndex > 0.5 -> "Basah / Wet"
-                        else -> "Normal"
+                        terrainData.soilSaturationIndex > 0.8 -> s.soilSaturated
+                        terrainData.soilSaturationIndex > 0.5 -> s.soilWet
+                        else -> s.soilNormal
                     },
                     color = Color(
                         when {
@@ -996,7 +996,7 @@ private fun TerrainAnalysisCard(terrainData: LandslideTerrainData) {
                     icon = "🏔️",
                     label = s.elevation,
                     value = "%.0f m".format(terrainData.elevation),
-                    subLabel = "ASL",
+                    subLabel = s.aboveSeaLevel,
                     color = Color.White
                 )
             }
@@ -1070,15 +1070,15 @@ private fun TerrainAnalysisCard(terrainData: LandslideTerrainData) {
                     // Rainfall metrics
                     Row(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("🌧️ Today", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text(s.rainfallTodayShort, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                             Text("%.1f mm".format(terrainData.todayPrecipitation), style = MaterialTheme.typography.bodySmall, color = Color.White)
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("📊 3-Day", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text(s.rain3DayShort, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                             Text("%.1f mm".format(terrainData.antecedentRainfall), style = MaterialTheme.typography.bodySmall, color = Color.White)
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("⚡ Max/hr", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text(s.maxPerHourShort, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                             Text("%.1f mm".format(terrainData.maxRainfallIntensity), style = MaterialTheme.typography.bodySmall, color = Color.White)
                         }
                     }
@@ -1087,7 +1087,7 @@ private fun TerrainAnalysisCard(terrainData: LandslideTerrainData) {
                     if (terrainData.elevationGrid.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "📍 Elevation Grid (SRTM 30m)",
+                            text = s.elevationGridLabel,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = Color.White.copy(alpha = 0.6f)
                         )
@@ -1216,15 +1216,7 @@ private fun DisasterFooter() {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Analisis menggunakan Neural Network (MLP 22→32→16→6) " +
-                    "dengan domain-informed initialization + incremental learning. " +
-                    "Model belajar otomatis dari data harian (maks 50 sampel, ~16 KB). " +
-                    "Data > 30 hari otomatis dihapus. Terrain analysis via Open-Elevation (SRTM 30m), " +
-                    "soil moisture via Open-Meteo, event monitoring via NASA EONET v3. " +
-                    "Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017), " +
-                    "Sahoo et al. (ICML 2018). " +
-                    "Data dari Open-Meteo, Marine API, GloFAS/ECMWF. " +
-                    "Prakiraan bersifat indikatif — ikuti peringatan resmi BMKG.",
+                text = LocalStrings.current.aboutAnalysisDescV2,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.4f),
                 lineHeight = 16.sp
@@ -1233,7 +1225,7 @@ private fun DisasterFooter() {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "AI Engine: MLP-v1.2 + Incremental Learning • Open-Meteo • GloFAS • NASA EONET",
+                text = LocalStrings.current.aiEngineLineV2,
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.3f)
             )

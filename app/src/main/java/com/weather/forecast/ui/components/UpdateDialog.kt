@@ -239,7 +239,7 @@ private fun ReadyToInstallDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             Button(onClick = onDismiss) {
-                Text("OK")
+                Text(s.ok)
             }
         }
     )

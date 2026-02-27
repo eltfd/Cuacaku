@@ -180,13 +180,13 @@ private fun WeatherTopBar(
             placeholder = { Text(s.searchPlaceholder) },
             leadingIcon = {
                 IconButton(onClick = { onSearchBarToggle(false) }) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.Default.ArrowBack, contentDescription = s.back)
                 }
             },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { onSearchQueryChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                        Icon(Icons.Default.Clear, contentDescription = s.clear)
                     }
                 }
             },
@@ -207,10 +207,10 @@ private fun WeatherTopBar(
             },
             actions = {
                 IconButton(onClick = { onSearchBarToggle(true) }) {
-                    Icon(Icons.Default.Search, contentDescription = "Search")
+                    Icon(Icons.Default.Search, contentDescription = s.search)
                 }
                 IconButton(onClick = onSettingsClick) {
-                    Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    Icon(Icons.Default.Settings, contentDescription = s.settings)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(

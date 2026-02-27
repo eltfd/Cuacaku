@@ -219,7 +219,7 @@ private fun AqiSummaryCard(current: CurrentAirQualityData) {
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "UV Index: ${current.uvIndexFormatted}",
+                    text = s.uvIndex(current.uvIndexFormatted),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White
                 )
@@ -549,15 +549,15 @@ private fun DailyAqiDetailContent(data: DailyAirQualityData) {
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("AQI Min", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                    Text(s.aqiMin, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                     Text("${data.minAqi}", style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("AQI Max", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                    Text(s.aqiMax, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                     Text("${data.maxAqi}", style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("UV Max", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                    Text(s.uvMax, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
                     Text("%.1f".format(data.maxUvIndex), style = MaterialTheme.typography.bodyMedium, color = Color.White)
                 }
                 if (data.avgWindSpeed > 0) {

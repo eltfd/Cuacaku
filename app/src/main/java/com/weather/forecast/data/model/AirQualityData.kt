@@ -89,17 +89,7 @@ data class HourlyAirQualityData(
         get() = "%.1f".format(pm25)
 
     val windDirectionText: String
-        get() = when {
-            windDirection in 0..22 || windDirection in 338..360 -> "U"
-            windDirection in 23..67 -> "TL"
-            windDirection in 68..112 -> "T"
-            windDirection in 113..157 -> "TG"
-            windDirection in 158..202 -> "S"
-            windDirection in 203..247 -> "BD"
-            windDirection in 248..292 -> "B"
-            windDirection in 293..337 -> "BL"
-            else -> "-"
-        }
+        get() = com.weather.forecast.data.locale.AppLocaleManager.strings.windDirectionShort(windDirection)
 }
 
 /**

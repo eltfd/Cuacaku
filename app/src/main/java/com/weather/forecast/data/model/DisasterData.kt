@@ -98,6 +98,7 @@ enum class DisasterType(
     val labelId: String,
     val icon: String,
     val description: String,
+    val descriptionEn: String,
     val colorHex: Long
 ) {
     FLOOD(
@@ -105,6 +106,7 @@ enum class DisasterType(
         labelId = "Banjir",
         icon = "🌊",
         description = "Banjir akibat curah hujan tinggi dan debit sungai meningkat",
+        descriptionEn = "Flooding due to high rainfall and increased river discharge",
         colorHex = 0xFF1565C0
     ),
     TIDAL_FLOOD(
@@ -112,6 +114,7 @@ enum class DisasterType(
         labelId = "Banjir Rob",
         icon = "🌊",
         description = "Banjir rob akibat gelombang tinggi dan pasang air laut",
+        descriptionEn = "Tidal flooding due to high waves and sea level rise",
         colorHex = 0xFF0D47A1
     ),
     CYCLONE(
@@ -119,6 +122,7 @@ enum class DisasterType(
         labelId = "Siklon / Angin Topan",
         icon = "🌀",
         description = "Siklon tropis atau angin topan dengan angin kencang & tekanan rendah",
+        descriptionEn = "Tropical cyclone or typhoon with strong winds & low pressure",
         colorHex = 0xFF880E4F
     ),
     THUNDERSTORM(
@@ -126,6 +130,7 @@ enum class DisasterType(
         labelId = "Badai Petir Hebat",
         icon = "⛈️",
         description = "Badai petir disertai hujan lebat, angin kencang, dan kemungkinan hujan es",
+        descriptionEn = "Severe thunderstorm with heavy rain, strong winds, and possible hail",
         colorHex = 0xFFBF360C
     ),
     LANDSLIDE(
@@ -133,6 +138,7 @@ enum class DisasterType(
         labelId = "Tanah Longsor",
         icon = "⛰️",
         description = "Potensi longsor akibat hujan terus-menerus yang meresap ke tanah",
+        descriptionEn = "Landslide potential from continuous rain seeping into the soil",
         colorHex = 0xFF795548
     ),
     GROUND_SUBSIDENCE(
@@ -140,6 +146,7 @@ enum class DisasterType(
         labelId = "Tanah Amblas",
         icon = "🕳️",
         description = "Potensi amblasan tanah akibat genangan air berkepanjangan",
+        descriptionEn = "Ground subsidence potential from prolonged waterlogging",
         colorHex = 0xFF5D4037
     );
 }

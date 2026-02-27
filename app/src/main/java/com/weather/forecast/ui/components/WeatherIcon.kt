@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.weather.forecast.data.model.WeatherCondition
+import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.ui.theme.*
 
 /**
@@ -61,7 +62,7 @@ fun WeatherIcon(
 
     Icon(
         imageVector = icon,
-        contentDescription = condition.descriptionId,
+        contentDescription = LocalStrings.current.localized(condition.description, condition.descriptionId),
         modifier = modifier,
         tint = tint
     )

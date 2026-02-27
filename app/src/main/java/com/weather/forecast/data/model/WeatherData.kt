@@ -237,32 +237,12 @@ enum class AlertType(
 // Helper Functions
 // ──────────────────────────────────────────────────────────
 
-/** Degrees → short cardinal (Indonesian) */
+/** Degrees → short cardinal (locale-aware) */
 fun degreesToCardinal(degrees: Int): String {
-    return when {
-        degrees in 0..22 || degrees in 338..360 -> "U"
-        degrees in 23..67 -> "TL"
-        degrees in 68..112 -> "T"
-        degrees in 113..157 -> "TG"
-        degrees in 158..202 -> "S"
-        degrees in 203..247 -> "BD"
-        degrees in 248..292 -> "B"
-        degrees in 293..337 -> "BL"
-        else -> "-"
-    }
+    return com.weather.forecast.data.locale.AppLocaleManager.strings.windDirectionShort(degrees)
 }
 
-/** Degrees → full cardinal name (Indonesian) */
+/** Degrees → full cardinal name (locale-aware) */
 fun degreesToCardinalFull(degrees: Int): String {
-    return when {
-        degrees in 0..22 || degrees in 338..360 -> "Utara"
-        degrees in 23..67 -> "Timur Laut"
-        degrees in 68..112 -> "Timur"
-        degrees in 113..157 -> "Tenggara"
-        degrees in 158..202 -> "Selatan"
-        degrees in 203..247 -> "Barat Daya"
-        degrees in 248..292 -> "Barat"
-        degrees in 293..337 -> "Barat Laut"
-        else -> "-"
-    }
+    return com.weather.forecast.data.locale.AppLocaleManager.strings.windDirectionFull(degrees)
 }
