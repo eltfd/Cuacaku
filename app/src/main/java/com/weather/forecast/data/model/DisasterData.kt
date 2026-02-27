@@ -39,7 +39,9 @@ data class DisasterForecast(
     /** Jumlah learning samples tersimpan */
     val learningSamples: Int = 0,
     /** Penggunaan storage AI (human-readable) */
-    val storageUsed: String = ""
+    val storageUsed: String = "",
+    /** Data terrain untuk analisis longsor (nullable jika fetch gagal) */
+    val terrainData: LandslideTerrainData? = null
 )
 
 /**

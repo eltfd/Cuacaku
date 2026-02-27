@@ -183,7 +183,11 @@ class WeatherRepository {
                     rain = hourly.rain.getOrNull(index) ?: 0.0,
                     showers = hourly.showers.getOrNull(index) ?: 0.0,
                     snowfall = hourly.snowfall.getOrNull(index) ?: 0.0,
-                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0
+                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0,
+                    soilMoistureShallow = hourly.soilMoisture0to7?.getOrNull(index) ?: 0.0,
+                    soilMoistureMedium = hourly.soilMoisture7to28?.getOrNull(index) ?: 0.0,
+                    soilMoistureDeep = hourly.soilMoisture28to100?.getOrNull(index) ?: 0.0,
+                    soilTemperature = hourly.soilTemperature0cm?.getOrNull(index) ?: 0.0
                 )
             } catch (e: Exception) {
                 null
@@ -233,7 +237,11 @@ class WeatherRepository {
                     rain = hourly.rain.getOrNull(index) ?: 0.0,
                     showers = hourly.showers.getOrNull(index) ?: 0.0,
                     snowfall = hourly.snowfall.getOrNull(index) ?: 0.0,
-                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0
+                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0,
+                    soilMoistureShallow = hourly.soilMoisture0to7?.getOrNull(index) ?: 0.0,
+                    soilMoistureMedium = hourly.soilMoisture7to28?.getOrNull(index) ?: 0.0,
+                    soilMoistureDeep = hourly.soilMoisture28to100?.getOrNull(index) ?: 0.0,
+                    soilTemperature = hourly.soilTemperature0cm?.getOrNull(index) ?: 0.0
                 )
             } catch (e: Exception) {
                 null

@@ -45,7 +45,8 @@ object DisasterAnalysisEngine {
         weather: WeatherData?,
         marine: WaterQualityData?,
         flood: WaterQualityData?,
-        weightDeltas: WeightDeltas? = null
+        weightDeltas: WeightDeltas? = null,
+        terrainData: LandslideTerrainData? = null
     ): List<DisasterPrediction> {
         val predictions = mutableListOf<DisasterPrediction>()
 
@@ -60,7 +61,7 @@ object DisasterAnalysisEngine {
         predictions.add(analyzeTidalFlood(hourly, marineData, current))
         predictions.add(analyzeCyclone(hourly, current, dailyToday))
         predictions.add(analyzeThunderstorm(hourly, current, dailyToday))
-        predictions.add(analyzeLandslide(hourly, dailyToday, weather?.daily))
+        predictions.add(analyzeLandslide(hourly, dailyToday, weather?.daily, terrainData))
         predictions.add(analyzeGroundSubsidence(hourly, dailyToday, weather?.daily, floodData))
 
         // ═══ Phase 2: Neural Network + Ensemble Fusion ═══
@@ -79,7 +80,8 @@ object DisasterAnalysisEngine {
         marineDaily: DailyMarineData?,
         floodDaily: DailyFloodData?,
         allDaily: List<DailyWeatherData>,
-        weightDeltas: WeightDeltas? = null
+        weightDeltas: WeightDeltas? = null,
+        terrainData: LandslideTerrainData? = null
     ): List<DisasterPrediction> {
         val predictions = mutableListOf<DisasterPrediction>()
 
@@ -87,7 +89,7 @@ object DisasterAnalysisEngine {
         predictions.add(analyzeDailyTidalFlood(daily, hourlyForDay, marineDaily))
         predictions.add(analyzeDailyCyclone(daily, hourlyForDay))
         predictions.add(analyzeDailyThunderstorm(daily, hourlyForDay))
-        predictions.add(analyzeDailyLandslide(daily, hourlyForDay, allDaily, dayIndex))
+        predictions.add(analyzeDailyLandslide(daily, hourlyForDay, allDaily, dayIndex, terrainData))
         predictions.add(analyzeDailyGroundSubsidence(daily, hourlyForDay, allDaily, dayIndex, floodDaily))
 
         // ═══ Neural Network + Ensemble Fusion ═══
@@ -590,18 +592,74 @@ object DisasterAnalysisEngine {
     }
 
     // ══════════════════════════════════════════════════
-    //  TANAH LONGSOR — Landslide Analysis
+    //  TANAH LONGSOR — Enhanced Landslide Analysis
     // ══════════════════════════════════════════════════
 
+    /**
+     * Analisis risiko longsor dengan data terrain lengkap.
+     *
+     * Faktor-faktor yang digunakan:
+     * 1. Kemiringan lereng (slope gradient) — dari Open-Elevation API
+     * 2. Kelembaban tanah / soil saturation — dari Open-Meteo soil data
+     * 3. Curah hujan kumulatif hari ini — dari data cuaca
+     * 4. Hujan anteseden 3 hari — trigger utama longsor
+     * 5. Intensitas hujan maksimum per jam — pemicu longsor cepat
+     * 6. Durasi hujan terus-menerus — infiltrasi berlanjut
+     * 7. Tutupan vegetasi (proxy) — stabilitas lereng
+     * 8. Kelembaban udara — indikator tanah basah
+     *
+     * Referensi:
+     * - Varnes (1978) — Slope Movement Classification
+     * - PVMBG (2019) — Sistem Peringatan Dini Longsor Indonesia
+     * - Caine (1980) — Rainfall intensity-duration threshold
+     * - Van Zuidam (1985) — Geomorphological slope classification
+     */
     private fun analyzeLandslide(
         hourly: List<HourlyWeatherData>,
         daily: DailyWeatherData?,
-        allDaily: List<DailyWeatherData>?
+        allDaily: List<DailyWeatherData>?,
+        terrain: LandslideTerrainData? = null
     ): DisasterPrediction {
         val factors = mutableListOf<ContributingFactor>()
         var score = 0.0
+        var dataPoints = 0
 
-        // Faktor 1: Curah hujan kumulatif hari ini (bobot 0.30)
+        // Faktor 1: Kemiringan lereng (bobot 0.20) — BARU
+        val slopeAngle = terrain?.slopeAngle ?: 0.0
+        val slopeCategory = terrain?.slopeCategory ?: SlopeCategory.FLAT
+        val slopeScore = slopeCategory.riskFactor
+        score += slopeScore * 0.20
+        if (terrain != null && terrain.elevationGrid.isNotEmpty()) dataPoints++
+        factors.add(ContributingFactor(
+            name = AppLocaleManager.strings.factorSlopeGradient,
+            value = "%.1f° (%s)".format(slopeAngle, AppLocaleManager.strings.localized(slopeCategory.label, slopeCategory.labelId)),
+            contribution = slopeScore,
+            isElevating = slopeScore > 0.3
+        ))
+
+        // Faktor 2: Kejenuhan tanah / soil saturation (bobot 0.15) — BARU
+        val saturationIndex = terrain?.soilSaturationIndex ?: run {
+            // Fallback: estimasi dari soil moisture hourly
+            val sm = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
+            if (sm.isNotEmpty()) (sm.average() / 0.50).coerceIn(0.0, 1.0) else 0.0
+        }
+        val saturationScore = when {
+            saturationIndex > 0.9 -> 1.0   // Tanah hampir jenuh penuh
+            saturationIndex > 0.75 -> 0.7
+            saturationIndex > 0.6 -> 0.4
+            saturationIndex > 0.4 -> 0.2
+            else -> 0.0
+        }
+        score += saturationScore * 0.15
+        if (saturationIndex > 0) dataPoints++
+        factors.add(ContributingFactor(
+            name = AppLocaleManager.strings.factorSoilSaturation,
+            value = "%.0f%%".format(saturationIndex * 100),
+            contribution = saturationScore,
+            isElevating = saturationScore > 0.3
+        ))
+
+        // Faktor 3: Curah hujan kumulatif hari ini (bobot 0.15)
         val todayPrecip = daily?.precipitationSum ?: hourly.sumOf { it.precipitation }
         val precipScore = when {
             todayPrecip > 100 -> 1.0
@@ -610,7 +668,8 @@ object DisasterAnalysisEngine {
             todayPrecip > 10 -> 0.2
             else -> 0.0
         }
-        score += precipScore * 0.30
+        score += precipScore * 0.15
+        dataPoints++
         factors.add(ContributingFactor(
             name = AppLocaleManager.strings.factorRainfallToday,
             value = "%.1f mm".format(todayPrecip),
@@ -618,25 +677,7 @@ object DisasterAnalysisEngine {
             isElevating = precipScore > 0.3
         ))
 
-        // Faktor 2: Durasi hujan (jam hujan > 0) (bobot 0.25)
-        val rainHours = hourly.count { it.precipitation > 0.5 }
-        val durationScore = when {
-            rainHours > 18 -> 1.0   // Hampir seharian hujan
-            rainHours > 12 -> 0.7
-            rainHours > 8 -> 0.4
-            rainHours > 4 -> 0.2
-            else -> 0.0
-        }
-        score += durationScore * 0.25
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRainDuration,
-            value = "$rainHours jam",
-            contribution = durationScore,
-            isElevating = durationScore > 0.3
-        ))
-
-        // Faktor 3: Hujan kumulatif 3 hari sebelumnya → tanah jenuh (bobot 0.30)
-        // Simulasi antecedent rainfall dari data daily
+        // Faktor 4: Hujan kumulatif 3 hari sebelumnya — tanah jenuh (bobot 0.15)
         val recentDays = allDaily?.take(3) ?: emptyList()
         val antecedentRain = recentDays.sumOf { it.precipitationSum }
         val antecedentScore = when {
@@ -646,7 +687,8 @@ object DisasterAnalysisEngine {
             antecedentRain > 20 -> 0.2
             else -> 0.0
         }
-        score += antecedentScore * 0.30
+        score += antecedentScore * 0.15
+        dataPoints++
         factors.add(ContributingFactor(
             name = AppLocaleManager.strings.factorRain3Day,
             value = "%.0f mm".format(antecedentRain),
@@ -654,7 +696,63 @@ object DisasterAnalysisEngine {
             isElevating = antecedentScore > 0.3
         ))
 
-        // Faktor 4: Kelembaban tinggi (bobot 0.15) — tanah basah
+        // Faktor 5: Intensitas hujan per jam maks (bobot 0.10) — BARU
+        val maxIntensity = terrain?.maxRainfallIntensity
+            ?: (hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0)
+        val intensityScore = when {
+            maxIntensity > 50 -> 1.0   // Sangat lebat — pemicu longsor cepat
+            maxIntensity > 20 -> 0.7
+            maxIntensity > 10 -> 0.4
+            maxIntensity > 5 -> 0.2
+            else -> 0.0
+        }
+        score += intensityScore * 0.10
+        dataPoints++
+        factors.add(ContributingFactor(
+            name = AppLocaleManager.strings.factorRainIntensityMax,
+            value = "%.1f mm/h".format(maxIntensity),
+            contribution = intensityScore,
+            isElevating = intensityScore > 0.3
+        ))
+
+        // Faktor 6: Durasi hujan terus-menerus (bobot 0.10)
+        val rainHours = terrain?.continuousRainHours
+            ?: hourly.count { it.precipitation > 0.5 }
+        val durationScore = when {
+            rainHours > 18 -> 1.0
+            rainHours > 12 -> 0.7
+            rainHours > 8 -> 0.4
+            rainHours > 4 -> 0.2
+            else -> 0.0
+        }
+        score += durationScore * 0.10
+        dataPoints++
+        factors.add(ContributingFactor(
+            name = AppLocaleManager.strings.factorRainDuration,
+            value = "$rainHours h",
+            contribution = durationScore,
+            isElevating = durationScore > 0.3
+        ))
+
+        // Faktor 7: Indeks tutupan vegetasi (bobot 0.05) — BARU
+        // Vegetasi rendah → destabilisasi lereng
+        val vegIndex = terrain?.vegetationIndex ?: 0.5
+        val vegScore = when {
+            vegIndex < 0.2 -> 0.8   // Lahan gundul → risiko tinggi
+            vegIndex < 0.4 -> 0.5
+            vegIndex < 0.6 -> 0.2
+            else -> 0.0             // Vegetasi padat → penahan longsor
+        }
+        score += vegScore * 0.05
+        if (terrain != null) dataPoints++
+        factors.add(ContributingFactor(
+            name = AppLocaleManager.strings.factorVegetation,
+            value = "%.0f%%".format(vegIndex * 100),
+            contribution = vegScore,
+            isElevating = vegScore > 0.3
+        ))
+
+        // Faktor 8: Kelembaban udara (bobot 0.10) — tanah basah
         val avgHumidity = hourly.map { it.humidity }.average().takeIf { !it.isNaN() } ?: 50.0
         val humidityScore = when {
             avgHumidity > 95 -> 0.8
@@ -662,7 +760,8 @@ object DisasterAnalysisEngine {
             avgHumidity > 85 -> 0.3
             else -> 0.0
         }
-        score += humidityScore * 0.15
+        score += humidityScore * 0.10
+        dataPoints++
         factors.add(ContributingFactor(
             name = AppLocaleManager.strings.factorAvgHumidity,
             value = "${avgHumidity.toInt()}%",
@@ -670,14 +769,26 @@ object DisasterAnalysisEngine {
             isElevating = humidityScore > 0.3
         ))
 
+        // Confidence berdasarkan kelengkapan data
+        val hasTerrainData = terrain != null && terrain.elevationGrid.isNotEmpty()
+        val hasSoilData = saturationIndex > 0
+        val baseConfidence = (dataPoints.toDouble() / 8.0).coerceIn(0.5, 1.0)
+        val confidence = when {
+            hasTerrainData && hasSoilData -> baseConfidence // Full data
+            hasSoilData -> baseConfidence * 0.85  // No terrain
+            hasTerrainData -> baseConfidence * 0.85  // No soil
+            else -> 0.6 // Minimal data (only rainfall + humidity)
+        }
+
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.LANDSLIDE,
             riskScore = score,
             riskLevel = riskLevel,
-            confidence = 0.7, // Tanpa data topografi, confidence rendah
+            confidence = confidence,
             factors = factors,
-            description = buildLandslideDescription(riskLevel, todayPrecip, antecedentRain, rainHours),
+            description = buildLandslideDescription(riskLevel, todayPrecip, antecedentRain, rainHours,
+                slopeAngle, saturationIndex, hasTerrainData),
             recommendation = buildLandslideRecommendation(riskLevel)
         )
     }
@@ -915,29 +1026,56 @@ object DisasterAnalysisEngine {
         daily: DailyWeatherData,
         hourly: List<HourlyWeatherData>,
         allDaily: List<DailyWeatherData>,
-        dayIndex: Int
+        dayIndex: Int,
+        terrain: LandslideTerrainData? = null
     ): DisasterPrediction {
         var score = 0.0
         val todayPrecip = daily.precipitationSum
         val rainHours = hourly.count { it.precipitation > 0.5 }
         val antecedentRain = allDaily.take(dayIndex + 1).sumOf { it.precipitationSum }
 
+        // Slope factor (0.15)
+        val slopeScore = terrain?.slopeCategory?.riskFactor ?: 0.0
+        score += slopeScore * 0.15
+
+        // Soil saturation factor (0.10)
+        val satIdx = terrain?.soilSaturationIndex ?: run {
+            val sm = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
+            if (sm.isNotEmpty()) (sm.average() / 0.50).coerceIn(0.0, 1.0) else 0.0
+        }
+        score += (when {
+            satIdx > 0.9 -> 1.0; satIdx > 0.75 -> 0.7; satIdx > 0.6 -> 0.4; else -> 0.0
+        }) * 0.10
+
+        // Precipitation factor (0.20)
         score += (when {
             todayPrecip > 100 -> 1.0; todayPrecip > 50 -> 0.7; todayPrecip > 20 -> 0.4; else -> 0.0
-        }) * 0.30
+        }) * 0.20
+
+        // Rain duration factor (0.15)
         score += (when {
             rainHours > 18 -> 1.0; rainHours > 12 -> 0.6; rainHours > 6 -> 0.3; else -> 0.0
-        }) * 0.25
+        }) * 0.15
+
+        // Antecedent rainfall factor (0.20)
         score += (when {
             antecedentRain > 150 -> 1.0; antecedentRain > 100 -> 0.7; antecedentRain > 50 -> 0.4; else -> 0.0
-        }) * 0.35
+        }) * 0.20
+
+        // Rainfall intensity factor (0.10)
+        val maxIntensity = hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0
+        score += (when {
+            maxIntensity > 50 -> 1.0; maxIntensity > 20 -> 0.7; maxIntensity > 10 -> 0.4; else -> 0.0
+        }) * 0.10
+
+        // Humidity factor (0.10)
         val humid = hourly.map { it.humidity }.average().takeIf { !it.isNaN() } ?: 50.0
         score += (when { humid > 95 -> 0.8; humid > 90 -> 0.4; else -> 0.0 }) * 0.10
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.LANDSLIDE, riskScore = score, riskLevel = riskLevel,
-            confidence = 0.6, factors = emptyList(),
+            confidence = if (terrain != null) 0.8 else 0.6, factors = emptyList(),
             description = AppLocaleManager.strings.landslideAnalysis("%.0f".format(todayPrecip), "%.0f".format(antecedentRain)),
             recommendation = ""
         )
@@ -1019,8 +1157,10 @@ object DisasterAnalysisEngine {
 
     private fun buildThunderstormRecommendation(risk: RiskLevel) = AppLocaleManager.strings.thunderstormRec(riskInt(risk))
 
-    private fun buildLandslideDescription(risk: RiskLevel, precip: Double, antecedent: Double, hours: Int) =
-        AppLocaleManager.strings.landslideDesc(riskInt(risk), "%.0f".format(precip), "%.0f".format(antecedent), hours)
+    private fun buildLandslideDescription(risk: RiskLevel, precip: Double, antecedent: Double, hours: Int,
+                                          slopeAngle: Double = 0.0, saturation: Double = 0.0, hasTerrain: Boolean = false) =
+        AppLocaleManager.strings.landslideDesc(riskInt(risk), "%.0f".format(precip), "%.0f".format(antecedent), hours,
+            slopeAngle, saturation, hasTerrain)
 
     private fun buildLandslideRecommendation(risk: RiskLevel) = AppLocaleManager.strings.landslideRec(riskInt(risk))
 

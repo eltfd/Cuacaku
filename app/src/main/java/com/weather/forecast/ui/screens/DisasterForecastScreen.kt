@@ -184,6 +184,14 @@ private fun DisasterForecastContent(data: DisasterForecast) {
             DisasterPredictionCard(prediction = prediction)
         }
 
+        // ═══ Terrain Analysis Card (if terrain data available) ═══
+        if (data.terrainData != null) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                TerrainAnalysisCard(terrainData = data.terrainData)
+            }
+        }
+
         // ═══ 7-Day Disaster Heatmap ═══
         item {
             Spacer(modifier = Modifier.height(16.dp))
@@ -896,6 +904,292 @@ private fun DailyDisasterCard(day: DailyDisasterSummary) {
     }
 }
 
+// ===================== TERRAIN ANALYSIS =====================
+
+@Composable
+private fun TerrainAnalysisCard(terrainData: LandslideTerrainData) {
+    val s = LocalStrings.current
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clickable { expanded = !expanded },
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF795548).copy(alpha = 0.25f)
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("⛰️", fontSize = 20.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = s.terrainAnalysis,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Open-Elevation SRTM + Open-Meteo Soil",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.6f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Main metrics row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Slope
+                TerrainMetricItem(
+                    icon = "📐",
+                    label = s.slopeGradient,
+                    value = "%.1f°".format(terrainData.slopeAngle),
+                    subLabel = terrainData.slopeCategory.name,
+                    color = Color(
+                        when {
+                            terrainData.slopeAngle > 30 -> 0xFFD32F2F
+                            terrainData.slopeAngle > 15 -> 0xFFFF9800
+                            terrainData.slopeAngle > 5 -> 0xFFFFC107
+                            else -> 0xFF4CAF50
+                        }
+                    )
+                )
+
+                // Soil Saturation
+                val satPct = "%.0f%%".format(terrainData.soilSaturationIndex * 100)
+                TerrainMetricItem(
+                    icon = "💧",
+                    label = s.soilSaturation,
+                    value = satPct,
+                    subLabel = when {
+                        terrainData.soilSaturationIndex > 0.8 -> "Jenuh / Saturated"
+                        terrainData.soilSaturationIndex > 0.5 -> "Basah / Wet"
+                        else -> "Normal"
+                    },
+                    color = Color(
+                        when {
+                            terrainData.soilSaturationIndex > 0.8 -> 0xFFD32F2F
+                            terrainData.soilSaturationIndex > 0.5 -> 0xFFFF9800
+                            else -> 0xFF4CAF50
+                        }
+                    )
+                )
+
+                // Elevation
+                TerrainMetricItem(
+                    icon = "🏔️",
+                    label = s.elevation,
+                    value = "%.0f m".format(terrainData.elevation),
+                    subLabel = "ASL",
+                    color = Color.White
+                )
+            }
+
+            // Expanded detail
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    Divider(color = Color.White.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Soil moisture breakdown
+                    Text(
+                        text = "🌱 ${s.soilMoisture}",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    SoilMoistureBar(
+                        label = s.soilMoistureShallow,
+                        value = terrainData.soilMoistureShallow,
+                        maxValue = 0.5
+                    )
+                    SoilMoistureBar(
+                        label = s.soilMoistureMedium,
+                        value = terrainData.soilMoistureMedium,
+                        maxValue = 0.5
+                    )
+                    SoilMoistureBar(
+                        label = s.soilMoistureDeep,
+                        value = terrainData.soilMoistureDeep,
+                        maxValue = 0.5
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Vegetation proxy + soil temp
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🌿 ${s.vegetationCover}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                text = "%.2f".format(terrainData.vegetationIndex),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color(if (terrainData.vegetationIndex > 0.5) 0xFF4CAF50 else 0xFFFF9800)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🌡️ ${s.soilTemperature}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                text = "%.1f°C".format(terrainData.soilTemperature),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Rainfall metrics
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("🌧️ Today", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text("%.1f mm".format(terrainData.todayPrecipitation), style = MaterialTheme.typography.bodySmall, color = Color.White)
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("📊 3-Day", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text("%.1f mm".format(terrainData.antecedentRainfall), style = MaterialTheme.typography.bodySmall, color = Color.White)
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("⚡ Max/hr", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                            Text("%.1f mm".format(terrainData.maxRainfallIntensity), style = MaterialTheme.typography.bodySmall, color = Color.White)
+                        }
+                    }
+
+                    // Elevation grid
+                    if (terrainData.elevationGrid.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "📍 Elevation Grid (SRTM 30m)",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        terrainData.elevationGrid.forEach { point ->
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+                                Text(
+                                    text = "${point.label}: ${point.elevation.toInt()} m",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TerrainMetricItem(
+    icon: String,
+    label: String,
+    value: String,
+    subLabel: String,
+    color: Color
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(icon, fontSize = 20.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.6f)
+        )
+        Text(
+            text = subLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.4f),
+            fontSize = 9.sp
+        )
+    }
+}
+
+@Composable
+private fun SoilMoistureBar(
+    label: String,
+    value: Double,
+    maxValue: Double
+) {
+    val fraction = (value / maxValue).toFloat().coerceIn(0f, 1f)
+    val color = when {
+        fraction > 0.8f -> Color(0xFFD32F2F)
+        fraction > 0.5f -> Color(0xFFFF9800)
+        fraction > 0.3f -> Color(0xFFFFC107)
+        else -> Color(0xFF4CAF50)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.width(110.dp)
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.1f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(color)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "%.3f".format(value),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.width(45.dp),
+            textAlign = TextAlign.End
+        )
+    }
+}
+
 // ===================== FOOTER =====================
 
 @Composable
@@ -922,10 +1216,11 @@ private fun DisasterFooter() {
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Analisis menggunakan Neural Network (MLP 20→32→16→6) " +
+                text = "Analisis menggunakan Neural Network (MLP 22→32→16→6) " +
                     "dengan domain-informed initialization + incremental learning. " +
                     "Model belajar otomatis dari data harian (maks 50 sampel, ~16 KB). " +
-                    "Data > 30 hari otomatis dihapus. " +
+                    "Data > 30 hari otomatis dihapus. Terrain analysis via Open-Elevation (SRTM 30m), " +
+                    "soil moisture via Open-Meteo, event monitoring via NASA EONET v3. " +
                     "Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017), " +
                     "Sahoo et al. (ICML 2018). " +
                     "Data dari Open-Meteo, Marine API, GloFAS/ECMWF. " +
@@ -938,7 +1233,7 @@ private fun DisasterFooter() {
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "AI Engine: MLP-v1.1 + Incremental Learning • Open-Meteo • GloFAS",
+                text = "AI Engine: MLP-v1.2 + Incremental Learning • Open-Meteo • GloFAS • NASA EONET",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.3f)
             )

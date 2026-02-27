@@ -108,4 +108,28 @@ object RetrofitClient {
             .build()
             .create(ReliefWebApiService::class.java)
     }
+
+    /**
+     * Open-Elevation API Service (Terrain Elevation)
+     */
+    val elevationApi: ElevationApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(ElevationApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ElevationApiService::class.java)
+    }
+
+    /**
+     * NASA EONET API Service (Natural Event Tracker)
+     */
+    val eonetApi: EonetApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(EonetApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(EonetApiService::class.java)
+    }
 }

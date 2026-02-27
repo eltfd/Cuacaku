@@ -106,7 +106,15 @@ data class HourlyForecast(
     @SerializedName("surface_pressure")
     val surfacePressure: List<Double>? = null,
     @SerializedName("pressure_msl")
-    val pressureMsl: List<Double>? = null
+    val pressureMsl: List<Double>? = null,
+    @SerializedName("soil_moisture_0_to_7cm")
+    val soilMoisture0to7: List<Double>? = null,
+    @SerializedName("soil_moisture_7_to_28cm")
+    val soilMoisture7to28: List<Double>? = null,
+    @SerializedName("soil_moisture_28_to_100cm")
+    val soilMoisture28to100: List<Double>? = null,
+    @SerializedName("soil_temperature_0cm")
+    val soilTemperature0cm: List<Double>? = null
 )
 
 /**

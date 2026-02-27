@@ -291,8 +291,8 @@ class AppStrings(val locale: AppLocale) {
         "No active disasters detected\nin your area"
     )
     val sourceReliefWeb = s(
-        "Sumber: ReliefWeb (UN OCHA) & Open-Meteo Flood API",
-        "Source: ReliefWeb (UN OCHA) & Open-Meteo Flood API"
+        "Sumber: ReliefWeb (UN OCHA), NASA EONET v3 & Open-Meteo Flood API",
+        "Source: ReliefWeb (UN OCHA), NASA EONET v3 & Open-Meteo Flood API"
     )
     val failedToLoadData = s("Gagal Memuat Data", "Failed to Load Data")
     fun monitorTitle(hasActive: Boolean) = s(
@@ -674,17 +674,24 @@ class AppStrings(val locale: AppLocale) {
 
     fun thunderstormRec(risk: Int) = when (risk) { 3 -> stormRecExtreme; 2 -> stormRecHigh; 1 -> stormRecMod; else -> stormRecLow }
 
-    fun landslideDesc(risk: Int, precip: String, antecedent: String, hours: Int): String {
+    fun landslideDesc(risk: Int, precip: String, antecedent: String, hours: Int,
+                      slopeAngle: Double = 0.0, saturation: Double = 0.0, hasTerrain: Boolean = false): String {
         val prefix = riskPrefix("slide",
             "🟢 Risiko longsor rendah — ", "🟢 Low landslide risk — ",
             "🟡 Potensi longsor — ", "🟡 Landslide potential — ",
             "🟠 Waspada longsor — ", "🟠 Landslide alert — ",
             "🔴 BAHAYA LONGSOR — ", "🔴 LANDSLIDE DANGER — ", risk)
         val data = s("Curah hujan $precip mm selama $hours jam. ", "Rainfall $precip mm over $hours hours. ")
+        val terrainInfo = if (hasTerrain) {
+            val slopeStr = "%.1f".format(slopeAngle)
+            val satStr = "%.0f".format(saturation * 100)
+            s("Kemiringan lereng: $slopeStr°, kejenuhan tanah: $satStr%. ",
+              "Slope gradient: $slopeStr°, soil saturation: $satStr%. ")
+        } else ""
         val extra = if (antecedent.toDoubleOrNull()?.let { it > 50 } == true)
             s("Akumulasi 3 hari: $antecedent mm — tanah mulai jenuh air.",
               "3-day accumulation: $antecedent mm — soil becoming saturated.") else ""
-        return "$prefix$data$extra"
+        return "$prefix$data$terrainInfo$extra"
     }
 
     fun landslideRec(risk: Int) = when (risk) { 3 -> slideRecExtreme; 2 -> slideRecHigh; 1 -> slideRecMod; else -> slideRecLow }
@@ -705,6 +712,33 @@ class AppStrings(val locale: AppLocale) {
     }
 
     fun subsidenceRec(risk: Int) = when (risk) { 3 -> subsidRecExtreme; 2 -> subsidRecHigh; 1 -> subsidRecMod; else -> subsidRecLow }
+
+    // ═══ NASA EONET strings ═══
+    val eonetLandslideDetected = s("Longsor terdeteksi oleh NASA EONET.", "Landslide detected by NASA EONET.")
+    val eonetFloodDetected = s("Banjir terdeteksi oleh NASA EONET.", "Flood detected by NASA EONET.")
+    fun eonetDistance(km: String) = s("Jarak: $km km dari lokasi Anda.", "Distance: $km km from your location.")
+
+    // ═══ Terrain Analysis strings ═══
+    val terrainAnalysis = s("Analisis Terrain", "Terrain Analysis")
+    val slopeGradient = s("Kemiringan Lereng", "Slope Gradient")
+    val soilSaturation = s("Kejenuhan Tanah", "Soil Saturation")
+    val soilMoisture = s("Kelembaban Tanah", "Soil Moisture")
+    val vegetationCover = s("Tutupan Vegetasi", "Vegetation Cover")
+    val elevation = s("Elevasi", "Elevation")
+    val factorSlopeGradient = s("Kemiringan Lereng", "Slope Gradient")
+    val factorSoilSaturation = s("Kejenuhan Tanah", "Soil Saturation")
+    val factorRainIntensityMax = s("Intensitas Hujan Maks", "Max Rain Intensity")
+    val factorVegetation = s("Tutupan Vegetasi", "Vegetation Cover")
+    val terrainDataUnavailable = s("Data terrain tidak tersedia", "Terrain data unavailable")
+    fun slopeCategory(name: String) = s("Kategori: $name", "Category: $name")
+    fun soilSaturationPercent(pct: String) = s("Kejenuhan: $pct%", "Saturation: $pct%")
+    fun elevationValue(m: String) = s("Ketinggian: $m m dpl", "Elevation: $m m ASL")
+    fun vegetationIndex(value: String) = s("Indeks vegetasi (proxy): $value", "Vegetation index (proxy): $value")
+    val soilMoistureShallow = s("Dangkal (0-7 cm)", "Shallow (0-7 cm)")
+    val soilMoistureMedium = s("Menengah (7-28 cm)", "Medium (7-28 cm)")
+    val soilMoistureDeep = s("Dalam (28-100 cm)", "Deep (28-100 cm)")
+    val soilTemperature = s("Suhu Tanah", "Soil Temperature")
+    val landslideRiskFactors = s("Faktor Risiko Longsor", "Landslide Risk Factors")
 
     companion object {
         val ID = AppStrings(AppLocale.ID)

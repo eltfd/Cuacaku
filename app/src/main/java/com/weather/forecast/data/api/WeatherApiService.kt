@@ -68,7 +68,9 @@ interface WeatherApiService {
                 "precipitation_probability,precipitation,rain,showers,snowfall,weather_code," +
                 "cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m," +
                 "uv_index,is_day,dew_point_2m,cape,freezing_level_height," +
-                "surface_pressure,pressure_msl"
+                "surface_pressure,pressure_msl," +
+                "soil_moisture_0_to_7cm,soil_moisture_7_to_28cm,soil_moisture_28_to_100cm," +
+                "soil_temperature_0cm"
 
         // Daily forecast parameters
         const val DAILY_PARAMS = "weather_code,temperature_2m_max,temperature_2m_min," +

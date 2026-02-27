@@ -39,6 +39,11 @@ import java.util.concurrent.TimeUnit
  *    - Mendapatkan ISO3 code negara untuk filter ReliefWeb
  *    - Gratis (OpenStreetMap)
  *
+ * 4. **NASA EONET v3** — Event tracking bencana alam global
+ *    - Real-time landslide, flood, dan event lainnya
+ *    - Koordinat presisi tinggi untuk proximity filter
+ *    - Gratis, tanpa API key
+ *
  * ── Lifecycle Management ──
  * ACTIVE → RECOVERY → RESOLVED → (auto-hide)
  *
@@ -59,6 +64,7 @@ class DisasterMonitorRepository(private val context: Context) {
     private val reliefWebApi = RetrofitClient.reliefWebApi
     private val floodApi = RetrofitClient.floodApi
     private val geocodingApi = RetrofitClient.geocodingApi
+    private val eonetApi = RetrofitClient.eonetApi
     private val gson = Gson()
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -156,14 +162,17 @@ class DisasterMonitorRepository(private val context: Context) {
                 // Fetch from APIs in parallel
                 val reliefWebResult = async { fetchReliefWebDisasters(latitude, longitude) }
                 val floodResult = async { fetchLocalFloodStatus(latitude, longitude) }
+                val eonetResult = async { fetchEonetLandslides(latitude, longitude) }
 
                 val reliefWebDisasters = reliefWebResult.await()
                 val localFloodDisaster = floodResult.await()
+                val eonetDisasters = eonetResult.await()
 
                 // Merge all sources
                 val allDisasters = mutableListOf<ActiveDisaster>()
                 allDisasters.addAll(reliefWebDisasters)
                 localFloodDisaster?.let { allDisasters.add(it) }
+                allDisasters.addAll(eonetDisasters)
 
                 // Merge with cached state (preserve timeline, manual overrides)
                 val merged = mergeWithCachedState(allDisasters)
@@ -469,6 +478,144 @@ class DisasterMonitorRepository(private val context: Context) {
         } catch (_: Exception) {
             null
         }
+    }
+
+    // ════════════════════════════════════════════════
+    //  NASA EONET — Landslide & Flood Event Tracking
+    // ════════════════════════════════════════════════
+
+    /**
+     * Fetch event bencana dari NASA EONET v3 — landslide, floods.
+     * Filter by proximity ke lokasi user.
+     *
+     * EONET menyediakan koordinat presisi tinggi (+metadata) untuk setiap event.
+     * Kategori: landslides, floods, severe storms, volcanoes, dll.
+     */
+    private suspend fun fetchEonetLandslides(
+        latitude: Double,
+        longitude: Double
+    ): List<ActiveDisaster> {
+        val disasters = mutableListOf<ActiveDisaster>()
+        val s = AppLocaleManager.strings
+
+        try {
+            // Fetch landslide events (last 90 days)
+            val landslideResponse = try {
+                eonetApi.getEvents(
+                    category = "landslides",
+                    days = 90,
+                    status = "open",
+                    limit = 30
+                )
+            } catch (_: Exception) { null }
+
+            landslideResponse?.events?.forEach { event ->
+                val lat = event.geometry?.firstOrNull()?.latitude
+                val lon = event.geometry?.firstOrNull()?.longitude
+                if (lat != null && lon != null) {
+                    val distance = haversineDistance(latitude, longitude, lat, lon)
+                    if (distance <= PROXIMITY_RADIUS_KM) {
+                        val phase = if (event.closed == null) DisasterPhase.ACTIVE else DisasterPhase.RECOVERY
+                        val eventDate = try {
+                            val dateStr = event.geometry?.firstOrNull()?.date
+                            if (dateStr != null) {
+                                Instant.parse(dateStr).toEpochMilli()
+                            } else System.currentTimeMillis()
+                        } catch (_: Exception) { System.currentTimeMillis() }
+
+                        disasters.add(
+                            ActiveDisaster(
+                                id = "eonet-${event.id}",
+                                title = event.title ?: "Landslide Event",
+                                type = ActiveDisasterType.LANDSLIDE,
+                                phase = phase,
+                                locations = listOf(
+                                    AffectedLocation(
+                                        name = event.title ?: "Unknown Location",
+                                        latitude = lat,
+                                        longitude = lon,
+                                        radiusKm = 50.0
+                                    )
+                                ),
+                                severity = DisasterSeverity.MODERATE,
+                                startDate = eventDate,
+                                lastUpdate = eventDate,
+                                currentSituation = buildString {
+                                    append(s.eonetLandslideDetected)
+                                    append(" ")
+                                    append(s.eonetDistance("%.0f".format(distance)))
+                                    event.description?.let { desc ->
+                                        if (desc.isNotBlank()) {
+                                            append("\n")
+                                            append(desc.take(200))
+                                        }
+                                    }
+                                },
+                                source = "NASA EONET v3",
+                                sourceUrl = event.link
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Also fetch flood events from EONET (complementary to Open-Meteo)
+            val floodResponse = try {
+                eonetApi.getEvents(
+                    category = "floods",
+                    days = 60,
+                    status = "open",
+                    limit = 20
+                )
+            } catch (_: Exception) { null }
+
+            floodResponse?.events?.forEach { event ->
+                val lat = event.geometry?.firstOrNull()?.latitude
+                val lon = event.geometry?.firstOrNull()?.longitude
+                if (lat != null && lon != null) {
+                    val distance = haversineDistance(latitude, longitude, lat, lon)
+                    if (distance <= PROXIMITY_RADIUS_KM) {
+                        val phase = if (event.closed == null) DisasterPhase.ACTIVE else DisasterPhase.RECOVERY
+                        val eventDate = try {
+                            val dateStr = event.geometry?.firstOrNull()?.date
+                            if (dateStr != null) Instant.parse(dateStr).toEpochMilli()
+                            else System.currentTimeMillis()
+                        } catch (_: Exception) { System.currentTimeMillis() }
+
+                        disasters.add(
+                            ActiveDisaster(
+                                id = "eonet-${event.id}",
+                                title = event.title ?: "Flood Event",
+                                type = ActiveDisasterType.FLOOD,
+                                phase = phase,
+                                locations = listOf(
+                                    AffectedLocation(
+                                        name = event.title ?: "Unknown Location",
+                                        latitude = lat,
+                                        longitude = lon,
+                                        radiusKm = 50.0
+                                    )
+                                ),
+                                severity = DisasterSeverity.MODERATE,
+                                startDate = eventDate,
+                                lastUpdate = eventDate,
+                                currentSituation = buildString {
+                                    append(s.eonetFloodDetected)
+                                    append(" ")
+                                    append(s.eonetDistance("%.0f".format(distance)))
+                                },
+                                source = "NASA EONET v3",
+                                sourceUrl = event.link
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return disasters
     }
 
     // ════════════════════════════════════════════════

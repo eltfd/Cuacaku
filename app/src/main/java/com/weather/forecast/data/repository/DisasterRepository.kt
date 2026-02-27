@@ -43,6 +43,7 @@ class DisasterRepository(context: Context) {
 
     private val waterQualityRepository = WaterQualityRepository()
     private val weatherRepository = WeatherRepository()
+    private val landslideTerrainRepository = LandslideTerrainRepository(context)
 
     // ── AI Learning ──
     private val learningEngine = IncrementalLearningEngine(context)
@@ -101,12 +102,24 @@ class DisasterRepository(context: Context) {
                     )
                 }
 
-                // ═══ Analisis hari ini (dengan learned weights) ═══
+                // ═══ Fetch Terrain Data for Landslide Analysis ═══
+                val terrainData = try {
+                    landslideTerrainRepository.getTerrainData(
+                        latitude = latitude,
+                        longitude = longitude,
+                        hourly = weather.hourly.take(24),
+                        allDaily = weather.daily,
+                        elevation = 0.0 // WeatherResponse elevation not available in WeatherData
+                    )
+                } catch (_: Exception) { null }
+
+                // ═══ Analisis hari ini (dengan learned weights + terrain) ═══
                 val todayPredictions = DisasterAnalysisEngine.analyzeToday(
                     weather = weather,
                     marine = water,
                     flood = water,
-                    weightDeltas = deltas
+                    weightDeltas = deltas,
+                    terrainData = terrainData
                 )
 
                 // ═══ Background Learning (fire-and-forget) ═══
@@ -136,7 +149,8 @@ class DisasterRepository(context: Context) {
                         marineDaily = marineDaily,
                         floodDaily = floodDaily,
                         allDaily = weather.daily,
-                        weightDeltas = deltas
+                        weightDeltas = deltas,
+                        terrainData = terrainData
                     )
 
                     DailyDisasterSummary(
@@ -176,7 +190,8 @@ class DisasterRepository(context: Context) {
                         aiDataCompleteness = todayFeatures.dataCompleteness,
                         learningSteps = stats.totalLearningSteps,
                         learningSamples = stats.totalSamples,
-                        storageUsed = storageUsage.formattedTotal
+                        storageUsed = storageUsage.formattedTotal,
+                        terrainData = terrainData
                     )
                 )
             } catch (e: Exception) {

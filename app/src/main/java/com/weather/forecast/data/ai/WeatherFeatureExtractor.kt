@@ -5,7 +5,7 @@ import com.weather.forecast.data.model.*
 /**
  * Weather Feature Extractor
  *
- * Mengekstrak dan menormalisasi 20 fitur meteorologi dari berbagai sumber data
+ * Mengekstrak dan menormalisasi 22 fitur meteorologi dari berbagai sumber data
  * menjadi vektor fitur [0, 1] yang siap diproses oleh neural network.
  *
  * Fitur diturunkan dari penelitian korelasi cuaca–bencana:
@@ -14,6 +14,7 @@ import com.weather.forecast.data.model.*
  * - Atmospheric features (tekanan, kelembaban, CAPE, dew point)
  * - Marine features (gelombang, swell)
  * - Hydrological features (debit sungai)
+ * - Soil features (kelembaban tanah, saturasi)
  * - Derived features (kode cuaca WMO, antecedent rainfall)
  *
  * Referensi normalisasi:
@@ -22,13 +23,14 @@ import com.weather.forecast.data.model.*
  */
 object WeatherFeatureExtractor {
 
-    const val FEATURE_COUNT = 20
+    const val FEATURE_COUNT = 22
 
     val FEATURE_NAMES = listOf(
         "precipTotal", "precipIntensity", "windSpeed", "windGusts", "windShear",
         "pressureLow", "pressureDrop", "humidity", "capeEnergy", "freezingLow",
         "cloudCover", "dewPointSpread", "waveHeight", "swellHeight", "dischargeRatio",
-        "rainDuration", "antecedentRain", "consecutiveRain", "weatherSeverity", "temperatureHigh"
+        "rainDuration", "antecedentRain", "consecutiveRain", "weatherSeverity", "temperatureHigh",
+        "soilSaturation", "soilMoistureRate"
     )
 
     // ══════════════════════════════════════════════════
@@ -175,6 +177,31 @@ object WeatherFeatureExtractor {
         features[19] = norm(tempMax, 20.0, 50.0)
         if (weather != null) dataPoints++
 
+        // [20] Kejenuhan tanah (soil saturation index) — rata-rata kelembaban tanah / titik jenuh
+        val soilShallow = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
+        val soilMedium = hourly.map { it.soilMoistureMedium }.filter { it > 0 }
+        val soilDeep = hourly.map { it.soilMoistureDeep }.filter { it > 0 }
+        val hasSoilData = soilShallow.isNotEmpty()
+        if (hasSoilData) {
+            val avgShallow = soilShallow.average()
+            val avgMedium = soilMedium.average().takeIf { !it.isNaN() } ?: avgShallow
+            val avgDeep = soilDeep.average().takeIf { !it.isNaN() } ?: avgShallow
+            // Weighted: shallow 50%, medium 30%, deep 20% — divisi titik jenuh 0.50 m³/m³
+            val saturation = (avgShallow * 0.5 + avgMedium * 0.3 + avgDeep * 0.2) / 0.50
+            features[20] = norm(saturation, 0.0, 1.5)
+            dataPoints++
+        }
+
+        // [21] Laju perubahan kelembaban tanah (rising = semakin jenuh)
+        if (hasSoilData && soilShallow.size >= 6) {
+            val firstHalf = soilShallow.take(soilShallow.size / 2).average()
+            val secondHalf = soilShallow.drop(soilShallow.size / 2).average()
+            val rate = (secondHalf - firstHalf) / firstHalf.coerceAtLeast(0.01)
+            // rate > 0 = tanah semakin basah, norm by 100% increase
+            features[21] = norm(rate, -0.5, 1.0)
+            dataPoints++
+        }
+
         return WeatherFeatures(
             features = features,
             featureNames = FEATURE_NAMES,
@@ -248,6 +275,29 @@ object WeatherFeatureExtractor {
 
         features[19] = norm(daily.temperatureMax, 20.0, 50.0); dataPoints++
 
+        // [20] Kejenuhan tanah (soil saturation)
+        val soilShallow = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
+        val soilMedium = hourly.map { it.soilMoistureMedium }.filter { it > 0 }
+        val soilDeep = hourly.map { it.soilMoistureDeep }.filter { it > 0 }
+        val hasSoilData = soilShallow.isNotEmpty()
+        if (hasSoilData) {
+            val avgShallow = soilShallow.average()
+            val avgMedium = soilMedium.average().takeIf { !it.isNaN() } ?: avgShallow
+            val avgDeep = soilDeep.average().takeIf { !it.isNaN() } ?: avgShallow
+            val saturation = (avgShallow * 0.5 + avgMedium * 0.3 + avgDeep * 0.2) / 0.50
+            features[20] = norm(saturation, 0.0, 1.5)
+            dataPoints++
+        }
+
+        // [21] Laju perubahan kelembaban tanah
+        if (hasSoilData && soilShallow.size >= 6) {
+            val firstHalf = soilShallow.take(soilShallow.size / 2).average()
+            val secondHalf = soilShallow.drop(soilShallow.size / 2).average()
+            val rate = (secondHalf - firstHalf) / firstHalf.coerceAtLeast(0.01)
+            features[21] = norm(rate, -0.5, 1.0)
+            dataPoints++
+        }
+
         return WeatherFeatures(
             features = features,
             featureNames = FEATURE_NAMES,
@@ -290,7 +340,7 @@ object WeatherFeatureExtractor {
  * Vektor fitur hasil ekstraksi
  */
 data class WeatherFeatures(
-    /** 20 fitur ternormalisasi [0, 1] */
+    /** 22 fitur ternormalisasi [0, 1] */
     val features: FloatArray,
     val featureNames: List<String>,
     /** Kelengkapan data (0–1), semakin tinggi = semakin akurat prediksi */

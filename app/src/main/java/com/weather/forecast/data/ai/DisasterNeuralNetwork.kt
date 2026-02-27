@@ -6,8 +6,8 @@ import kotlin.math.sqrt
 /**
  * DisasterNeuralNetwork — Multi-Layer Perceptron untuk prediksi risiko bencana
  *
- * Arsitektur: Input(20) → Hidden(32, LeakyReLU) → Hidden(16, LeakyReLU) → Output(6, Sigmoid)
- * Total parameter: 20×32 + 32 + 32×16 + 16 + 16×6 + 6 = 1,222
+ * Arsitektur: Input(22) → Hidden(32, LeakyReLU) → Hidden(16, LeakyReLU) → Output(6, Sigmoid)
+ * Total parameter: 22×32 + 32 + 32×16 + 16 + 16×6 + 6 = 1,286
  *
  * ── Referensi Ilmiah ──
  * [1] Gorishniy et al. (2021) "Revisiting Deep Learning Models for Tabular Data"
@@ -40,14 +40,14 @@ import kotlin.math.sqrt
 object DisasterNeuralNetwork {
 
     // ── Arsitektur ──
-    private const val INPUT = 20
+    private const val INPUT = 22
     private const val H1 = 32   // Hidden layer 1
     private const val H2 = 16   // Hidden layer 2
     private const val OUTPUT = 6
     private const val TEMPERATURE = 1.3f  // Output calibration temperature
 
-    const val MODEL_VERSION = "MLP-v1.1-incremental"
-    const val TOTAL_PARAMS = INPUT * H1 + H1 + H1 * H2 + H2 + H2 * OUTPUT + OUTPUT // 1302
+    const val MODEL_VERSION = "MLP-v1.2-incremental"
+    const val TOTAL_PARAMS = INPUT * H1 + H1 + H1 * H2 + H2 + H2 * OUTPUT + OUTPUT // 1366
 
     // ── Flat Weight Arrays (row-major) ──
     private val w1 = FloatArray(INPUT * H1)
@@ -152,7 +152,7 @@ object DisasterNeuralNetwork {
     // ════════════════════════════════════════════════
 
     /**
-     * Matriks relevansi fitur → jenis bencana [20 × 6]
+     * Matriks relevansi fitur → jenis bencana [22 × 6]
      *
      * Setiap baris = satu fitur input, setiap kolom = satu jenis bencana.
      * Nilai 0–1 menunjukkan seberapa relevan fitur tersebut untuk bencana itu.
@@ -185,7 +185,9 @@ object DisasterNeuralNetwork {
         floatArrayOf(0.50f, 0.10f, 0.10f, 0.05f, 0.90f, 0.85f), // 16: antecedentRain
         floatArrayOf(0.30f, 0.05f, 0.05f, 0.05f, 0.60f, 0.90f), // 17: consecutiveRain
         floatArrayOf(0.40f, 0.20f, 0.30f, 0.70f, 0.20f, 0.10f), // 18: weatherSeverity
-        floatArrayOf(0.10f, 0.10f, 0.20f, 0.25f, 0.10f, 0.10f)  // 19: temperatureHigh
+        floatArrayOf(0.10f, 0.10f, 0.20f, 0.25f, 0.10f, 0.10f), // 19: temperatureHigh
+        floatArrayOf(0.70f, 0.15f, 0.10f, 0.10f, 0.85f, 0.90f), // 20: soilSaturation
+        floatArrayOf(0.55f, 0.10f, 0.05f, 0.05f, 0.70f, 0.75f)  // 21: soilMoistureRate
     )
 
     // Init block — harus setelah RELEVANCE agar tidak NPE
@@ -220,7 +222,7 @@ object DisasterNeuralNetwork {
         val scale2 = sqrt(2.0f / (H1 + H2)) * 2.0f
         val scale3 = sqrt(2.0f / (H2 + OUTPUT)) * 2.0f
 
-        // ── Layer 1: Input → Hidden1 (20 × 32) ──
+        // ── Layer 1: Input → Hidden1 (22 × 32) ──
         // 32 neurons = 6 disaster types × 5 variations + 2 bonus neurons
         for (j in 0 until H1) {
             val specialty = j % OUTPUT          // Jenis bencana yang dideteksi
