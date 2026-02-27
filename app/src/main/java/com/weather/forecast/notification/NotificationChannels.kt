@@ -12,6 +12,10 @@ object NotificationChannels {
     const val DAILY_FORECAST = "daily_forecast"
     /** Channel darurat — IMPORTANCE_MAX, getaran agresif, bypass DND */
     const val EXTREME_WEATHER_EMERGENCY = "extreme_weather_emergency"
+    /** Channel peringatan bencana — AI-based disaster predictions */
+    const val DISASTER_ALERTS = "disaster_alerts"
+    /** Channel darurat bencana — EXTREME risk, bypass DND */
+    const val DISASTER_EMERGENCY = "disaster_emergency"
 }
 
 /**
@@ -28,5 +32,9 @@ object NotificationIds {
     const val HIGH_RISK_ALERT = 1005
     /** Peringatan darurat cuaca EKSTREM — getaran agresif */
     const val EXTREME_RISK_ALERT = 1006
+    /** Peringatan bencana (AI-based) — HIGH risk */
+    const val DISASTER_HIGH_ALERT = 1007
+    /** Peringatan darurat bencana — EXTREME risk, getaran SOS */
+    const val DISASTER_EXTREME_ALERT = 1008
     const val WEATHER_UPDATE_SERVICE = 2001
 }

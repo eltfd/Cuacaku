@@ -96,8 +96,42 @@ class WeatherApplication : Application() {
                 )
             }
 
+            // Disaster Alerts Channel — AI-based disaster predictions (HIGH risk)
+            val disasterAlertChannel = NotificationChannel(
+                NotificationChannels.DISASTER_ALERTS,
+                "Peringatan Bencana / Disaster Alerts",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Peringatan potensi bencana dari analisis AI (longsor, banjir, siklon, dll)"
+                enableVibration(true)
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+            }
+
+            // Disaster Emergency Channel — EXTREME risk, aggressive SOS vibration
+            val disasterEmergencyChannel = NotificationChannel(
+                NotificationChannels.DISASTER_EMERGENCY,
+                "Darurat Bencana / Disaster Emergency",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Peringatan darurat bencana level EKSTREM — getaran SOS agresif"
+                enableVibration(true)
+                vibrationPattern = extremeVibrationPattern
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setBypassDnd(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setSound(
+                    android.provider.Settings.System.DEFAULT_ALARM_ALERT_URI,
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .build()
+                )
+            }
+
             notificationManager.createNotificationChannels(
-                listOf(alertChannel, dailyChannel, emergencyChannel)
+                listOf(alertChannel, dailyChannel, emergencyChannel, disasterAlertChannel, disasterEmergencyChannel)
             )
         }
     }

@@ -408,6 +408,37 @@ class AppStrings(val locale: AppLocale) {
     )
     val notifUpdatingWeather = s("Memperbarui data cuaca...", "Updating weather data...")
 
+    // ═══ Disaster Prediction Notification Strings ═══
+    val notifDisasterHighTitle = s(
+        "⚠️ Peringatan Potensi Bencana",
+        "⚠️ Disaster Risk Warning"
+    )
+    fun notifDisasterHighBody(types: String) = s(
+        "Terdeteksi risiko TINGGI: $types. Harap waspada dan pantau perkembangan.",
+        "HIGH risk detected: $types. Stay alert and monitor developments."
+    )
+    val notifDisasterCheck = s(
+        "Buka aplikasi untuk detail analisis AI.",
+        "Open app for detailed AI analysis."
+    )
+    val notifDisasterExtremeTitle = s(
+        "🚨 DARURAT BENCANA — RISIKO EKSTREM",
+        "🚨 DISASTER EMERGENCY — EXTREME RISK"
+    )
+    val notifDisasterExtremeHeader = s(
+        "POTENSI BENCANA LEVEL EKSTREM",
+        "EXTREME DISASTER POTENTIAL"
+    )
+    val notifDisasterExtremeAction = s(
+        "⚠️ Segera evakuasi jika berada di area rawan bencana!",
+        "⚠️ Evacuate immediately if in disaster-prone area!"
+    )
+    val disasterAlertSetting = s("Peringatan Bencana AI", "AI Disaster Alert")
+    val disasterAlertSettingDesc = s(
+        "Notifikasi saat AI mendeteksi risiko bencana tinggi/ekstrem (longsor, banjir, dll)",
+        "Notification when AI detects high/extreme disaster risk (landslide, flood, etc)"
+    )
+
     // ═══════════════════════════════════════════════════
     //  APP UPDATE MANAGER
     // ═══════════════════════════════════════════════════

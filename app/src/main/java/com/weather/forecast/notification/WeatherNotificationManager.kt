@@ -22,6 +22,8 @@ import com.weather.forecast.data.model.RiskLevel
 import com.weather.forecast.data.model.WeatherAlert
 import com.weather.forecast.data.model.WeatherCondition
 import com.weather.forecast.data.model.WeatherPotential
+import com.weather.forecast.data.model.DisasterPrediction
+import com.weather.forecast.data.model.RiskLevel as DisasterRiskLevel
 
 /**
  * Weather Notification Manager
@@ -361,6 +363,142 @@ class WeatherNotificationManager(private val context: Context) {
         notificationManager.notify(NotificationIds.EXTREME_RISK_ALERT, notification)
 
         // Trigger aggressive vibration explicitly
+        vibrate(extremeVibrationPattern, isExtreme = true)
+    }
+
+    // ── Disaster risk alerts (AI-based predictions) ────────────
+
+    /**
+     * Kirim notifikasi peringatan bencana berdasarkan [DisasterPrediction].
+     *
+     * - **HIGH** → channel DISASTER_ALERTS, priority HIGH, vibration tegas
+     * - **EXTREME** → channel DISASTER_EMERGENCY, priority MAX,
+     *   SOS vibration agresif, fullscreen intent, bypass DND
+     *
+     * Dipanggil oleh [WeatherUpdateWorker] setelah AI menganalisis potensi bencana.
+     */
+    fun sendDisasterRiskAlert(
+        locationName: String,
+        predictions: List<DisasterPrediction>
+    ) {
+        if (!hasNotificationPermission()) return
+
+        val highRisks = predictions.filter { it.riskLevel == RiskLevel.HIGH }
+        val extremeRisks = predictions.filter { it.riskLevel == RiskLevel.EXTREME }
+
+        if (extremeRisks.isNotEmpty()) {
+            sendExtremeDisasterNotification(locationName, extremeRisks, highRisks)
+        } else if (highRisks.isNotEmpty()) {
+            sendHighDisasterNotification(locationName, highRisks)
+        }
+    }
+
+    /**
+     * Notifikasi bencana risiko TINGGI — getaran tegas, priority HIGH
+     */
+    private fun sendHighDisasterNotification(
+        locationName: String,
+        highRisks: List<DisasterPrediction>
+    ) {
+        val s = AppLocaleManager.strings
+        val disasterNames = highRisks.joinToString(", ") { s.localized(it.type.label, it.type.labelId) }
+
+        val title = s.notifDisasterHighTitle
+        val content = buildString {
+            append("⚠️ $locationName\n")
+            append(s.notifDisasterHighBody(disasterNames))
+            append("\n")
+            highRisks.forEach { pred ->
+                val confidence = "%.0f".format(pred.confidence * 100)
+                append("\n${pred.type.icon} ${s.localized(pred.type.label, pred.type.labelId)}: ")
+                append("${s.localized(pred.riskLevel.label, pred.riskLevel.labelId)} ")
+                append("($confidence%)")
+            }
+            append("\n\n${s.notifDisasterCheck}")
+        }
+
+        val notification = createNotification(
+            channelId = NotificationChannels.DISASTER_ALERTS,
+            title = title,
+            content = content,
+            priority = NotificationCompat.PRIORITY_HIGH,
+            category = NotificationCompat.CATEGORY_ALARM,
+            vibrationPattern = highRiskVibrationPattern
+        )
+
+        notificationManager.notify(NotificationIds.DISASTER_HIGH_ALERT, notification)
+        vibrate(highRiskVibrationPattern, isExtreme = false)
+    }
+
+    /**
+     * 🚨 Notifikasi darurat bencana EKSTREM
+     *
+     * - Channel DISASTER_EMERGENCY (IMPORTANCE_MAX, bypass DND)
+     * - Getaran SOS agresif
+     * - Full-screen intent
+     * - Ongoing — tidak bisa di-swipe
+     */
+    private fun sendExtremeDisasterNotification(
+        locationName: String,
+        extremeRisks: List<DisasterPrediction>,
+        highRisks: List<DisasterPrediction>
+    ) {
+        val s = AppLocaleManager.strings
+
+        val title = s.notifDisasterExtremeTitle
+        val content = buildString {
+            append("🚨 $locationName — ${s.notifDisasterExtremeHeader}\n\n")
+            extremeRisks.forEach { pred ->
+                append("🔴 ${pred.type.icon} ${s.localized(pred.type.label, pred.type.labelId)}: ")
+                append("EXTREME (${("%.0f".format(pred.confidence * 100))}%)\n")
+                append("   ${pred.description.take(120)}\n\n")
+            }
+            if (highRisks.isNotEmpty()) {
+                highRisks.forEach { pred ->
+                    append("🟠 ${pred.type.icon} ${s.localized(pred.type.label, pred.type.labelId)}: ")
+                    append("HIGH (${("%.0f".format(pred.confidence * 100))}%)\n")
+                }
+                append("\n")
+            }
+            append("${s.notifDisasterExtremeAction}\n")
+            append(s.notifSeekShelter)
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("open_disaster_alert", true)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context, 3, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val fullScreenIntent = PendingIntent.getActivity(
+            context, 4, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(
+            context,
+            NotificationChannels.DISASTER_EMERGENCY
+        )
+            .setSmallIcon(R.drawable.ic_weather_splash)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(pendingIntent)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setVibrate(extremeVibrationPattern)
+            .setLights(android.graphics.Color.RED, 500, 200)
+            .setAutoCancel(true)
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        notificationManager.notify(NotificationIds.DISASTER_EXTREME_ALERT, notification)
         vibrate(extremeVibrationPattern, isExtreme = true)
     }
 

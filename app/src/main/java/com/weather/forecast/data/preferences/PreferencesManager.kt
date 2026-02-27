@@ -37,6 +37,7 @@ class PreferencesManager(private val context: Context) {
         val SEVERE_WEATHER_ALERT = booleanPreferencesKey("severe_weather_alert")
         val RAIN_ALERT = booleanPreferencesKey("rain_alert")
         val TEMPERATURE_ALERT = booleanPreferencesKey("temperature_alert")
+        val DISASTER_ALERT = booleanPreferencesKey("disaster_alert")
         val LAST_LATITUDE = doublePreferencesKey("last_latitude")
         val LAST_LONGITUDE = doublePreferencesKey("last_longitude")
         val LAST_LOCATION_NAME = stringPreferencesKey("last_location_name")
@@ -68,6 +69,7 @@ class PreferencesManager(private val context: Context) {
                 severeWeatherAlert = preferences[Keys.SEVERE_WEATHER_ALERT] ?: true,
                 rainAlert = preferences[Keys.RAIN_ALERT] ?: true,
                 temperatureAlert = preferences[Keys.TEMPERATURE_ALERT] ?: false,
+                disasterAlert = preferences[Keys.DISASTER_ALERT] ?: true,
                 lastLatitude = preferences[Keys.LAST_LATITUDE],
                 lastLongitude = preferences[Keys.LAST_LONGITUDE],
                 lastLocationName = preferences[Keys.LAST_LOCATION_NAME]
@@ -102,7 +104,8 @@ class PreferencesManager(private val context: Context) {
         dailyMinute: Int? = null,
         severeWeatherAlert: Boolean? = null,
         rainAlert: Boolean? = null,
-        temperatureAlert: Boolean? = null
+        temperatureAlert: Boolean? = null,
+        disasterAlert: Boolean? = null
     ) {
         context.dataStore.edit { preferences ->
             enabled?.let { preferences[Keys.NOTIFICATIONS_ENABLED] = it }
@@ -112,6 +115,7 @@ class PreferencesManager(private val context: Context) {
             severeWeatherAlert?.let { preferences[Keys.SEVERE_WEATHER_ALERT] = it }
             rainAlert?.let { preferences[Keys.RAIN_ALERT] = it }
             temperatureAlert?.let { preferences[Keys.TEMPERATURE_ALERT] = it }
+            disasterAlert?.let { preferences[Keys.DISASTER_ALERT] = it }
         }
     }
 
@@ -140,6 +144,7 @@ data class UserPreferences(
     val severeWeatherAlert: Boolean = true,
     val rainAlert: Boolean = true,
     val temperatureAlert: Boolean = false,
+    val disasterAlert: Boolean = true,
     val lastLatitude: Double? = null,
     val lastLongitude: Double? = null,
     val lastLocationName: String? = null

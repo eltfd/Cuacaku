@@ -5,6 +5,7 @@ import androidx.work.*
 import com.weather.forecast.data.model.RiskLevel
 import com.weather.forecast.data.model.WeatherCondition
 import com.weather.forecast.data.preferences.PreferencesManager
+import com.weather.forecast.data.repository.DisasterRepository
 import com.weather.forecast.data.repository.WeatherRepository
 import com.weather.forecast.location.LocationManager
 import com.weather.forecast.notification.WeatherNotificationManager
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit
  * - Rain probability alerts
  * - Temperature alerts
  * - **Weather risk alerts (HIGH → vibration, EXTREME → emergency SOS vibration)**
+ * - **Disaster risk alerts (AI-based: flood, landslide, cyclone, thunderstorm, subsidence)**
  */
 class WeatherUpdateWorker(
     context: Context,
@@ -27,6 +29,7 @@ class WeatherUpdateWorker(
 ) : CoroutineWorker(context, workerParams) {
 
     private val weatherRepository = WeatherRepository()
+    private val disasterRepository = DisasterRepository(context)
     private val locationManager = LocationManager(context)
     private val notificationManager = WeatherNotificationManager(context)
     private val preferencesManager = PreferencesManager(context)
@@ -120,6 +123,34 @@ class WeatherUpdateWorker(
                         temp <= 10 -> notificationManager.sendTemperatureAlert(
                             weatherData.location.name, temp, isHigh = false
                         )
+                    }
+                }
+
+                // ── Disaster Prediction Alert ────────────────────────
+                // Jalankan analisis AI untuk 6 jenis bencana.
+                // Kirim notifikasi jika ada risiko HIGH atau EXTREME.
+                // EXTREME → getaran SOS + bypass DND.
+                if (preferences.disasterAlert) {
+                    try {
+                        val disasterResult = disasterRepository.getDisasterForecast(
+                            location.latitude,
+                            location.longitude
+                        )
+
+                        disasterResult.onSuccess { forecast ->
+                            val dangerousPredictions = forecast.todayPredictions.filter {
+                                it.riskLevel == RiskLevel.HIGH || it.riskLevel == RiskLevel.EXTREME
+                            }
+
+                            if (dangerousPredictions.isNotEmpty()) {
+                                notificationManager.sendDisasterRiskAlert(
+                                    locationName = weatherData.location.name,
+                                    predictions = dangerousPredictions
+                                )
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // Silently fail — disaster analysis is best-effort
                     }
                 }
             }

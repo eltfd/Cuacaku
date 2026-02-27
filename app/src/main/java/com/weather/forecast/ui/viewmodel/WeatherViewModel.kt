@@ -198,7 +198,8 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         dailyEnabled: Boolean? = null,
         severeWeatherAlert: Boolean? = null,
         rainAlert: Boolean? = null,
-        temperatureAlert: Boolean? = null
+        temperatureAlert: Boolean? = null,
+        disasterAlert: Boolean? = null
     ) {
         viewModelScope.launch {
             preferencesManager.updateNotificationSettings(
@@ -206,7 +207,8 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                 dailyEnabled = dailyEnabled,
                 severeWeatherAlert = severeWeatherAlert,
                 rainAlert = rainAlert,
-                temperatureAlert = temperatureAlert
+                temperatureAlert = temperatureAlert,
+                disasterAlert = disasterAlert
             )
         }
     }

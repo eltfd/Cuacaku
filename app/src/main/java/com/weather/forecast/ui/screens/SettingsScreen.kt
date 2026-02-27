@@ -117,6 +117,18 @@ fun SettingsScreen(
                             viewModel.updateNotificationSettings(temperatureAlert = it)
                         }
                     )
+
+                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                    // Disaster AI alert
+                    SwitchSettingItem(
+                        title = s.disasterAlertSetting,
+                        subtitle = s.disasterAlertSettingDesc,
+                        checked = preferences.disasterAlert,
+                        onCheckedChange = {
+                            viewModel.updateNotificationSettings(disasterAlert = it)
+                        }
+                    )
                 }
             }
 
