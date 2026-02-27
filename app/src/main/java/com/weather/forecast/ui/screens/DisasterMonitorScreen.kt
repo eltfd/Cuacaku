@@ -86,12 +86,12 @@ private fun MonitorLoadingContent() {
             CircularProgressIndicator(color = Color.White)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Memantau situasi bencana...",
+                "Monitoring disaster situation...",
                 color = Color.White.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                "Mengambil data dari ReliefWeb & Open-Meteo",
+                "Fetching data from ReliefWeb & Open-Meteo",
                 color = Color.White.copy(alpha = 0.5f),
                 style = MaterialTheme.typography.labelSmall
             )
@@ -122,13 +122,13 @@ private fun MonitorEmptyContent(onRefresh: () -> Unit) {
             Text("✅", fontSize = 64.sp)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Situasi Aman",
+                "All Clear",
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Tidak ada bencana aktif yang terdeteksi\ndi Indonesia saat ini",
+                "No active disasters detected\nin your area",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -144,7 +144,7 @@ private fun MonitorEmptyContent(onRefresh: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Sumber: ReliefWeb (UN OCHA) & Open-Meteo Flood API",
+                "Source: ReliefWeb (UN OCHA) & Open-Meteo Flood API",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.4f)
             )
@@ -175,14 +175,14 @@ private fun MonitorErrorContent(message: String, onRetry: () -> Unit) {
             Text("⚠️", fontSize = 48.sp)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Gagal Memuat Data",
+                "Failed to Load Data",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.White
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(message, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onRetry) { Text("Coba Lagi") }
+            Button(onClick = onRetry) { Text("Retry") }
         }
     }
 }
@@ -268,9 +268,9 @@ private fun MonitorContent(
         item {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                "Sumber: ReliefWeb (UN OCHA) & Open-Meteo Flood API\n" +
-                        "Data diperbarui secara berkala. Event otomatis hilang\n" +
-                        "setelah kondisi kembali normal.",
+                "Source: ReliefWeb (UN OCHA) & Open-Meteo Flood API\n" +
+                        "Data is updated periodically. Events auto-hide\n" +
+                        "after conditions return to normal.",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
@@ -325,7 +325,7 @@ private fun MonitorHeader(data: ActiveDisasterMonitor, onRefresh: () -> Unit) {
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(
-                        text = if (hasActive) "⚠️ Pemantauan Bencana" else "📡 Pemantauan Bencana",
+                        text = if (hasActive) "⚠️ Disaster Monitor" else "📡 Disaster Monitor",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -334,7 +334,7 @@ private fun MonitorHeader(data: ActiveDisasterMonitor, onRefresh: () -> Unit) {
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Data real-time bencana di Indonesia",
+                    text = "Real-time disaster data near you",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
@@ -350,9 +350,9 @@ private fun MonitorHeader(data: ActiveDisasterMonitor, onRefresh: () -> Unit) {
         }
 
         // Last updated
-        val dateFormat = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID"))
+        val dateFormat = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
         Text(
-            text = "Terakhir diperbarui: ${dateFormat.format(Date(data.lastUpdated))}",
+            text = "Last updated: ${dateFormat.format(Date(data.lastUpdated))}",
             style = MaterialTheme.typography.labelSmall,
             color = Color.White.copy(alpha = 0.4f),
             modifier = Modifier.padding(top = 4.dp)
@@ -373,19 +373,19 @@ private fun PhasesSummaryBar(data: ActiveDisasterMonitor) {
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         PhaseChip(
-            label = "Aktif",
+            label = "Active",
             count = data.activeCount,
             color = Color(DisasterPhase.ACTIVE.colorHex),
             modifier = Modifier.weight(1f)
         )
         PhaseChip(
-            label = "Pemulihan",
+            label = "Recovery",
             count = data.recoveryCount,
             color = Color(DisasterPhase.RECOVERY.colorHex),
             modifier = Modifier.weight(1f)
         )
         PhaseChip(
-            label = "Pulih",
+            label = "Resolved",
             count = data.resolvedCount,
             color = Color(DisasterPhase.RESOLVED.colorHex),
             modifier = Modifier.weight(1f)
@@ -578,7 +578,7 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
                 // Days until hidden (only for resolved)
                 if (disaster.phase == DisasterPhase.RESOLVED && disaster.daysUntilHidden > 0) {
                     Text(
-                        text = "Hilang dalam ${disaster.daysUntilHidden} hari",
+                        text = "Hidden in ${disaster.daysUntilHidden} days",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(DisasterPhase.RESOLVED.colorHex).copy(alpha = 0.6f)
                     )
@@ -615,7 +615,7 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
 
                     // ── Current Situation ──
                     Text(
-                        text = "Situasi Terkini",
+                        text = "Current Situation",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color.White.copy(alpha = 0.8f)
                     )
@@ -630,16 +630,16 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
                     disaster.impact?.let { impact ->
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Dampak",
+                            text = "Impact",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = Color.White.copy(alpha = 0.8f)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         impact.affectedPeople?.let {
-                            Text("👥 $it orang terdampak", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                            Text("👥 $it people affected", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                         }
                         impact.affectedAreaKm2?.let {
-                            Text("📏 ${"%.1f".format(it)} km² area terdampak", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                            Text("📏 ${"%.1f".format(it)} km² area affected", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                         }
                         impact.infrastructureDamage?.let {
                             Text("🏗️ $it", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
@@ -672,7 +672,7 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Sumber: ${disaster.source}",
+                            text = "Source: ${disaster.source}",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.3f)
                         )
@@ -700,9 +700,9 @@ private fun RecoveryProgressSection(disaster: ActiveDisaster) {
         ) {
             Text(
                 text = when (disaster.phase) {
-                    DisasterPhase.ACTIVE -> "Bencana berlangsung"
-                    DisasterPhase.RECOVERY -> "Pemulihan: ${"%.0f".format(progress * 100)}%"
-                    DisasterPhase.RESOLVED -> "Pulih sepenuhnya ✓"
+                    DisasterPhase.ACTIVE -> "Disaster ongoing"
+                    DisasterPhase.RECOVERY -> "Recovery: ${"%.0f".format(progress * 100)}%"
+                    DisasterPhase.RESOLVED -> "Fully recovered ✓"
                 },
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                 color = phaseColor
@@ -770,7 +770,7 @@ private fun SeverityBadge(severity: DisasterSeverity) {
 
 @Composable
 private fun DisasterTimeline(events: List<DisasterTimelineEvent>) {
-    val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale("id", "ID"))
+    val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
 
     Column {
         events.forEachIndexed { index, event ->
@@ -831,11 +831,11 @@ private fun DisasterTimeline(events: List<DisasterTimelineEvent>) {
 
 private fun formatDuration(days: Int): String {
     return when {
-        days == 0 -> "Hari ini"
-        days == 1 -> "1 hari lalu"
-        days < 7 -> "$days hari lalu"
-        days < 30 -> "${days / 7} minggu lalu"
-        days < 365 -> "${days / 30} bulan lalu"
-        else -> "${days / 365} tahun lalu"
+        days == 0 -> "Today"
+        days == 1 -> "1 day ago"
+        days < 7 -> "$days days ago"
+        days < 30 -> "${days / 7} weeks ago"
+        days < 365 -> "${days / 30} months ago"
+        else -> "${days / 365} years ago"
     }
 }

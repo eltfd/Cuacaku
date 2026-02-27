@@ -21,17 +21,22 @@ import java.util.concurrent.TimeUnit
 /**
  * Active Disaster Monitor Repository
  *
- * Memantau bencana yang sedang/sudah terjadi di Indonesia dan sekitarnya.
+ * Memantau bencana yang sedang/sudah terjadi di seluruh dunia,
+ * berdasarkan lokasi user secara dinamis.
  *
  * ── Data Sources ──
- * 1. **ReliefWeb API** (UN OCHA) — Data bencana aktif, global
+ * 1. **ReliefWeb API** (UN OCHA) — Data bencana aktif, global coverage
  *    - Status: alert, ongoing, past
- *    - Filter: Indonesia (IDN)
+ *    - Filter: Dinamis berdasarkan negara user (reverse geocode → ISO3)
  *    - Gratis, tanpa API key
  *
  * 2. **Open-Meteo Flood API** — Data debit sungai real-time
- *    - Digunakan untuk deteksi banjir lokal berdasarkan threshold
+ *    - Deteksi banjir lokal berdasarkan threshold, global coverage
  *    - Sudah ada di FloodApiService
+ *
+ * 3. **Nominatim Reverse Geocoding** — Deteksi negara dari koordinat
+ *    - Mendapatkan ISO3 code negara untuk filter ReliefWeb
+ *    - Gratis (OpenStreetMap)
  *
  * ── Lifecycle Management ──
  * ACTIVE → RECOVERY → RESOLVED → (auto-hide)
@@ -52,6 +57,7 @@ class DisasterMonitorRepository(private val context: Context) {
 
     private val reliefWebApi = RetrofitClient.reliefWebApi
     private val floodApi = RetrofitClient.floodApi
+    private val geocodingApi = RetrofitClient.geocodingApi
     private val gson = Gson()
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -61,9 +67,15 @@ class DisasterMonitorRepository(private val context: Context) {
         private const val KEY_CACHED_DISASTERS = "cached_disasters"
         private const val KEY_LAST_FETCH = "last_fetch"
         private const val KEY_MANUAL_OVERRIDES = "manual_overrides"
+        private const val KEY_CACHED_COUNTRY_ISO3 = "cached_country_iso3"
+        private const val KEY_CACHED_COUNTRY_NAME = "cached_country_name"
+        private const val KEY_COUNTRY_CACHE_TIME = "country_cache_time"
 
         /** Minimum interval antara fetch API (15 menit) */
         private const val FETCH_INTERVAL_MS = 15 * 60 * 1000L
+
+        /** Cache country result for 1 hour — reverse geocode jarang berubah */
+        private const val COUNTRY_CACHE_INTERVAL_MS = 60 * 60 * 1000L
 
         /** Threshold debit sungai untuk klasifikasi banjir aktif (m³/s) */
         private const val FLOOD_DISCHARGE_THRESHOLD_HIGH = 500.0
@@ -71,6 +83,42 @@ class DisasterMonitorRepository(private val context: Context) {
 
         /** Berapa hari ke belakang dicari event di ReliefWeb */
         private const val LOOKBACK_DAYS = 60L
+
+        /** Radius proximity filter (km) — bencana dalam jarak ini ditampilkan */
+        private const val PROXIMITY_RADIUS_KM = 500.0
+
+        /** ISO 3166-1 alpha-2 → alpha-3 mapping (common countries) */
+        private val COUNTRY_CODE_MAP = mapOf(
+            "id" to "IDN", "us" to "USA", "gb" to "GBR", "jp" to "JPN",
+            "de" to "DEU", "fr" to "FRA", "in" to "IND", "cn" to "CHN",
+            "br" to "BRA", "au" to "AUS", "ca" to "CAN", "kr" to "KOR",
+            "mx" to "MEX", "it" to "ITA", "es" to "ESP", "ru" to "RUS",
+            "nl" to "NLD", "tr" to "TUR", "sa" to "SAU", "ae" to "ARE",
+            "sg" to "SGP", "my" to "MYS", "th" to "THA", "ph" to "PHL",
+            "vn" to "VNM", "bd" to "BGD", "pk" to "PAK", "lk" to "LKA",
+            "np" to "NPL", "mm" to "MMR", "kh" to "KHM", "la" to "LAO",
+            "nz" to "NZL", "za" to "ZAF", "ng" to "NGA", "ke" to "KEN",
+            "eg" to "EGY", "ma" to "MAR", "et" to "ETH", "gh" to "GHA",
+            "tz" to "TZA", "co" to "COL", "ar" to "ARG", "cl" to "CHL",
+            "pe" to "PER", "ec" to "ECU", "ve" to "VEN", "bo" to "BOL",
+            "py" to "PRY", "uy" to "URY", "ht" to "HTI", "do" to "DOM",
+            "gt" to "GTM", "hn" to "HND", "sv" to "SLV", "ni" to "NIC",
+            "cr" to "CRI", "pa" to "PAN", "cu" to "CUB", "jm" to "JAM",
+            "at" to "AUT", "be" to "BEL", "ch" to "CHE", "cz" to "CZE",
+            "dk" to "DNK", "fi" to "FIN", "gr" to "GRC", "hu" to "HUN",
+            "ie" to "IRL", "no" to "NOR", "pl" to "POL", "pt" to "PRT",
+            "ro" to "ROU", "se" to "SWE", "ua" to "UKR", "bg" to "BGR",
+            "hr" to "HRV", "rs" to "SRB", "si" to "SVN", "sk" to "SVK",
+            "il" to "ISR", "jo" to "JOR", "lb" to "LBN", "iq" to "IRQ",
+            "ir" to "IRN", "af" to "AFG", "mn" to "MNG", "kz" to "KAZ",
+            "uz" to "UZB", "tm" to "TKM", "kg" to "KGZ", "tj" to "TJK",
+            "pg" to "PNG", "fj" to "FJI", "ws" to "WSM", "to" to "TON",
+            "mz" to "MOZ", "mg" to "MDG", "cd" to "COD", "cm" to "CMR",
+            "sn" to "SEN", "ml" to "MLI", "bf" to "BFA", "ne" to "NER",
+            "td" to "TCD", "sd" to "SDN", "ss" to "SSD", "so" to "SOM",
+            "ly" to "LBY", "tn" to "TUN", "dz" to "DZA", "ci" to "CIV",
+            "tl" to "TLS", "bn" to "BRN", "tw" to "TWN", "hk" to "HKG"
+        )
     }
 
     /**
@@ -105,7 +153,7 @@ class DisasterMonitorRepository(private val context: Context) {
                 }
 
                 // Fetch from APIs in parallel
-                val reliefWebResult = async { fetchReliefWebDisasters() }
+                val reliefWebResult = async { fetchReliefWebDisasters(latitude, longitude) }
                 val floodResult = async { fetchLocalFloodStatus(latitude, longitude) }
 
                 val reliefWebDisasters = reliefWebResult.await()
@@ -142,51 +190,119 @@ class DisasterMonitorRepository(private val context: Context) {
     }
 
     // ════════════════════════════════════════════════
-    //  ReliefWeb Data Fetching
+    //  ReliefWeb Data Fetching (Global)
     // ════════════════════════════════════════════════
 
     /**
-     * Fetch bencana aktif dari ReliefWeb API.
-     * Filter: Indonesia (IDN), status ongoing + alert.
+     * Deteksi negara dari koordinat user via reverse geocoding.
+     * Hasil di-cache selama 1 jam untuk hemat bandwidth.
+     *
+     * @return ISO3 country code (e.g. "IDN", "USA", "JPN") atau null jika gagal
      */
-    private suspend fun fetchReliefWebDisasters(): List<ActiveDisaster> {
+    private suspend fun detectCountryIso3(latitude: Double, longitude: Double): String? {
+        // Check cache first
+        val now = System.currentTimeMillis()
+        val cacheTime = prefs.getLong(KEY_COUNTRY_CACHE_TIME, 0)
+        if (now - cacheTime < COUNTRY_CACHE_INTERVAL_MS) {
+            val cached = prefs.getString(KEY_CACHED_COUNTRY_ISO3, null)
+            if (!cached.isNullOrBlank()) return cached
+        }
+
+        return try {
+            val response = geocodingApi.reverseGeocode(
+                latitude = latitude,
+                longitude = longitude,
+                zoom = 5  // Country level — hemat bandwidth
+            )
+            val alpha2 = response.address?.countryCode?.lowercase()
+            val iso3 = alpha2?.let { COUNTRY_CODE_MAP[it] }
+
+            // Cache result
+            if (iso3 != null) {
+                prefs.edit()
+                    .putString(KEY_CACHED_COUNTRY_ISO3, iso3)
+                    .putString(KEY_CACHED_COUNTRY_NAME, response.address?.country ?: "")
+                    .putLong(KEY_COUNTRY_CACHE_TIME, now)
+                    .apply()
+            }
+            iso3
+        } catch (_: Exception) {
+            // Fallback: gunakan cache lama jika ada
+            prefs.getString(KEY_CACHED_COUNTRY_ISO3, null)
+        }
+    }
+
+    /**
+     * Fetch bencana aktif dari ReliefWeb API — global, berdasarkan lokasi user.
+     *
+     * Strategy:
+     * 1. Fetch disasters berdasarkan negara user (via reverse geocode → ISO3)
+     * 2. Fetch recent global disasters, filter by proximity
+     * 3. Merge & deduplicate
+     */
+    private suspend fun fetchReliefWebDisasters(
+        latitude: Double,
+        longitude: Double
+    ): List<ActiveDisaster> {
         val disasters = mutableListOf<ActiveDisaster>()
 
         try {
-            // Fetch ongoing disasters in Indonesia
-            val ongoingResponse = reliefWebApi.getDisastersByCountry(
-                filterValue1 = "IDN",
-                filterValue2 = "ongoing",
-                limit = 20
-            )
-            disasters.addAll(mapReliefWebToActiveDisasters(ongoingResponse, DisasterPhase.ACTIVE))
+            // Step 1: Detect user's country
+            val countryIso3 = detectCountryIso3(latitude, longitude)
 
-            // Also fetch alerts (early warning)
-            val alertResponse = reliefWebApi.getDisastersByCountry(
-                filterValue1 = "IDN",
-                filterValue2 = "alert",
-                limit = 10
-            )
-            disasters.addAll(mapReliefWebToActiveDisasters(alertResponse, DisasterPhase.ACTIVE))
+            // Step 2: Fetch country-specific disasters (if country detected)
+            if (countryIso3 != null) {
+                // Ongoing disasters in user's country
+                val ongoingResponse = reliefWebApi.getDisastersByCountry(
+                    filterValue1 = countryIso3,
+                    filterValue2 = "ongoing",
+                    limit = 20
+                )
+                disasters.addAll(mapReliefWebToActiveDisasters(ongoingResponse, DisasterPhase.ACTIVE))
 
-            // Fetch recently past (untuk tracking recovery)
+                // Alerts (early warning) in user's country
+                val alertResponse = reliefWebApi.getDisastersByCountry(
+                    filterValue1 = countryIso3,
+                    filterValue2 = "alert",
+                    limit = 10
+                )
+                disasters.addAll(mapReliefWebToActiveDisasters(alertResponse, DisasterPhase.ACTIVE))
+            }
+
+            // Step 3: Fetch recent global disasters (proximity-based)
             val dateFrom = LocalDate.now().minusDays(LOOKBACK_DAYS)
                 .format(DateTimeFormatter.ISO_DATE)
-            val pastResponse = try {
+            val globalResponse = try {
                 reliefWebApi.getRecentDisasters(
                     dateFrom = dateFrom,
-                    limit = 20
+                    limit = 50
                 )
             } catch (_: Exception) { null }
 
-            // Filter past disasters yang masih relevan (Indonesia)
-            pastResponse?.data?.forEach { item ->
+            globalResponse?.data?.forEach { item ->
                 val fields = item.fields ?: return@forEach
                 val countries = fields.country ?: return@forEach
-                val isIndonesia = countries.any { it.iso3 == "IDN" }
-                if (isIndonesia && fields.status == "past") {
-                    mapSingleReliefWebDisaster(item, DisasterPhase.RECOVERY)?.let {
-                        disasters.add(it)
+
+                // Filter: nearby disasters by proximity OR recovery in user's country
+                val isNearby = countries.any { country ->
+                    val loc = country.location
+                    if (loc?.lat != null && loc.lon != null) {
+                        haversineDistance(latitude, longitude, loc.lat, loc.lon) <= PROXIMITY_RADIUS_KM
+                    } else {
+                        // Fallback: match by country ISO3
+                        countryIso3 != null && country.iso3 == countryIso3
+                    }
+                }
+
+                if (isNearby) {
+                    val phase = when (fields.status) {
+                        "ongoing" -> DisasterPhase.ACTIVE
+                        "alert" -> DisasterPhase.ACTIVE
+                        "past" -> DisasterPhase.RECOVERY
+                        else -> DisasterPhase.RECOVERY
+                    }
+                    mapSingleReliefWebDisaster(item, phase)?.let { disaster ->
+                        disasters.add(disaster)
                     }
                 }
             }
@@ -196,6 +312,24 @@ class DisasterMonitorRepository(private val context: Context) {
         }
 
         return disasters.distinctBy { it.id }
+    }
+
+    /**
+     * Hitung jarak antara dua titik koordinat menggunakan formula Haversine.
+     * @return Jarak dalam kilometer
+     */
+    private fun haversineDistance(
+        lat1: Double, lon1: Double,
+        lat2: Double, lon2: Double
+    ): Double {
+        val r = 6371.0 // Radius bumi (km)
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return r * c
     }
 
     /**
@@ -308,12 +442,12 @@ class DisasterMonitorRepository(private val context: Context) {
 
             ActiveDisaster(
                 id = "local-flood-${"%.2f".format(latitude)}-${"%.2f".format(longitude)}",
-                title = "Potensi Banjir (Debit Sungai Tinggi)",
+                title = "Flood Risk (High River Discharge)",
                 type = ActiveDisasterType.FLOOD,
                 phase = phase,
                 locations = listOf(
                     AffectedLocation(
-                        name = "Lokasi Anda",
+                        name = "Your Location",
                         latitude = latitude,
                         longitude = longitude,
                         radiusKm = 25.0
@@ -322,9 +456,9 @@ class DisasterMonitorRepository(private val context: Context) {
                 severity = severity,
                 startDate = System.currentTimeMillis(),
                 lastUpdate = System.currentTimeMillis(),
-                currentSituation = "Debit sungai terdekat: $dischargeStr m³/s (maks: $maxStr m³/s). " +
-                        if (phase == DisasterPhase.RECOVERY) "Debit mulai menurun, waspada."
-                        else "Debit sangat tinggi, potensi banjir!",
+                currentSituation = "Nearby river discharge: $dischargeStr m³/s (max: $maxStr m³/s). " +
+                        if (phase == DisasterPhase.RECOVERY) "Discharge decreasing, stay alert."
+                        else "Discharge very high, flood risk!",
                 recoveryProgress = if (phase == DisasterPhase.RECOVERY) {
                     (1f - (currentDischarge / maxDischarge).toFloat()).coerceIn(0.1f, 0.8f)
                 } else 0f,
@@ -341,8 +475,8 @@ class DisasterMonitorRepository(private val context: Context) {
 
     /**
      * Apply lifecycle rules:
-     * - ACTIVE tanpa update > 7 hari → RECOVERY
-     * - RECOVERY tanpa update > STALE_RECOVERY_DAYS → RESOLVED
+     * - ACTIVE with no update > 7 days → RECOVERY
+     * - RECOVERY with no update > STALE_RECOVERY_DAYS → RESOLVED
      * - RESOLVED > display days → remove (auto-hide)
      */
     private fun applyLifecycleRules(disasters: List<ActiveDisaster>): List<ActiveDisaster> {
@@ -368,7 +502,7 @@ class DisasterMonitorRepository(private val context: Context) {
                         current.copy(
                             phase = DisasterPhase.RECOVERY,
                             recoveryProgress = 0.3f,
-                            currentSituation = "${current.currentSituation}\n⏳ Tidak ada update > 7 hari, kemungkinan dalam pemulihan."
+                            currentSituation = "${current.currentSituation}\n⏳ No updates in 7+ days, likely in recovery."
                         )
                     } else current
                 }
@@ -378,7 +512,7 @@ class DisasterMonitorRepository(private val context: Context) {
                             phase = DisasterPhase.RESOLVED,
                             recoveryProgress = 1.0f,
                             resolvedDate = now,
-                            currentSituation = "Pemulihan dianggap selesai (tidak ada update > ${DisasterDisplayConfig.STALE_RECOVERY_DAYS} hari)."
+                            currentSituation = "Recovery complete (no updates in ${DisasterDisplayConfig.STALE_RECOVERY_DAYS}+ days)."
                         )
                     } else current
                 }
@@ -420,7 +554,7 @@ class DisasterMonitorRepository(private val context: Context) {
                         DisasterTimelineEvent(
                             timestamp = System.currentTimeMillis(),
                             phase = newDisaster.phase,
-                            description = "Status berubah: ${existing.phase.labelId} → ${newDisaster.phase.labelId}",
+                            description = "Status changed: ${existing.phase.labelId} → ${newDisaster.phase.labelId}",
                             icon = newDisaster.phase.icon
                         )
                     )
@@ -465,24 +599,19 @@ class DisasterMonitorRepository(private val context: Context) {
     }
 
     private fun extractProvinceFromTitle(title: String): String {
-        val provinces = listOf(
-            "Aceh", "Sumatera Utara", "Sumatera Barat", "Riau", "Jambi",
-            "Sumatera Selatan", "Bengkulu", "Lampung", "Bangka Belitung",
-            "Kepulauan Riau", "DKI Jakarta", "Jawa Barat", "Jawa Tengah",
-            "DI Yogyakarta", "Jawa Timur", "Banten", "Bali",
-            "Nusa Tenggara Barat", "Nusa Tenggara Timur", "Kalimantan Barat",
-            "Kalimantan Tengah", "Kalimantan Selatan", "Kalimantan Timur",
-            "Kalimantan Utara", "Sulawesi Utara", "Sulawesi Tengah",
-            "Sulawesi Selatan", "Sulawesi Tenggara", "Gorontalo",
-            "Sulawesi Barat", "Maluku", "Maluku Utara", "Papua",
-            "Papua Barat", "Papua Tengah", "Papua Pegunungan",
-            "North Sumatra", "West Sumatra", "South Sumatra",
-            "West Java", "Central Java", "East Java", "West Kalimantan",
-            "Central Kalimantan", "South Kalimantan", "East Kalimantan",
-            "North Sulawesi", "Central Sulawesi", "South Sulawesi",
-            "West Papua", "North Maluku"
-        )
-        return provinces.firstOrNull { it.lowercase() in title.lowercase() } ?: ""
+        // Try to extract region/province from disaster title
+        // ReliefWeb titles are typically formatted as:
+        //   "Country: Event in Region" or "Region - Event"
+        val parts = title.split(":", "-", "–", "—").map { it.trim() }
+        return if (parts.size > 1) {
+            // Try the second part which often contains the region
+            val regionPart = parts.drop(1).joinToString(" ").trim()
+            // Remove common prefixes like "Floods in", "Earthquake in", etc.
+            val cleaned = regionPart
+                .replace(Regex("^(Floods?|Earthquake|Landslide|Cyclone|Storm|Tsunami|Drought|Eruption|Volcano)\\s+(in|near|at)\\s+", RegexOption.IGNORE_CASE), "")
+                .trim()
+            cleaned.take(80)
+        } else ""
     }
 
     private fun estimateSeverity(title: String, description: String?): DisasterSeverity {
@@ -523,9 +652,9 @@ class DisasterMonitorRepository(private val context: Context) {
         daysSinceEvent: Int
     ): String {
         val phaseDesc = when (phase) {
-            DisasterPhase.ACTIVE -> "Bencana masih berlangsung."
-            DisasterPhase.RECOVERY -> "Area dalam proses pemulihan ($daysSinceEvent hari sejak kejadian)."
-            DisasterPhase.RESOLVED -> "Kondisi sudah kembali normal."
+            DisasterPhase.ACTIVE -> "Disaster is ongoing."
+            DisasterPhase.RECOVERY -> "Area is in recovery ($daysSinceEvent days since event)."
+            DisasterPhase.RESOLVED -> "Conditions have returned to normal."
         }
         return "$title\n$phaseDesc"
     }
@@ -543,7 +672,7 @@ class DisasterMonitorRepository(private val context: Context) {
                 DisasterTimelineEvent(
                     timestamp = eventDate,
                     phase = DisasterPhase.ACTIVE,
-                    description = "Bencana dilaporkan: $title",
+                    description = "Disaster reported: $title",
                     icon = "🚨"
                 )
             )
@@ -554,7 +683,7 @@ class DisasterMonitorRepository(private val context: Context) {
                 DisasterTimelineEvent(
                     timestamp = changedDate,
                     phase = phase,
-                    description = "Update terbaru",
+                    description = "Latest update",
                     icon = "📋"
                 )
             )
@@ -567,8 +696,8 @@ class DisasterMonitorRepository(private val context: Context) {
         if (description.isNullOrBlank()) return null
         return DisasterImpact(
             aidStatus = when {
-                "response" in description.lowercase() -> "Bantuan sedang disalurkan"
-                "relief" in description.lowercase() -> "Operasi bantuan aktif"
+                "response" in description.lowercase() -> "Aid response in progress"
+                "relief" in description.lowercase() -> "Relief operations active"
                 else -> null
             }
         )
@@ -624,7 +753,7 @@ class DisasterMonitorRepository(private val context: Context) {
     }
 
     /**
-     * Simpan manual phase override (misal: user menandai bencana sudah resolved).
+     * Save manual phase override (e.g., user marks a disaster as resolved).
      */
     fun setManualPhaseOverride(disasterId: String, phase: DisasterPhase) {
         val overrides = loadManualOverrides().toMutableMap()
@@ -635,7 +764,7 @@ class DisasterMonitorRepository(private val context: Context) {
     }
 
     /**
-     * Hapus manual override.
+     * Clear manual override.
      */
     fun clearManualOverride(disasterId: String) {
         val overrides = loadManualOverrides().toMutableMap()

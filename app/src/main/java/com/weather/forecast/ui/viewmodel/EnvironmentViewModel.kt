@@ -19,12 +19,22 @@ import kotlinx.coroutines.launch
 /**
  * Environment ViewModel
  *
- * Mengelola data kualitas udara dan kualitas air.
- * Menggunakan lokasi yang sama dengan WeatherViewModel.
+ * Mengelola data lingkungan (udara, air, bencana) dengan
+ * prioritized async loading berdasarkan lokasi user.
  *
- * State:
- * - AirQualityUiState: Loading, Success, Error
- * - WaterQualityUiState: Loading, Success, Error
+ * ── Loading Strategy ──
+ * Phase 1 (High Priority): Air quality & water quality — data yang langsung
+ *   terlihat user di tab pertama, paling ringan bandwidth-nya.
+ * Phase 2 (Medium Priority): Disaster forecast — prediksi potensi bencana.
+ * Phase 3 (Low Priority): Disaster monitor — data ReliefWeb yang lebih berat
+ *   (reverse geocode + multiple API calls).
+ *
+ * Semua data diambil berdasarkan lokasi user secara dinamis → global support.
+ *
+ * ── Bandwidth Optimization ──
+ * - Sequential phases menghindari burst request bersamaan
+ * - Per-module caching di masing-masing repository
+ * - Lazy load: data Phase 2/3 bisa di-trigger manual saat user buka tab
  */
 class EnvironmentViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -68,7 +78,14 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     /**
-     * Load air quality & water quality data
+     * Load all environment data with prioritized async loading.
+     *
+     * Phase 1 (immediate): Air quality + Water quality — lightweight, user sees first
+     * Phase 2 (after Phase 1): Disaster forecast — medium weight
+     * Phase 3 (after Phase 2): Disaster monitor — heaviest (reverse geocode + ReliefWeb)
+     *
+     * Each phase runs in parallel internally, phases are sequential to avoid
+     * burst network usage and reduce bandwidth pressure.
      */
     fun loadAllData() {
         viewModelScope.launch {
@@ -77,10 +94,19 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             currentLatitude = location.first
             currentLongitude = location.second
 
-            // Load all in parallel
-            launch { loadAirQualityData(location.first, location.second) }
-            launch { loadWaterQualityData(location.first, location.second) }
-            launch { loadDisasterData(location.first, location.second) }
+            // ── Phase 1: High Priority (lightweight, visible first) ──
+            val airJob = launch { loadAirQualityData(location.first, location.second) }
+            val waterJob = launch { loadWaterQualityData(location.first, location.second) }
+
+            // Wait for Phase 1 to complete before starting heavier APIs
+            airJob.join()
+            waterJob.join()
+
+            // ── Phase 2: Medium Priority (disaster prediction) ──
+            val disasterJob = launch { loadDisasterData(location.first, location.second) }
+            disasterJob.join()
+
+            // ── Phase 3: Low Priority (heaviest — reverse geocode + ReliefWeb) ──
             launch { loadDisasterMonitorData(location.first, location.second) }
         }
     }
@@ -165,7 +191,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             _airQualityState.value = AirQualityUiState.Success(data)
         }.onFailure { error ->
             _airQualityState.value = AirQualityUiState.Error(
-                message = error.message ?: "Gagal memuat data kualitas udara"
+                message = error.message ?: "Failed to load air quality data"
             )
         }
     }
@@ -178,7 +204,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             _waterQualityState.value = WaterQualityUiState.Success(data)
         }.onFailure { error ->
             _waterQualityState.value = WaterQualityUiState.Error(
-                message = error.message ?: "Gagal memuat data kualitas air"
+                message = error.message ?: "Failed to load water quality data"
             )
         }
     }
@@ -191,7 +217,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             _disasterState.value = DisasterUiState.Success(data)
         }.onFailure { error ->
             _disasterState.value = DisasterUiState.Error(
-                message = error.message ?: "Gagal memuat prakiraan bencana"
+                message = error.message ?: "Failed to load disaster forecast"
             )
         }
     }
@@ -208,7 +234,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             }
         }.onFailure { error ->
             _disasterMonitorState.value = DisasterMonitorUiState.Error(
-                message = error.message ?: "Gagal memuat data pemantauan bencana"
+                message = error.message ?: "Failed to load disaster monitoring data"
             )
         }
     }
@@ -238,10 +264,10 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
         return if (prefs.lastLatitude != null && prefs.lastLongitude != null) {
             Pair(prefs.lastLatitude, prefs.lastLongitude)
         } else {
-            _airQualityState.value = AirQualityUiState.Error("Lokasi tidak tersedia")
-            _waterQualityState.value = WaterQualityUiState.Error("Lokasi tidak tersedia")
-            _disasterState.value = DisasterUiState.Error("Lokasi tidak tersedia")
-            _disasterMonitorState.value = DisasterMonitorUiState.Error("Lokasi tidak tersedia")
+            _airQualityState.value = AirQualityUiState.Error("Location not available")
+            _waterQualityState.value = WaterQualityUiState.Error("Location not available")
+            _disasterState.value = DisasterUiState.Error("Location not available")
+            _disasterMonitorState.value = DisasterMonitorUiState.Error("Location not available")
             null
         }
     }

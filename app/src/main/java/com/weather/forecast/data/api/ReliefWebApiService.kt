@@ -13,7 +13,7 @@ import retrofit2.http.*
  * Features:
  * - Free & Open Source (UN-hosted)
  * - Tidak perlu API key
- * - Data bencana global, termasuk Indonesia
+ * - Data bencana global (worldwide coverage)
  * - Filter per negara, jenis bencana, dan status
  * - Format: JSON
  *
@@ -21,6 +21,7 @@ import retrofit2.http.*
  * - Memantau bencana aktif yang sudah terjadi (banjir, longsor, dll.)
  * - Mendapatkan update terkini tentang recovery
  * - Menampilkan area yang terdampak
+ * - Mendukung seluruh negara di dunia (dinamis berdasarkan lokasi user)
  */
 interface ReliefWebApiService {
 
@@ -54,6 +55,9 @@ interface ReliefWebApiService {
      *
      * ReliefWeb uses a query body format for complex filters,
      * but we can also use nested query params for simpler cases.
+     *
+     * @param filterValue1 Country ISO3 code (e.g. "IDN", "USA", "JPN", "DEU")
+     *                     — dynamic, based on user's location
      */
     @GET("disasters")
     suspend fun getDisastersByCountry(
@@ -61,7 +65,7 @@ interface ReliefWebApiService {
         @Query("fields[include][]") fields: List<String> = DISASTER_FIELDS,
         @Query("filter[operator]") filterOperator: String = "AND",
         @Query("filter[conditions][0][field]") filterField1: String = "country.iso3",
-        @Query("filter[conditions][0][value]") filterValue1: String = "IDN",
+        @Query("filter[conditions][0][value]") filterValue1: String,  // Dynamic: user's country ISO3
         @Query("filter[conditions][1][field]") filterField2: String = "status",
         @Query("filter[conditions][1][value]") filterValue2: String = "ongoing",
         @Query("sort[]") sort: String = "date.event:desc",
@@ -70,6 +74,8 @@ interface ReliefWebApiService {
 
     /**
      * Get recent reports untuk disaster tertentu (detail / update).
+     *
+     * @param countryIso3 Country ISO3 code — dynamic, based on user's location
      */
     @GET("reports")
     suspend fun getDisasterReports(
@@ -79,7 +85,7 @@ interface ReliefWebApiService {
         @Query("filter[conditions][0][field]") filterField1: String = "disaster.id",
         @Query("filter[conditions][0][value]") disasterId: Int,
         @Query("filter[conditions][1][field]") filterField2: String = "primary_country.iso3",
-        @Query("filter[conditions][1][value]") countryIso3: String = "IDN",
+        @Query("filter[conditions][1][value]") countryIso3: String,  // Dynamic: user's country ISO3
         @Query("sort[]") sort: String = "date.created:desc",
         @Query("limit") limit: Int = 5
     ): ReliefWebReportResponse
