@@ -49,7 +49,9 @@ data class SeismicMonitorData(
     val emergencyContacts: List<EmergencyContact> = EmergencyContacts.getForLocale(),
     // ── Indonesian Data Sources ──
     val bmkgEarthquakes: List<BmkgEarthquakeEvent> = emptyList(),
-    val crowdsourcedReports: List<CrowdsourcedDisasterReport> = emptyList()
+    val crowdsourcedReports: List<CrowdsourcedDisasterReport> = emptyList(),
+    // ── Landslide Risk ──
+    val landslideRisk: LandslideRiskAssessment? = null
 ) {
     val hasActiveThreats: Boolean get() =
         nearbyEarthquakes.any { it.magnitude >= 4.0 } ||
@@ -704,6 +706,88 @@ enum class CrowdsourcedDisasterType(
     companion object {
         fun fromApiKey(key: String?): CrowdsourcedDisasterType {
             return values().find { it.apiKey == key } ?: UNKNOWN
+        }
+    }
+
+    val localizedLabel: String get() {
+        val isId = AppLocaleManager.locale == com.weather.forecast.data.locale.AppLocale.ID
+        return if (isId) labelId else labelEn
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  LANDSLIDE RISK ASSESSMENT
+// ═══════════════════════════════════════════════════
+
+/**
+ * Landslide risk assessment based on meteorological,
+ * hydrological, and seismic factors.
+ *
+ * Data Sources:
+ * - Open-Meteo Weather API (rainfall, soil moisture)
+ * - USGS Earthquake data (seismic trigger)
+ */
+data class LandslideRiskAssessment(
+    val riskLevel: LandslideRiskLevel,
+    val riskScore: Int,                    // 0-100
+    val factors: List<LandslideRiskFactor>,
+
+    // ── Rainfall Data ──
+    val currentRainRate: Double,            // mm/hr
+    val rainfall24h: Double,                // mm accumulated
+    val rainfall72h: Double,                // mm accumulated
+    val rainfallForecast24h: Double,        // mm expected next 24h
+
+    // ── Soil Moisture Data ──
+    val soilMoistureSurface: Double,        // m³/m³ (0-7cm)
+    val soilMoistureMiddle: Double,         // m³/m³ (7-28cm)
+    val soilMoistureDeep: Double,           // m³/m³ (28-100cm)
+    val soilSaturationPercent: Double,      // 0-100%
+
+    // ── Seismic Trigger ──
+    val recentNearbyQuakes: Int,            // Count in past 7 days within 100km
+    val maxNearbyMagnitude: Double,         // Strongest nearby quake
+
+    // ── Forecast ──
+    val hourlyRainForecast: List<HourlyRainForecast> = emptyList(),
+    val description: String,
+    val recommendation: String
+)
+
+data class LandslideRiskFactor(
+    val name: String,
+    val nameId: String,
+    val score: Int,          // Individual factor score
+    val maxScore: Int,       // Max possible for this factor
+    val description: String,
+    val descriptionId: String
+)
+
+data class HourlyRainForecast(
+    val time: String,
+    val rain: Double,         // mm
+    val probability: Int      // 0-100%
+)
+
+enum class LandslideRiskLevel(
+    val labelEn: String,
+    val labelId: String,
+    val colorHex: Long,
+    val emoji: String
+) {
+    LOW("Low Risk", "Risiko Rendah", 0xFF4CAF50, "\u2705"),
+    MODERATE("Moderate Risk", "Risiko Sedang", 0xFFFFEB3B, "\u26A0\uFE0F"),
+    HIGH("High Risk", "Risiko Tinggi", 0xFFFF9800, "\uD83D\uDFE0"),
+    VERY_HIGH("Very High Risk", "Risiko Sangat Tinggi", 0xFFF44336, "\uD83D\uDD34"),
+    CRITICAL("Critical", "Kritis", 0xFF880E4F, "\u203C\uFE0F");
+
+    companion object {
+        fun fromScore(score: Int): LandslideRiskLevel = when {
+            score >= 80 -> CRITICAL
+            score >= 60 -> VERY_HIGH
+            score >= 40 -> HIGH
+            score >= 20 -> MODERATE
+            else -> LOW
         }
     }
 

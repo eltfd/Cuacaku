@@ -48,6 +48,7 @@ class SeismicRepository(private val context: Context) {
     private val marineApi = RetrofitClient.marineApi
     private val bmkgApi = RetrofitClient.bmkgApi
     private val petaBencanaApi = RetrofitClient.petaBencanaApi
+    private val weatherApi = RetrofitClient.weatherApi
     private val gson = Gson()
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -105,6 +106,7 @@ class SeismicRepository(private val context: Context) {
             val reliefDeferred = async { fetchReliefPoints(latitude, longitude) }
             val bmkgDeferred = async { fetchBmkgEarthquakes(latitude, longitude) }
             val petaBencanaDeferred = async { fetchPetaBencanaReports(latitude, longitude) }
+            val landslideDeferred = async { fetchLandslideRiskData(latitude, longitude) }
 
             val allEarthquakes = earthquakeDeferred.await()
             val significantEarthquakes = significantDeferred.await()
@@ -113,6 +115,7 @@ class SeismicRepository(private val context: Context) {
             val reliefPoints = reliefDeferred.await()
             val bmkgEarthquakes = bmkgDeferred.await()
             val crowdsourcedReports = petaBencanaDeferred.await()
+            val landslideBaseData = landslideDeferred.await()
 
             // ── Process earthquakes ──
             val processedQuakes = allEarthquakes.map { feature ->
@@ -144,6 +147,9 @@ class SeismicRepository(private val context: Context) {
             )
             val overallPhase = determineOverallPhase(lifecycleStates, impactAreas, reliefPoints)
 
+            // ── Finalize landslide risk with seismic data ──
+            val landslideRisk = finalizeLandslideRisk(landslideBaseData, nearbyQuakes)
+
             val result = SeismicMonitorData(
                 earthquakes = processedQuakes,
                 nearbyEarthquakes = nearbyQuakes,
@@ -160,7 +166,8 @@ class SeismicRepository(private val context: Context) {
                 lifecycleStates = lifecycleStates,
                 reliefPoints = reliefPoints,
                 bmkgEarthquakes = bmkgEarthquakes,
-                crowdsourcedReports = crowdsourcedReports
+                crowdsourcedReports = crowdsourcedReports,
+                landslideRisk = landslideRisk
             )
 
             Result.success(result)
@@ -1311,6 +1318,284 @@ class SeismicRepository(private val context: Context) {
         return reports
             .filter { it.isReal }
             .sortedByDescending { it.time }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  LANDSLIDE RISK ASSESSMENT
+    // ═══════════════════════════════════════════════════
+
+    /**
+     * Intermediate data from weather API (before combining with seismic data).
+     */
+    private data class LandslideWeatherData(
+        val currentRainRate: Double,
+        val rainfall24h: Double,
+        val rainfall72h: Double,
+        val rainfallForecast24h: Double,
+        val soilMoistureSurface: Double,
+        val soilMoistureMiddle: Double,
+        val soilMoistureDeep: Double,
+        val hourlyRainForecast: List<HourlyRainForecast>,
+        val rainfallScore: Int,
+        val soilMoistureScore: Int,
+        val forecastScore: Int
+    )
+
+    /**
+     * Fetch rainfall + soil moisture from Open-Meteo weather API
+     * for landslide risk calculation.
+     */
+    private suspend fun fetchLandslideRiskData(
+        latitude: Double,
+        longitude: Double
+    ): LandslideWeatherData? {
+        return try {
+            val response = weatherApi.getWeather(
+                latitude = latitude,
+                longitude = longitude,
+                forecastDays = 7
+            )
+
+            val hourly = response.hourlyForecast ?: return null
+            val daily = response.dailyForecast
+
+            val hourlyRain = hourly.rain
+            val hourlyPrecipProb = hourly.precipitationProbability
+            val soilSurface = hourly.soilMoisture0to7 ?: emptyList()
+            val soilMiddle = hourly.soilMoisture7to28 ?: emptyList()
+            val soilDeep = hourly.soilMoisture28to100 ?: emptyList()
+            val hourlyTimes = hourly.time
+
+            // Current conditions (index 0 = now/closest hour)
+            val currentRainRate = hourlyRain.getOrElse(0) { 0.0 }
+
+            // Past 24h rainfall (last 24 indices of historical data)
+            // Open-Meteo provides data from start of today; so indices 0-23 = today's hours
+            val rainfall24h = hourlyRain.take(24).sum()
+            val rainfall72h = daily?.rainSum?.take(3)?.sum() ?: rainfall24h
+
+            // Future 24h rainfall forecast (indices 24-47)
+            val rainfallForecast24h = hourlyRain.drop(24).take(24).sum()
+
+            // Current soil moisture
+            val currentSoilSurface = soilSurface.getOrElse(0) { 0.0 }
+            val currentSoilMiddle = soilMiddle.getOrElse(0) { 0.0 }
+            val currentSoilDeep = soilDeep.getOrElse(0) { 0.0 }
+
+            // Build hourly rain forecast (next 24h)
+            val hourlyForecast = (24 until minOf(48, hourlyTimes.size)).mapNotNull { i ->
+                val time = hourlyTimes.getOrNull(i) ?: return@mapNotNull null
+                val rain = hourlyRain.getOrElse(i) { 0.0 }
+                val prob = hourlyPrecipProb.getOrElse(i) { 0 }
+                HourlyRainForecast(time = time, rain = rain, probability = prob)
+            }
+
+            // ── Calculate rainfall score (0-40) ──
+            var rainfallScore = 0
+            // Current rain rate
+            rainfallScore += when {
+                currentRainRate >= 20.0 -> 15   // Very heavy rain
+                currentRainRate >= 10.0 -> 10   // Heavy rain
+                currentRainRate >= 5.0  -> 6    // Moderate rain
+                currentRainRate > 0.5   -> 3    // Light rain
+                else -> 0
+            }
+            // 24h accumulation
+            rainfallScore += when {
+                rainfall24h >= 200.0 -> 15      // Extreme
+                rainfall24h >= 100.0 -> 12      // Very heavy
+                rainfall24h >= 50.0  -> 8       // Heavy
+                rainfall24h >= 20.0  -> 4       // Moderate
+                else -> 0
+            }
+            // 72h accumulation bonus
+            rainfallScore += when {
+                rainfall72h >= 300.0 -> 10
+                rainfall72h >= 150.0 -> 6
+                rainfall72h >= 75.0  -> 3
+                else -> 0
+            }
+            rainfallScore = rainfallScore.coerceAtMost(40)
+
+            // ── Calculate soil moisture score (0-30) ──
+            // Typical saturation point ~0.45-0.5 m³/m³
+            val avgMoisture = listOf(currentSoilSurface, currentSoilMiddle, currentSoilDeep)
+                .filter { v -> v > 0 }.let { list -> if (list.isEmpty()) listOf(0.0) else list }.average()
+
+            var soilScore = 0
+            soilScore += when {
+                avgMoisture >= 0.45 -> 15       // Near saturation
+                avgMoisture >= 0.35 -> 10       // Very wet
+                avgMoisture >= 0.25 -> 5        // Moist
+                else -> 0
+            }
+            // Deep soil saturation is especially dangerous
+            soilScore += when {
+                currentSoilDeep >= 0.45 -> 15   // Deep saturation
+                currentSoilDeep >= 0.35 -> 8    // Deep moisture high
+                currentSoilDeep >= 0.25 -> 3
+                else -> 0
+            }
+            soilScore = soilScore.coerceAtMost(30)
+
+            // ── Calculate forecast score (0-10) ──
+            var forecastScore = 0
+            forecastScore += when {
+                rainfallForecast24h >= 100.0 -> 10
+                rainfallForecast24h >= 50.0  -> 7
+                rainfallForecast24h >= 20.0  -> 4
+                rainfallForecast24h >= 10.0  -> 2
+                else -> 0
+            }
+            forecastScore = forecastScore.coerceAtMost(10)
+
+            LandslideWeatherData(
+                currentRainRate = currentRainRate,
+                rainfall24h = rainfall24h,
+                rainfall72h = rainfall72h,
+                rainfallForecast24h = rainfallForecast24h,
+                soilMoistureSurface = currentSoilSurface,
+                soilMoistureMiddle = currentSoilMiddle,
+                soilMoistureDeep = currentSoilDeep,
+                hourlyRainForecast = hourlyForecast,
+                rainfallScore = rainfallScore,
+                soilMoistureScore = soilScore,
+                forecastScore = forecastScore
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Combine weather data with seismic data to produce final landslide risk assessment.
+     */
+    private fun finalizeLandslideRisk(
+        weatherData: LandslideWeatherData?,
+        nearbyQuakes: List<EarthquakeEvent>
+    ): LandslideRiskAssessment? {
+        val data = weatherData ?: return null
+
+        // ── Seismic trigger score (0-20) ──
+        val recentNearbyQuakes = nearbyQuakes.filter {
+            it.distanceFromUserKm <= 100.0
+        }
+        val maxMagnitude = recentNearbyQuakes.maxByOrNull { it.magnitude }?.magnitude ?: 0.0
+
+        var seismicScore = 0
+        seismicScore += when {
+            maxMagnitude >= 6.0 -> 15
+            maxMagnitude >= 5.0 -> 10
+            maxMagnitude >= 4.0 -> 6
+            maxMagnitude >= 3.0 -> 3
+            else -> 0
+        }
+        seismicScore += when {
+            recentNearbyQuakes.size >= 10 -> 5
+            recentNearbyQuakes.size >= 5  -> 3
+            recentNearbyQuakes.size >= 2  -> 1
+            else -> 0
+        }
+        seismicScore = seismicScore.coerceAtMost(20)
+
+        // ── Total risk score ──
+        val totalScore = (data.rainfallScore + data.soilMoistureScore +
+                seismicScore + data.forecastScore).coerceIn(0, 100)
+        val riskLevel = LandslideRiskLevel.fromScore(totalScore)
+
+        // ── Build risk factors ──
+        val factors = mutableListOf<LandslideRiskFactor>()
+
+        factors.add(LandslideRiskFactor(
+            name = "Rainfall Intensity",
+            nameId = "Intensitas Hujan",
+            score = data.rainfallScore,
+            maxScore = 40,
+            description = "Current: ${"%.1f".format(data.currentRainRate)} mm/h, 24h: ${"%.0f".format(data.rainfall24h)} mm, 72h: ${"%.0f".format(data.rainfall72h)} mm",
+            descriptionId = "Saat ini: ${"%.1f".format(data.currentRainRate)} mm/jam, 24 jam: ${"%.0f".format(data.rainfall24h)} mm, 72 jam: ${"%.0f".format(data.rainfall72h)} mm"
+        ))
+
+        // Soil moisture saturation percent
+        val saturationPct = (listOf(data.soilMoistureSurface, data.soilMoistureMiddle, data.soilMoistureDeep)
+            .filter { v -> v > 0 }.let { list -> if (list.isEmpty()) listOf(0.0) else list }.average() / 0.5 * 100).coerceIn(0.0, 100.0)
+
+        factors.add(LandslideRiskFactor(
+            name = "Soil Saturation",
+            nameId = "Kelembaban Tanah",
+            score = data.soilMoistureScore,
+            maxScore = 30,
+            description = "Saturation: ${"%.0f".format(saturationPct)}% (Surface: ${"%.2f".format(data.soilMoistureSurface)}, Deep: ${"%.2f".format(data.soilMoistureDeep)} m\u00b3/m\u00b3)",
+            descriptionId = "Kejenuhan: ${"%.0f".format(saturationPct)}% (Permukaan: ${"%.2f".format(data.soilMoistureSurface)}, Dalam: ${"%.2f".format(data.soilMoistureDeep)} m\u00b3/m\u00b3)"
+        ))
+
+        factors.add(LandslideRiskFactor(
+            name = "Seismic Activity",
+            nameId = "Aktivitas Seismik",
+            score = seismicScore,
+            maxScore = 20,
+            description = "${recentNearbyQuakes.size} quakes within 100km (max M${"%.1f".format(maxMagnitude)})",
+            descriptionId = "${recentNearbyQuakes.size} gempa dalam 100km (maks M${"%.1f".format(maxMagnitude)})"
+        ))
+
+        factors.add(LandslideRiskFactor(
+            name = "Rain Forecast",
+            nameId = "Prakiraan Hujan",
+            score = data.forecastScore,
+            maxScore = 10,
+            description = "Next 24h: ${"%.0f".format(data.rainfallForecast24h)} mm expected",
+            descriptionId = "24 jam ke depan: ${"%.0f".format(data.rainfallForecast24h)} mm diperkirakan"
+        ))
+
+        // ── Description & Recommendation ──
+        val descEn = when (riskLevel) {
+            LandslideRiskLevel.LOW -> "Low landslide risk. Current conditions are stable."
+            LandslideRiskLevel.MODERATE -> "Moderate landslide risk. Monitor conditions if in hilly or steep terrain."
+            LandslideRiskLevel.HIGH -> "High landslide risk. Heavy rainfall and saturated soil increase danger. Avoid steep slopes."
+            LandslideRiskLevel.VERY_HIGH -> "Very high landslide risk! Evacuate from hillside areas immediately if possible."
+            LandslideRiskLevel.CRITICAL -> "CRITICAL landslide risk! Extreme conditions detected. Evacuate immediately from all elevated terrain!"
+        }
+        val descId = when (riskLevel) {
+            LandslideRiskLevel.LOW -> "Risiko longsor rendah. Kondisi saat ini stabil."
+            LandslideRiskLevel.MODERATE -> "Risiko longsor sedang. Pantau kondisi jika berada di area perbukitan."
+            LandslideRiskLevel.HIGH -> "Risiko longsor tinggi. Hujan deras dan tanah jenuh meningkatkan bahaya. Hindari lereng curam."
+            LandslideRiskLevel.VERY_HIGH -> "Risiko longsor sangat tinggi! Segera evakuasi dari area perbukitan jika memungkinkan."
+            LandslideRiskLevel.CRITICAL -> "Risiko longsor KRITIS! Kondisi ekstrem terdeteksi. Segera evakuasi dari semua area dataran tinggi!"
+        }
+        val recEn = when (riskLevel) {
+            LandslideRiskLevel.LOW -> "No special precautions needed."
+            LandslideRiskLevel.MODERATE -> "Stay alert for signs: cracks in ground, tilting trees, unusual water flow."
+            LandslideRiskLevel.HIGH -> "Prepare evacuation route. Watch for landslide signs: ground movement, muddy water, falling debris."
+            LandslideRiskLevel.VERY_HIGH -> "Evacuate hillside areas. Do not travel on mountain roads. Contact local authorities."
+            LandslideRiskLevel.CRITICAL -> "EVACUATE IMMEDIATELY. This is a life-threatening situation!"
+        }
+        val recId = when (riskLevel) {
+            LandslideRiskLevel.LOW -> "Tidak perlu tindakan khusus."
+            LandslideRiskLevel.MODERATE -> "Tetap waspada terhadap tanda: retakan tanah, pohon miring, aliran air tidak biasa."
+            LandslideRiskLevel.HIGH -> "Siapkan jalur evakuasi. Perhatikan tanda longsor: pergerakan tanah, air keruh, reruntuhan."
+            LandslideRiskLevel.VERY_HIGH -> "Evakuasi area perbukitan. Jangan bepergian di jalan pegunungan. Hubungi pihak berwenang."
+            LandslideRiskLevel.CRITICAL -> "SEGERA EVAKUASI. Ini adalah situasi yang mengancam jiwa!"
+        }
+
+        val isId = AppLocaleManager.locale == com.weather.forecast.data.locale.AppLocale.ID
+
+        return LandslideRiskAssessment(
+            riskLevel = riskLevel,
+            riskScore = totalScore,
+            factors = factors,
+            currentRainRate = data.currentRainRate,
+            rainfall24h = data.rainfall24h,
+            rainfall72h = data.rainfall72h,
+            rainfallForecast24h = data.rainfallForecast24h,
+            soilMoistureSurface = data.soilMoistureSurface,
+            soilMoistureMiddle = data.soilMoistureMiddle,
+            soilMoistureDeep = data.soilMoistureDeep,
+            soilSaturationPercent = saturationPct,
+            recentNearbyQuakes = recentNearbyQuakes.size,
+            maxNearbyMagnitude = maxMagnitude,
+            hourlyRainForecast = data.hourlyRainForecast,
+            description = if (isId) descId else descEn,
+            recommendation = if (isId) recId else recEn
+        )
     }
 
     // ═══════════════════════════════════════════════════
