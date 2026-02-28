@@ -975,8 +975,8 @@ class AppStrings(val locale: AppLocale) {
     val loading = s("Memuat...", "Loading...")
     val failedLoadSeismicData = s("Gagal memuat data seismik", "Failed to load seismic data")
     val seismicDataNote = s(
-        "Data gempa dari BMKG (resmi Indonesia) & USGS (global). Laporan bencana dari PetaBencana.id (crowdsource). Data gunung api dari USGS & NASA EONET. Risiko longsor dari Open-Meteo (curah hujan & kelembaban tanah).",
-        "Earthquake data from BMKG (official Indonesia) & USGS (global). Disaster reports from PetaBencana.id (crowdsource). Volcano data from USGS & NASA EONET. Landslide risk from Open-Meteo (rainfall & soil moisture)."
+        "Data gempa dari BMKG (resmi Indonesia) & USGS (global). Laporan bencana dari PetaBencana.id (crowdsource). Data gunung api dari USGS & NASA EONET.",
+        "Earthquake data from BMKG (official Indonesia) & USGS (global). Disaster reports from PetaBencana.id (crowdsource). Volcano data from USGS & NASA EONET."
     )
     val waveDataNote = s(
         "Data gelombang dari Open-Meteo Marine API. Peringatan ini untuk keselamatan pelaut & nelayan.",
