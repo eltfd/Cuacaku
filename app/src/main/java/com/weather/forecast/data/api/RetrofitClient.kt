@@ -30,7 +30,7 @@ object RetrofitClient {
             // User-Agent required by Nominatim
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .header("User-Agent", "Cuacaku/1.9.0")
+                    .header("User-Agent", "Cuacaku/1.9.1")
                     .build()
                 chain.proceed(request)
             }

@@ -1296,7 +1296,12 @@ class SeismicRepository(private val context: Context) {
                     floodDepthCm = props.report_data?.flood_depth,
                     structureDamage = props.report_data?.structureFailure,
                     windImpact = props.report_data?.impact,
-                    evacuationArea = props.report_data?.evacuationArea
+                    evacuationArea = props.report_data?.evacuationArea,
+                    evacuationNumber = props.report_data?.evacuationNumber,
+                    volcanicSigns = props.report_data?.volcanicSigns,
+                    accessibilityFailure = props.report_data?.accessabilityFailure,
+                    roadCondition = props.report_data?.condition,
+                    severityPoints = props.report_data?.points
                 ))
             }
         } catch (_: Exception) {

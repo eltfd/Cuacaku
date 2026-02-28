@@ -624,6 +624,11 @@ data class CrowdsourcedDisasterReport(
     val structureDamage: Int? = null, // For earthquake reports (0-4)
     val windImpact: Int? = null,   // For wind reports (0-1)
     val evacuationArea: Boolean? = null, // For volcano reports
+    val evacuationNumber: Int? = null, // Number of evacuees
+    val volcanicSigns: List<Int>? = null, // Volcanic signs observed
+    val accessibilityFailure: Int? = null, // Road accessibility (0-4) for earthquake
+    val roadCondition: Int? = null, // Road condition for earthquake
+    val severityPoints: Int? = null, // General severity score
     val source: String = "PetaBencana.id"
 ) {
     val isNearby: Boolean get() = distanceFromUserKm <= 100.0
@@ -637,6 +642,44 @@ data class CrowdsourcedDisasterReport(
             else -> "Rendah (<30cm)"
         }
     }
+
+    val floodSeverityLevel: Int get() = when {
+        (floodDepthCm ?: 0) >= 150 -> 4
+        (floodDepthCm ?: 0) >= 70 -> 3
+        (floodDepthCm ?: 0) >= 30 -> 2
+        (floodDepthCm ?: 0) > 0 -> 1
+        else -> 0
+    }
+
+    val structureDamageLabel: String? get() = structureDamage?.let {
+        when (it) {
+            0 -> "Tidak Ada Kerusakan"
+            1 -> "Ringan"
+            2 -> "Sedang"
+            3 -> "Berat"
+            4 -> "Sangat Berat"
+            else -> null
+        }
+    }
+
+    val windImpactLabel: String? get() = windImpact?.let {
+        when (it) {
+            0 -> "Dampak Ringan"
+            1 -> "Dampak Signifikan"
+            else -> null
+        }
+    }
+
+    val volcanicSignsLabels: List<String> get() = volcanicSigns?.map {
+        when (it) {
+            0 -> "Asap/Abu"
+            1 -> "Lava"
+            2 -> "Gempa Vulkanik"
+            3 -> "Suara Gemuruh"
+            4 -> "Bau Belerang"
+            else -> "Tanda #$it"
+        }
+    } ?: emptyList()
 
     val emoji: String get() = disasterType.emoji
 }
