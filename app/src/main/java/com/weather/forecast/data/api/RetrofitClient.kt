@@ -30,7 +30,7 @@ object RetrofitClient {
             // User-Agent required by Nominatim
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .header("User-Agent", "WeatherForecastApp/1.0")
+                    .header("User-Agent", "Cuacaku/1.9.0")
                     .build()
                 chain.proceed(request)
             }
@@ -155,5 +155,31 @@ object RetrofitClient {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(USGSVolcanoApiService::class.java)
+    }
+
+    /**
+     * BMKG API Service (Indonesian Meteorological Agency)
+     * Real-time earthquake data specific to Indonesia.
+     */
+    val bmkgApi: BmkgApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(BmkgApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(BmkgApiService::class.java)
+    }
+
+    /**
+     * PetaBencana.id API Service
+     * Crowdsourced real-time disaster reports for Indonesia.
+     */
+    val petaBencanaApi: PetaBencanaApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(PetaBencanaApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(PetaBencanaApiService::class.java)
     }
 }

@@ -46,6 +46,8 @@ class SeismicRepository(private val context: Context) {
     private val volcanoApi = RetrofitClient.volcanoApi
     private val eonetApi = RetrofitClient.eonetApi
     private val marineApi = RetrofitClient.marineApi
+    private val bmkgApi = RetrofitClient.bmkgApi
+    private val petaBencanaApi = RetrofitClient.petaBencanaApi
     private val gson = Gson()
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -101,12 +103,16 @@ class SeismicRepository(private val context: Context) {
             val volcanoDeferred = async { fetchVolcanicActivity(latitude, longitude) }
             val waveDeferred = async { fetchHighWaveData(latitude, longitude) }
             val reliefDeferred = async { fetchReliefPoints(latitude, longitude) }
+            val bmkgDeferred = async { fetchBmkgEarthquakes(latitude, longitude) }
+            val petaBencanaDeferred = async { fetchPetaBencanaReports(latitude, longitude) }
 
             val allEarthquakes = earthquakeDeferred.await()
             val significantEarthquakes = significantDeferred.await()
             val volcanoData = volcanoDeferred.await()
             val waveData = waveDeferred.await()
             val reliefPoints = reliefDeferred.await()
+            val bmkgEarthquakes = bmkgDeferred.await()
+            val crowdsourcedReports = petaBencanaDeferred.await()
 
             // ── Process earthquakes ──
             val processedQuakes = allEarthquakes.map { feature ->
@@ -152,7 +158,9 @@ class SeismicRepository(private val context: Context) {
                 userLongitude = longitude,
                 overallPhase = overallPhase,
                 lifecycleStates = lifecycleStates,
-                reliefPoints = reliefPoints
+                reliefPoints = reliefPoints,
+                bmkgEarthquakes = bmkgEarthquakes,
+                crowdsourcedReports = crowdsourcedReports
             )
 
             Result.success(result)
@@ -1170,6 +1178,134 @@ class SeismicRepository(private val context: Context) {
         }
 
         return areas.sortedBy { it.distanceFromUserKm }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  BMKG EARTHQUAKE DATA (Indonesian Source)
+    // ═══════════════════════════════════════════════════
+
+    /**
+     * Fetch earthquake data from BMKG (Indonesian Met Agency).
+     * Combines autogempa (latest) + gempaterkini (15 recent M5.0+).
+     * Preferred for Indonesian users due to higher accuracy for local quakes.
+     */
+    private suspend fun fetchBmkgEarthquakes(
+        userLat: Double,
+        userLon: Double
+    ): List<BmkgEarthquakeEvent> {
+        val events = mutableListOf<BmkgEarthquakeEvent>()
+
+        try {
+            // Fetch both endpoints in parallel
+            val autoResult = try { bmkgApi.getAutoGempa() } catch (_: Exception) { null }
+            val terkiniResult = try { bmkgApi.getGempaTerkini() } catch (_: Exception) { null }
+
+            // Process autogempa (latest single event with full detail)
+            autoResult?.Infogempa?.gempa?.let { gempa ->
+                val lat = gempa.parsedLatitude
+                val lon = gempa.parsedLongitude
+                val dist = KnownVolcanoes.haversineDistance(userLat, userLon, lat, lon)
+                events.add(BmkgEarthquakeEvent(
+                    magnitude = gempa.parsedMagnitude,
+                    latitude = lat,
+                    longitude = lon,
+                    depthKm = gempa.parsedDepthKm,
+                    time = gempa.parsedTimeMillis,
+                    dateString = gempa.Tanggal ?: "",
+                    timeString = gempa.Jam ?: "",
+                    region = gempa.Wilayah ?: "",
+                    potential = gempa.Potensi ?: "",
+                    feltReport = gempa.Dirasakan,
+                    shakemapUrl = gempa.shakemapUrl,
+                    distanceFromUserKm = dist
+                ))
+            }
+
+            // Process gempaterkini (15 recent M5.0+ quakes)
+            terkiniResult?.Infogempa?.gempa?.forEach { gempa ->
+                val lat = gempa.parsedLatitude
+                val lon = gempa.parsedLongitude
+                val dist = KnownVolcanoes.haversineDistance(userLat, userLon, lat, lon)
+
+                // Avoid duplicate with autogempa
+                if (events.none { it.time == gempa.parsedTimeMillis && it.magnitude == gempa.parsedMagnitude }) {
+                    events.add(BmkgEarthquakeEvent(
+                        magnitude = gempa.parsedMagnitude,
+                        latitude = lat,
+                        longitude = lon,
+                        depthKm = gempa.parsedDepthKm,
+                        time = gempa.parsedTimeMillis,
+                        dateString = gempa.Tanggal ?: "",
+                        timeString = gempa.Jam ?: "",
+                        region = gempa.Wilayah ?: "",
+                        potential = gempa.Potensi ?: "",
+                        feltReport = null,
+                        shakemapUrl = null,
+                        distanceFromUserKm = dist
+                    ))
+                }
+            }
+        } catch (_: Exception) {
+            // BMKG may be unreachable; continue with USGS data
+        }
+
+        return events.sortedByDescending { it.time }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  PETABENCANA.ID CROWDSOURCED REPORTS
+    // ═══════════════════════════════════════════════════
+
+    /**
+     * Fetch crowdsourced disaster reports from PetaBencana.id.
+     * Returns last 7 days of confirmed reports filtered to non-training data.
+     */
+    private suspend fun fetchPetaBencanaReports(
+        userLat: Double,
+        userLon: Double
+    ): List<CrowdsourcedDisasterReport> {
+        val reports = mutableListOf<CrowdsourcedDisasterReport>()
+
+        try {
+            val response = petaBencanaApi.getReports(
+                timeperiod = 604800 // 7 days
+            )
+
+            response.result?.objects?.output?.geometries?.forEach { geometry ->
+                val props = geometry.properties ?: return@forEach
+                val lat = geometry.latitude
+                val lon = geometry.longitude
+
+                // Skip training/test data  
+                if (props.is_training == true) return@forEach
+
+                val dist = KnownVolcanoes.haversineDistance(userLat, userLon, lat, lon)
+
+                reports.add(CrowdsourcedDisasterReport(
+                    id = props.pkey ?: "",
+                    disasterType = CrowdsourcedDisasterType.fromApiKey(props.disaster_type),
+                    latitude = lat,
+                    longitude = lon,
+                    time = props.parsedTimeMillis,
+                    text = props.text?.trim() ?: "",
+                    imageUrl = props.image_url,
+                    cityName = props.tags?.city,
+                    provinceCode = props.tags?.instance_region_code,
+                    distanceFromUserKm = dist,
+                    isTraining = props.is_training ?: false,
+                    floodDepthCm = props.report_data?.flood_depth,
+                    structureDamage = props.report_data?.structureFailure,
+                    windImpact = props.report_data?.impact,
+                    evacuationArea = props.report_data?.evacuationArea
+                ))
+            }
+        } catch (_: Exception) {
+            // PetaBencana may be unreachable; continue without crowdsourced data
+        }
+
+        return reports
+            .filter { it.isReal }
+            .sortedByDescending { it.time }
     }
 
     // ═══════════════════════════════════════════════════

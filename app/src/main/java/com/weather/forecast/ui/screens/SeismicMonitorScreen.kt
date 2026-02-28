@@ -233,6 +233,20 @@ private fun SeismicContent(
             }
         }
 
+        // ── BMKG Official Earthquake Data (Indonesia) ──
+        if (data.bmkgEarthquakes.isNotEmpty()) {
+            item {
+                BmkgEarthquakeSection(data.bmkgEarthquakes)
+            }
+        }
+
+        // ── PetaBencana Crowdsourced Reports ──
+        if (data.crowdsourcedReports.isNotEmpty()) {
+            item {
+                CrowdsourcedReportSection(data.crowdsourcedReports)
+            }
+        }
+
         // ── Volcanic Activity ──
         item {
             VolcanicActivitySection(data.volcanicActivity, data.nearbyVolcanoes)
@@ -880,6 +894,425 @@ private fun InfoChip(label: String, value: String, modifier: Modifier = Modifier
             fontWeight = FontWeight.Medium,
             color = Color.White
         )
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  BMKG EARTHQUAKE SECTION (Indonesian Official Data)
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun BmkgEarthquakeSection(earthquakes: List<BmkgEarthquakeEvent>) {
+    val strings = LocalStrings.current
+    var expanded by remember { mutableStateOf(true) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B5E20).copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "🇮🇩 ${strings.localized("BMKG Earthquakes", "Gempa BMKG")} (${earthquakes.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = strings.localized(
+                            "Official Indonesian seismic data",
+                            "Data seismik resmi Indonesia"
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    earthquakes.take(10).forEach { eq ->
+                        BmkgEarthquakeCard(eq)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BmkgEarthquakeCard(earthquake: BmkgEarthquakeEvent) {
+    val strings = LocalStrings.current
+
+    val magnitudeColor = when {
+        earthquake.magnitude >= 7.0 -> Color(0xFFD32F2F)
+        earthquake.magnitude >= 5.0 -> Color(0xFFFF9800)
+        earthquake.magnitude >= 4.0 -> Color(0xFFFFC107)
+        else -> Color(0xFF4CAF50)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = magnitudeColor.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Magnitude badge
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(magnitudeColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "${"%.1f".format(earthquake.magnitude)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = earthquake.region,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${earthquake.dateString} • ${earthquake.timeString}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = "${strings.localized("Depth", "Kedalaman")}: ${"%.0f".format(earthquake.depthKm)} km • " +
+                            "${strings.distance}: ${"%.0f".format(earthquake.distanceFromUserKm)} km",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            // Potential & felt report
+            if (earthquake.potential.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = earthquake.potential,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (earthquake.hasTsunamiPotential) Color(0xFFF44336) else Color.White.copy(alpha = 0.7f),
+                    fontWeight = if (earthquake.hasTsunamiPotential) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+
+            earthquake.feltReport?.let { felt ->
+                if (felt.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${strings.localized("Felt", "Dirasakan")}: $felt",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFFFB74D)
+                    )
+                }
+            }
+
+            // Source label
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "BMKG • data.bmkg.go.id",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.4f)
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  CROWDSOURCED DISASTER REPORTS (PetaBencana.id)
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun CrowdsourcedReportSection(reports: List<CrowdsourcedDisasterReport>) {
+    val strings = LocalStrings.current
+    var expanded by remember { mutableStateOf(true) }
+
+    // Group by type for summary
+    val typeCounts = reports.groupBy { it.disasterType }.mapValues { it.value.size }
+    val nearbyReports = reports.filter { it.isNearby }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D47A1).copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "📢 ${strings.localized("Disaster Reports", "Laporan Bencana")} (${reports.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = strings.localized(
+                            "Crowdsourced via PetaBencana.id (7 days)",
+                            "Laporan warga via PetaBencana.id (7 hari)"
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f)
+                )
+            }
+
+            // Disaster type summary chips
+            if (typeCounts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(typeCounts.entries.toList()) { (type, count) ->
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color.White.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "${type.emoji} ${type.localizedLabel} ($count)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Nearby reports alert
+            if (nearbyReports.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFF9800).copy(alpha = 0.2f)
+                ) {
+                    Text(
+                        text = "⚠️ ${strings.localized(
+                            "${nearbyReports.size} reports within 100 km",
+                            "${nearbyReports.size} laporan dalam radius 100 km"
+                        )}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFB74D),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    // Show nearest reports first, limit to 15
+                    reports.sortedBy { it.distanceFromUserKm }.take(15).forEach { report ->
+                        CrowdsourcedReportCard(report)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CrowdsourcedReportCard(report: CrowdsourcedDisasterReport) {
+    val strings = LocalStrings.current
+    val context = LocalContext.current
+
+    val typeColor = when (report.disasterType) {
+        CrowdsourcedDisasterType.FLOOD -> Color(0xFF2196F3)
+        CrowdsourcedDisasterType.EARTHQUAKE -> Color(0xFFFF9800)
+        CrowdsourcedDisasterType.WIND -> Color(0xFF78909C)
+        CrowdsourcedDisasterType.HAZE -> Color(0xFF9E9E9E)
+        CrowdsourcedDisasterType.FIRE -> Color(0xFFF44336)
+        CrowdsourcedDisasterType.VOLCANO -> Color(0xFFD32F2F)
+        CrowdsourcedDisasterType.UNKNOWN -> Color(0xFF757575)
+    }
+
+    val timeAgo = formatTimeAgo(report.time, strings)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = typeColor.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Type emoji badge
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(typeColor.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = report.emoji,
+                        fontSize = 20.sp
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = report.disasterType.localizedLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = typeColor
+                        )
+                        if (report.cityName != null) {
+                            Text(
+                                text = " • ${report.cityName}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Text(
+                        text = "$timeAgo • ${"%.0f".format(report.distanceFromUserKm)} km",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            // Report text
+            if (report.text.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = report.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Extra data chips
+            Row(
+                modifier = Modifier.padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                report.floodDepthCm?.let { depth ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF2196F3).copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = "💧 ${depth}cm",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF90CAF9),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                report.structureDamage?.let { dmg ->
+                    if (dmg > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFFF9800).copy(alpha = 0.2f)
+                        ) {
+                            Text(
+                                text = "🏠 ${strings.localized("Damage", "Kerusakan")}: $dmg/4",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFFCC80),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (report.evacuationArea == true) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFF44336).copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = "🚨 ${strings.localized("Evacuation", "Evakuasi")}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFEF9A9A),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            // Source label
+            Text(
+                text = "PetaBencana.id",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.4f),
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Format epoch millis to human-readable time ago string.
+ */
+private fun formatTimeAgo(timeMillis: Long, strings: com.weather.forecast.data.locale.AppStrings): String {
+    val now = System.currentTimeMillis()
+    val diff = now - timeMillis
+    val minutes = diff / 60000
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        minutes < 1 -> strings.localized("Just now", "Baru saja")
+        minutes < 60 -> strings.localized("${minutes}m ago", "${minutes} menit lalu")
+        hours < 24 -> strings.localized("${hours}h ago", "${hours} jam lalu")
+        days < 7 -> strings.localized("${days}d ago", "${days} hari lalu")
+        else -> SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(timeMillis))
     }
 }
 

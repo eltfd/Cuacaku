@@ -46,7 +46,10 @@ data class SeismicMonitorData(
     val lifecycleStates: List<DisasterLifecycleState> = emptyList(),
     val sosState: SOSState = SOSState(),
     val reliefPoints: List<ReliefPoint> = emptyList(),
-    val emergencyContacts: List<EmergencyContact> = EmergencyContacts.getForLocale()
+    val emergencyContacts: List<EmergencyContact> = EmergencyContacts.getForLocale(),
+    // ── Indonesian Data Sources ──
+    val bmkgEarthquakes: List<BmkgEarthquakeEvent> = emptyList(),
+    val crowdsourcedReports: List<CrowdsourcedDisasterReport> = emptyList()
 ) {
     val hasActiveThreats: Boolean get() =
         nearbyEarthquakes.any { it.magnitude >= 4.0 } ||
@@ -563,5 +566,106 @@ object KnownVolcanoes {
                 kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
         val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
         return r * c
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  BMKG EARTHQUAKE (Indonesian Official Source)
+// ═══════════════════════════════════════════════════
+
+/**
+ * Processed BMKG earthquake event for UI display.
+ * Prioritized for Indonesian users as the official national data source.
+ */
+data class BmkgEarthquakeEvent(
+    val magnitude: Double,
+    val latitude: Double,
+    val longitude: Double,
+    val depthKm: Double,
+    val time: Long,
+    val dateString: String,        // "27 Feb 2026"
+    val timeString: String,        // "03:12:27 WIB"
+    val region: String,            // "Pusat gempa berada di darat 35 km BaratLaut Kaimana"
+    val potential: String,         // Tsunami potential assessment
+    val feltReport: String?,       // "II-III Kaimana"
+    val shakemapUrl: String?,      // URL to BMKG shakemap image
+    val distanceFromUserKm: Double,
+    val source: String = "BMKG"
+) {
+    val isNearby: Boolean get() = distanceFromUserKm <= 500.0
+    val isSignificant: Boolean get() = magnitude >= 5.0
+    val hasTsunamiPotential: Boolean get() =
+        potential.contains("tsunami", ignoreCase = true) &&
+        !potential.contains("tidak", ignoreCase = true) &&
+        !potential.contains("no", ignoreCase = true)
+}
+
+// ═══════════════════════════════════════════════════
+//  CROWDSOURCED DISASTER REPORTS (PetaBencana.id)
+// ═══════════════════════════════════════════════════
+
+/**
+ * Crowdsourced disaster report from PetaBencana.id.
+ * Real-time community reports for Indonesian disasters.
+ */
+data class CrowdsourcedDisasterReport(
+    val id: String,
+    val disasterType: CrowdsourcedDisasterType,
+    val latitude: Double,
+    val longitude: Double,
+    val time: Long,
+    val text: String,              // User-submitted description
+    val imageUrl: String?,         // Photo evidence
+    val cityName: String?,         // From tags
+    val provinceCode: String?,     // "ID-JK", "ID-JB", etc.
+    val distanceFromUserKm: Double,
+    val isTraining: Boolean,       // Training/test data flag
+    val floodDepthCm: Int? = null, // For flood reports
+    val structureDamage: Int? = null, // For earthquake reports (0-4)
+    val windImpact: Int? = null,   // For wind reports (0-1)
+    val evacuationArea: Boolean? = null, // For volcano reports
+    val source: String = "PetaBencana.id"
+) {
+    val isNearby: Boolean get() = distanceFromUserKm <= 100.0
+    val isReal: Boolean get() = !isTraining
+
+    val floodSeverityLabel: String? get() = floodDepthCm?.let {
+        when {
+            it >= 150 -> "Sangat Dalam (≥150cm)"
+            it >= 70 -> "Dalam (70-150cm)"
+            it >= 30 -> "Sedang (30-70cm)"
+            else -> "Rendah (<30cm)"
+        }
+    }
+
+    val emoji: String get() = disasterType.emoji
+}
+
+/**
+ * Supported disaster types from PetaBencana.id
+ */
+enum class CrowdsourcedDisasterType(
+    val apiKey: String,
+    val labelEn: String,
+    val labelId: String,
+    val emoji: String
+) {
+    FLOOD("flood", "Flood", "Banjir", "🌊"),
+    EARTHQUAKE("earthquake", "Earthquake", "Gempa Bumi", "🌍"),
+    WIND("wind", "Strong Wind", "Angin Kencang", "💨"),
+    HAZE("haze", "Haze", "Kabut Asap", "🌫️"),
+    FIRE("fire", "Forest Fire", "Kebakaran Hutan", "🔥"),
+    VOLCANO("volcano", "Volcano", "Gunung Api", "🌋"),
+    UNKNOWN("unknown", "Unknown", "Tidak Diketahui", "⚠️");
+
+    companion object {
+        fun fromApiKey(key: String?): CrowdsourcedDisasterType {
+            return values().find { it.apiKey == key } ?: UNKNOWN
+        }
+    }
+
+    val localizedLabel: String get() {
+        val isId = AppLocaleManager.locale == com.weather.forecast.data.locale.AppLocale.ID
+        return if (isId) labelId else labelEn
     }
 }
