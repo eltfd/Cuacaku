@@ -49,7 +49,10 @@ data class SeismicMonitorData(
     val emergencyContacts: List<EmergencyContact> = EmergencyContacts.getForLocale(),
     // ── Indonesian Data Sources ──
     val bmkgEarthquakes: List<BmkgEarthquakeEvent> = emptyList(),
-    val crowdsourcedReports: List<CrowdsourcedDisasterReport> = emptyList()
+    val crowdsourcedReports: List<CrowdsourcedDisasterReport> = emptyList(),
+    // ── Landslide Monitoring ──
+    val landslideTerrainData: LandslideTerrainData? = null,
+    val landslideAnalysis: DisasterPrediction? = null
 ) {
     val hasActiveThreats: Boolean get() =
         nearbyEarthquakes.any { it.magnitude >= 4.0 } ||

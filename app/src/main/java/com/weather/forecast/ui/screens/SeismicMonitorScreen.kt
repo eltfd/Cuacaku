@@ -285,6 +285,16 @@ private fun SeismicContent(
             }
         }
 
+        // ── Landslide Risk Monitoring ──
+        data.landslideAnalysis?.let { analysis ->
+            item {
+                LandslideMonitorSection(
+                    analysis = analysis,
+                    terrainData = data.landslideTerrainData
+                )
+            }
+        }
+
         // ── Volcanic Activity ──
         item {
             VolcanicActivitySection(data.volcanicActivity, data.nearbyVolcanoes)
@@ -2378,6 +2388,548 @@ private fun formatTimeAgo(timeMillis: Long, strings: com.weather.forecast.data.l
         hours < 24 -> strings.localized("${hours}h ago", "${hours} jam lalu")
         days < 7 -> strings.localized("${days}d ago", "${days} hari lalu")
         else -> SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(timeMillis))
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  LANDSLIDE RISK MONITORING
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun LandslideMonitorSection(
+    analysis: DisasterPrediction,
+    terrainData: LandslideTerrainData?
+) {
+    val strings = LocalStrings.current
+    var expanded by remember { mutableStateOf(true) }
+    val landslideBrown = Color(0xFF795548)
+    val riskScore = analysis.riskScore
+    val riskLevel = analysis.riskLevel
+
+    val riskColor = when (riskLevel) {
+        RiskLevel.EXTREME -> Color(0xFFD32F2F)
+        RiskLevel.HIGH -> Color(0xFFFF5722)
+        RiskLevel.MODERATE -> Color(0xFFFF9800)
+        else -> Color(0xFF4CAF50)
+    }
+
+    val riskLabel = when (riskLevel) {
+        RiskLevel.EXTREME -> strings.localized("BAHAYA", "EXTREME")
+        RiskLevel.HIGH -> strings.localized("Tinggi", "High")
+        RiskLevel.MODERATE -> strings.localized("Sedang", "Moderate")
+        else -> strings.localized("Rendah", "Low")
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = landslideBrown.copy(alpha = 0.14f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // ── Header ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⛰️", fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = strings.localized("Pemantauan Longsor", "Landslide Monitoring"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = strings.localized(
+                                "Analisis 8 faktor real-time",
+                                "Real-time 8-factor analysis"
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f)
+                )
+            }
+
+            // ── Risk Level Badge ──
+            Spacer(modifier = Modifier.height(10.dp))
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = riskColor.copy(alpha = 0.2f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(riskColor)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${strings.localized("Risiko", "Risk")}: $riskLabel",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = riskColor
+                        )
+                    }
+                    Text(
+                        text = "${(riskScore * 100).toInt()}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = riskColor
+                    )
+                }
+            }
+
+            // ── Risk Score Bar ──
+            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.White.copy(alpha = 0.08f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction = riskScore.toFloat().coerceIn(0f, 1f))
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(Color(0xFF4CAF50), Color(0xFFFFEB3B), Color(0xFFFF9800), Color(0xFFF44336))
+                            )
+                        )
+                )
+            }
+
+            // ── Confidence ──
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${strings.localized("Keyakinan", "Confidence")}: ${(analysis.confidence * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.5f)
+            )
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(modifier = Modifier.padding(top = 12.dp)) {
+                    // ── Terrain Quick Stats ──
+                    terrainData?.let { terrain ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            LandslideStatBox(
+                                label = strings.localized("Kemiringan", "Slope"),
+                                value = "%.1f°".format(terrain.slopeAngle),
+                                subLabel = strings.localized(
+                                    terrain.slopeCategory.labelId,
+                                    terrain.slopeCategory.label
+                                ),
+                                color = Color(terrain.slopeCategory.colorHex),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            LandslideStatBox(
+                                label = strings.localized("Saturasi Tanah", "Soil Saturation"),
+                                value = "${(terrain.soilSaturationIndex * 100).toInt()}%",
+                                subLabel = when {
+                                    terrain.soilSaturationIndex > 0.8 -> strings.localized("Jenuh", "Saturated")
+                                    terrain.soilSaturationIndex > 0.5 -> strings.localized("Basah", "Wet")
+                                    else -> strings.localized("Normal", "Normal")
+                                },
+                                color = when {
+                                    terrain.soilSaturationIndex > 0.8 -> Color(0xFFD32F2F)
+                                    terrain.soilSaturationIndex > 0.5 -> Color(0xFFFF9800)
+                                    else -> Color(0xFF4CAF50)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            LandslideStatBox(
+                                label = strings.localized("Vegetasi", "Vegetation"),
+                                value = "${(terrain.vegetationIndex * 100).toInt()}%",
+                                subLabel = when {
+                                    terrain.vegetationIndex < 0.3 -> strings.localized("Gundul", "Bare")
+                                    terrain.vegetationIndex < 0.6 -> strings.localized("Jarang", "Sparse")
+                                    else -> strings.localized("Lebat", "Dense")
+                                },
+                                color = when {
+                                    terrain.vegetationIndex < 0.3 -> Color(0xFFF44336)
+                                    terrain.vegetationIndex < 0.6 -> Color(0xFFFF9800)
+                                    else -> Color(0xFF4CAF50)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // ── Rainfall Metrics ──
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            LandslideStatBox(
+                                label = strings.localized("Hujan Hari Ini", "Rain Today"),
+                                value = "%.1f mm".format(terrain.todayPrecipitation),
+                                subLabel = when {
+                                    terrain.todayPrecipitation > 100 -> strings.localized("Sangat Lebat", "Very Heavy")
+                                    terrain.todayPrecipitation > 50 -> strings.localized("Lebat", "Heavy")
+                                    terrain.todayPrecipitation > 20 -> strings.localized("Sedang", "Moderate")
+                                    else -> strings.localized("Ringan", "Light")
+                                },
+                                color = when {
+                                    terrain.todayPrecipitation > 100 -> Color(0xFFD32F2F)
+                                    terrain.todayPrecipitation > 50 -> Color(0xFFFF5722)
+                                    terrain.todayPrecipitation > 20 -> Color(0xFFFF9800)
+                                    else -> Color(0xFF4CAF50)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            LandslideStatBox(
+                                label = strings.localized("Hujan 3 Hari", "Rain 3-Day"),
+                                value = "%.0f mm".format(terrain.antecedentRainfall),
+                                subLabel = when {
+                                    terrain.antecedentRainfall > 150 -> strings.localized("Kritis", "Critical")
+                                    terrain.antecedentRainfall > 100 -> strings.localized("Tinggi", "High")
+                                    terrain.antecedentRainfall > 50 -> strings.localized("Waspada", "Alert")
+                                    else -> strings.localized("Aman", "Safe")
+                                },
+                                color = when {
+                                    terrain.antecedentRainfall > 150 -> Color(0xFFD32F2F)
+                                    terrain.antecedentRainfall > 100 -> Color(0xFFFF5722)
+                                    terrain.antecedentRainfall > 50 -> Color(0xFFFF9800)
+                                    else -> Color(0xFF4CAF50)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            LandslideStatBox(
+                                label = strings.localized("Intensitas Maks", "Max Intensity"),
+                                value = "%.1f mm/h".format(terrain.maxRainfallIntensity),
+                                subLabel = when {
+                                    terrain.maxRainfallIntensity > 50 -> strings.localized("Ekstrem", "Extreme")
+                                    terrain.maxRainfallIntensity > 20 -> strings.localized("Deras", "Heavy")
+                                    terrain.maxRainfallIntensity > 10 -> strings.localized("Sedang", "Moderate")
+                                    else -> strings.localized("Ringan", "Light")
+                                },
+                                color = when {
+                                    terrain.maxRainfallIntensity > 50 -> Color(0xFFD32F2F)
+                                    terrain.maxRainfallIntensity > 20 -> Color(0xFFFF5722)
+                                    terrain.maxRainfallIntensity > 10 -> Color(0xFFFF9800)
+                                    else -> Color(0xFF4CAF50)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // ── Soil Moisture Layers ──
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "💧 ${strings.localized("Kelembaban Tanah", "Soil Moisture")}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SoilLayerBar(
+                            label = strings.localized("Dangkal (0-7cm)", "Shallow (0-7cm)"),
+                            value = terrain.soilMoistureShallow,
+                            maxValue = 0.5
+                        )
+                        SoilLayerBar(
+                            label = strings.localized("Sedang (7-28cm)", "Medium (7-28cm)"),
+                            value = terrain.soilMoistureMedium,
+                            maxValue = 0.5
+                        )
+                        SoilLayerBar(
+                            label = strings.localized("Dalam (28-100cm)", "Deep (28-100cm)"),
+                            value = terrain.soilMoistureDeep,
+                            maxValue = 0.5
+                        )
+
+                        // ── Elevation Grid ──
+                        if (terrain.elevationGrid.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "🏔️ ${strings.localized("Elevasi", "Elevation")}: ${"%.0f".format(terrain.elevation)} m",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                items(terrain.elevationGrid) { point ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = landslideBrown.copy(alpha = 0.2f)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = point.label,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White.copy(alpha = 0.5f)
+                                            )
+                                            Text(
+                                                text = "${"%.0f".format(point.elevation)}m",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── 8-Factor Risk Breakdown ──
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Divider(color = Color.White.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "📊 ${strings.localized("Faktor Risiko (8 Faktor)", "Risk Factors (8 Factors)")}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val factorWeights = listOf(0.20, 0.15, 0.15, 0.15, 0.10, 0.10, 0.05, 0.10)
+                    analysis.factors.forEachIndexed { index, factor ->
+                        val weight = factorWeights.getOrElse(index) { 0.10 }
+                        LandslideFactorRow(
+                            name = factor.name,
+                            value = factor.value,
+                            contribution = factor.contribution,
+                            weight = weight,
+                            isElevating = factor.isElevating
+                        )
+                    }
+
+                    // ── Description & Recommendation ──
+                    if (analysis.description.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = riskColor.copy(alpha = 0.1f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = analysis.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.8f)
+                                )
+                                if (analysis.recommendation.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "💡 ${analysis.recommendation}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color.White.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Data Source Note ──
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = strings.localized(
+                            "Sumber: Open-Elevation (SRTM) • Open-Meteo (curah hujan & tanah) • 8 faktor berbobot",
+                            "Source: Open-Elevation (SRTM) • Open-Meteo (rainfall & soil) • 8 weighted factors"
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.35f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LandslideStatBox(
+    label: String,
+    value: String,
+    subLabel: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = subLabel,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.5f),
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun SoilLayerBar(
+    label: String,
+    value: Double,
+    maxValue: Double
+) {
+    val fraction = (value / maxValue).toFloat().coerceIn(0f, 1f)
+    val barColor = when {
+        fraction > 0.8f -> Color(0xFFD32F2F)
+        fraction > 0.5f -> Color(0xFFFF9800)
+        fraction > 0.3f -> Color(0xFFFFC107)
+        else -> Color(0xFF4CAF50)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.6f),
+            modifier = Modifier.width(110.dp)
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(12.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction = fraction.coerceAtLeast(0.02f))
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(barColor)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "%.3f".format(value),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            modifier = Modifier.width(45.dp),
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+@Composable
+private fun LandslideFactorRow(
+    name: String,
+    value: String,
+    contribution: Double,
+    weight: Double,
+    isElevating: Boolean
+) {
+    val barColor = when {
+        contribution > 0.7 -> Color(0xFFD32F2F)
+        contribution > 0.4 -> Color(0xFFFF9800)
+        contribution > 0.2 -> Color(0xFFFFC107)
+        else -> Color(0xFF4CAF50)
+    }
+    val indicatorIcon = if (isElevating) "▲" else "─"
+    val indicatorColor = if (isElevating) Color(0xFFFF5722) else Color(0xFF4CAF50)
+
+    Column(modifier = Modifier.padding(vertical = 3.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Text(
+                    text = indicatorIcon,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = indicatorColor
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "(${(weight * 100).toInt()}%)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.4f)
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Color.White.copy(alpha = 0.06f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction = contribution.toFloat().coerceIn(0.02f, 1f))
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(barColor)
+            )
+        }
     }
 }
 

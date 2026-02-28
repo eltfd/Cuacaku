@@ -48,6 +48,9 @@ class SeismicRepository(private val context: Context) {
     private val marineApi = RetrofitClient.marineApi
     private val bmkgApi = RetrofitClient.bmkgApi
     private val petaBencanaApi = RetrofitClient.petaBencanaApi
+    private val weatherApi = RetrofitClient.weatherApi
+    private val landslideTerrainRepository = LandslideTerrainRepository(context)
+    private val weatherRepository = WeatherRepository()
     private val gson = Gson()
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -105,6 +108,7 @@ class SeismicRepository(private val context: Context) {
             val reliefDeferred = async { fetchReliefPoints(latitude, longitude) }
             val bmkgDeferred = async { fetchBmkgEarthquakes(latitude, longitude) }
             val petaBencanaDeferred = async { fetchPetaBencanaReports(latitude, longitude) }
+            val landslideDeferred = async { fetchLandslideMonitorData(latitude, longitude) }
 
             val allEarthquakes = earthquakeDeferred.await()
             val significantEarthquakes = significantDeferred.await()
@@ -113,6 +117,7 @@ class SeismicRepository(private val context: Context) {
             val reliefPoints = reliefDeferred.await()
             val bmkgEarthquakes = bmkgDeferred.await()
             val crowdsourcedReports = petaBencanaDeferred.await()
+            val landslideResult = landslideDeferred.await()
 
             // ── Process earthquakes ──
             val processedQuakes = allEarthquakes.map { feature ->
@@ -160,7 +165,9 @@ class SeismicRepository(private val context: Context) {
                 lifecycleStates = lifecycleStates,
                 reliefPoints = reliefPoints,
                 bmkgEarthquakes = bmkgEarthquakes,
-                crowdsourcedReports = crowdsourcedReports
+                crowdsourcedReports = crowdsourcedReports,
+                landslideTerrainData = landslideResult?.first,
+                landslideAnalysis = landslideResult?.second
             )
 
             Result.success(result)
@@ -1311,6 +1318,59 @@ class SeismicRepository(private val context: Context) {
         return reports
             .filter { it.isReal }
             .sortedByDescending { it.time }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  LANDSLIDE TERRAIN MONITORING
+    // ═══════════════════════════════════════════════════
+
+    /**
+     * Fetch real-time landslide terrain data and run analysis.
+     *
+     * Uses:
+     * - Open-Elevation API → slope gradient
+     * - Open-Meteo Weather → soil moisture, rainfall, humidity
+     * - DisasterAnalysisEngine → 8-factor landslide risk analysis
+     *
+     * Returns null if data is unavailable.
+     */
+    private suspend fun fetchLandslideMonitorData(
+        latitude: Double,
+        longitude: Double
+    ): Pair<LandslideTerrainData, DisasterPrediction>? {
+        return try {
+            // Fetch weather data for soil moisture & rainfall
+            val weatherData = weatherRepository.getWeatherData(latitude, longitude).getOrNull()
+                ?: return null
+
+            val hourly = weatherData.hourly.take(24)
+            val daily = weatherData.daily
+
+            // Fetch terrain data (elevation, slope, soil, etc.)
+            val terrainData = landslideTerrainRepository.getTerrainData(
+                latitude = latitude,
+                longitude = longitude,
+                hourly = hourly,
+                allDaily = daily,
+                elevation = 0.0
+            )
+
+            // Run landslide analysis using the existing 8-factor engine
+            val todayPredictions = DisasterAnalysisEngine.analyzeToday(
+                weather = weatherData,
+                marine = null,
+                flood = null,
+                terrainData = terrainData
+            )
+
+            // Extract only the landslide prediction
+            val landslideAnalysis = todayPredictions.find { it.type == DisasterType.LANDSLIDE }
+                ?: return null
+
+            Pair(terrainData, landslideAnalysis)
+        } catch (_: Exception) {
+            null // Landslide data fetch failed; continue without it
+        }
     }
 
     // ═══════════════════════════════════════════════════
