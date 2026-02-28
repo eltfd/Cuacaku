@@ -100,11 +100,13 @@ class SeismicRepository(private val context: Context) {
             val significantDeferred = async { fetchSignificantEarthquakes(startTime) }
             val volcanoDeferred = async { fetchVolcanicActivity(latitude, longitude) }
             val waveDeferred = async { fetchHighWaveData(latitude, longitude) }
+            val reliefDeferred = async { fetchReliefPoints(latitude, longitude) }
 
             val allEarthquakes = earthquakeDeferred.await()
             val significantEarthquakes = significantDeferred.await()
             val volcanoData = volcanoDeferred.await()
             val waveData = waveDeferred.await()
+            val reliefPoints = reliefDeferred.await()
 
             // ── Process earthquakes ──
             val processedQuakes = allEarthquakes.map { feature ->
@@ -130,6 +132,12 @@ class SeismicRepository(private val context: Context) {
                 nearbyQuakes, tsunamiRisk, volcanicEvents, latitude, longitude
             )
 
+            // ── Determine disaster lifecycle ──
+            val lifecycleStates = determineLifecycleStates(
+                nearbyQuakes, tsunamiRisk, volcanicEvents, impactAreas, reliefPoints
+            )
+            val overallPhase = determineOverallPhase(lifecycleStates, impactAreas, reliefPoints)
+
             val result = SeismicMonitorData(
                 earthquakes = processedQuakes,
                 nearbyEarthquakes = nearbyQuakes,
@@ -141,13 +149,443 @@ class SeismicRepository(private val context: Context) {
                 impactAreas = impactAreas,
                 lastUpdated = now,
                 userLatitude = latitude,
-                userLongitude = longitude
+                userLongitude = longitude,
+                overallPhase = overallPhase,
+                lifecycleStates = lifecycleStates,
+                reliefPoints = reliefPoints
             )
 
             Result.success(result)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  DISASTER LIFECYCLE DETERMINATION
+    // ═══════════════════════════════════════════════════
+
+    /**
+     * Determine the lifecycle phase for each disaster type.
+     */
+    private fun determineLifecycleStates(
+        earthquakes: List<EarthquakeEvent>,
+        tsunamiRisk: TsunamiRiskAssessment,
+        volcanicEvents: List<VolcanicEvent>,
+        impactAreas: List<DisasterImpactArea>,
+        reliefPoints: List<ReliefPoint>
+    ): List<DisasterLifecycleState> {
+        val states = mutableListOf<DisasterLifecycleState>()
+        val strings = AppLocaleManager.strings
+        val now = System.currentTimeMillis()
+        val oneHourAgo = now - 60 * 60 * 1000L
+        val oneDayAgo = now - 24 * 60 * 60 * 1000L
+
+        // ── Earthquake Lifecycle ──
+        val recentStrongQuakes = earthquakes.filter { it.magnitude >= 4.0 && it.time >= oneHourAgo }
+        val olderStrongQuakes = earthquakes.filter { it.magnitude >= 4.0 && it.time in oneDayAgo..oneHourAgo }
+        val quakeImpactAreas = impactAreas.filter { it.type == ImpactAreaType.EARTHQUAKE }
+
+        val eqPhase = when {
+            recentStrongQuakes.any { it.isNearby && it.magnitude >= 5.0 } -> DisasterLifecyclePhase.ACTIVE_DISASTER
+            olderStrongQuakes.isNotEmpty() && reliefPoints.isNotEmpty() -> DisasterLifecyclePhase.POST_DISASTER
+            earthquakes.any { it.magnitude >= 3.5 && it.isNearby } -> DisasterLifecyclePhase.EARLY_WARNING
+            else -> DisasterLifecyclePhase.NORMAL
+        }
+
+        val eqEarlyWarning = if (eqPhase == DisasterLifecyclePhase.EARLY_WARNING) {
+            val indicators = mutableListOf<WarningIndicator>()
+            val recentCount = earthquakes.count { it.time >= oneDayAgo && it.isNearby }
+            indicators.add(WarningIndicator(
+                strings.localized("Nearby Quakes (24h)", "Gempa Terdekat (24j)"),
+                "$recentCount", "≥ 3", recentCount >= 3,
+                if (recentCount >= 5) EscalationTrend.RAPID_INCREASE else EscalationTrend.STABLE
+            ))
+            val maxMag = earthquakes.filter { it.isNearby }.maxByOrNull { it.magnitude }
+            maxMag?.let {
+                indicators.add(WarningIndicator(
+                    strings.localized("Max Magnitude", "Mag. Maksimum"),
+                    "M${"%.1f".format(it.magnitude)}", "≥ M5.0", it.magnitude >= 5.0,
+                    EscalationTrend.STABLE
+                ))
+            }
+            EarlyWarningData(
+                threatLevel = if (recentCount >= 5) EarlyWarningLevel.WATCH else EarlyWarningLevel.ADVISORY,
+                indicators = indicators,
+                preparednessChecklist = getEarthquakePreparedness(),
+                escalationTrend = if (recentCount >= 5) EscalationTrend.INCREASING else EscalationTrend.STABLE
+            )
+        } else null
+
+        val eqActiveInfo = if (eqPhase == DisasterLifecyclePhase.ACTIVE_DISASTER) {
+            val strongestRecent = recentStrongQuakes.maxByOrNull { it.magnitude }
+            ActiveDisasterInfo(
+                severity = ImpactSeverity.fromMagnitude(strongestRecent?.magnitude ?: 0.0),
+                impactArea = quakeImpactAreas.firstOrNull(),
+                startTime = strongestRecent?.time ?: now,
+                isUserInDangerZone = quakeImpactAreas.any { it.userInZone },
+                emergencyContacts = EmergencyContacts.getForLocale()
+            )
+        } else null
+
+        val eqPostInfo = if (eqPhase == DisasterLifecyclePhase.POST_DISASTER) {
+            PostDisasterInfo(
+                reliefPoints = reliefPoints,
+                recentReports = emptyList(),
+                recoveryStatus = strings.localized(
+                    "Recovery phase — Check nearby relief points",
+                    "Fase pemulihan — Cek posko bantuan terdekat"
+                ),
+                lastUpdated = now
+            )
+        } else null
+
+        states.add(DisasterLifecycleState(
+            type = DisasterLifecycleType.EARTHQUAKE,
+            phase = eqPhase,
+            summary = when (eqPhase) {
+                DisasterLifecyclePhase.NORMAL -> strings.localized("No significant seismic activity", "Tidak ada aktivitas seismik signifikan")
+                DisasterLifecyclePhase.EARLY_WARNING -> strings.localized("Increased seismic activity detected", "Aktivitas seismik meningkat terdeteksi")
+                DisasterLifecyclePhase.ACTIVE_DISASTER -> strings.localized("Active earthquake — Take cover!", "Gempa aktif — Berlindung!")
+                DisasterLifecyclePhase.POST_DISASTER -> strings.localized("Post-earthquake recovery phase", "Fase pemulihan pascagempa")
+            },
+            details = when (eqPhase) {
+                DisasterLifecyclePhase.ACTIVE_DISASTER -> {
+                    val strongest = recentStrongQuakes.maxByOrNull { it.magnitude }
+                    strings.localized(
+                        "M${"%.1f".format(strongest?.magnitude ?: 0.0)} earthquake detected ${strongest?.let { "${"%.0f".format(it.distanceFromUserKm)} km away" } ?: "nearby"}",
+                        "Gempa M${"%.1f".format(strongest?.magnitude ?: 0.0)} terdeteksi ${strongest?.let { "${"%.0f".format(it.distanceFromUserKm)} km dari lokasi Anda" } ?: "di sekitar"}"
+                    )
+                }
+                else -> ""
+            },
+            earlyWarning = eqEarlyWarning,
+            activeDisasterInfo = eqActiveInfo,
+            postDisasterInfo = eqPostInfo
+        ))
+
+        // ── Tsunami Lifecycle ──
+        val tsunamiPhase = when {
+            tsunamiRisk.riskLevel >= TsunamiRiskLevel.WARNING -> DisasterLifecyclePhase.ACTIVE_DISASTER
+            tsunamiRisk.riskLevel >= TsunamiRiskLevel.ADVISORY -> DisasterLifecyclePhase.EARLY_WARNING
+            else -> DisasterLifecyclePhase.NORMAL
+        }
+
+        val tsunamiEarlyWarning = if (tsunamiPhase == DisasterLifecyclePhase.EARLY_WARNING) {
+            val indicators = tsunamiRisk.factors.map { f ->
+                WarningIndicator(f.name, f.value, "-", f.isElevating, EscalationTrend.STABLE)
+            }
+            EarlyWarningData(
+                threatLevel = EarlyWarningLevel.WATCH,
+                indicators = indicators,
+                preparednessChecklist = getTsunamiPreparedness(),
+                estimatedOnsetHours = tsunamiRisk.estimatedArrivalMinutes?.let { it / 60 },
+                escalationTrend = EscalationTrend.INCREASING
+            )
+        } else null
+
+        val tsunamiActiveInfo = if (tsunamiPhase == DisasterLifecyclePhase.ACTIVE_DISASTER) {
+            val tsunamiAreas = impactAreas.filter { it.type == ImpactAreaType.TSUNAMI }
+            ActiveDisasterInfo(
+                severity = ImpactSeverity.CATASTROPHIC,
+                impactArea = tsunamiAreas.firstOrNull(),
+                startTime = tsunamiRisk.triggerEarthquakes.firstOrNull()?.time ?: now,
+                isUserInDangerZone = tsunamiAreas.any { it.userInZone },
+                evacuationDirections = listOf(
+                    EvacuationDirection(
+                        "Inland / Higher Ground", "Ke Daratan / Dataran Tinggi",
+                        0.0,
+                        "Move immediately to higher ground (>30m above sea level)",
+                        "Segera menuju dataran tinggi (>30m di atas permukaan laut)"
+                    )
+                ),
+                emergencyContacts = EmergencyContacts.getForLocale()
+            )
+        } else null
+
+        states.add(DisasterLifecycleState(
+            type = DisasterLifecycleType.TSUNAMI,
+            phase = tsunamiPhase,
+            summary = when (tsunamiPhase) {
+                DisasterLifecyclePhase.NORMAL -> strings.localized("No tsunami risk", "Tidak ada risiko tsunami")
+                DisasterLifecyclePhase.EARLY_WARNING -> strings.localized("Tsunami advisory active", "Peringatan dini tsunami aktif")
+                DisasterLifecyclePhase.ACTIVE_DISASTER -> strings.localized("TSUNAMI WARNING — Evacuate NOW!", "PERINGATAN TSUNAMI — EVAKUASI SEKARANG!")
+                DisasterLifecyclePhase.POST_DISASTER -> strings.localized("Post-tsunami recovery", "Pemulihan pascatsunami")
+            },
+            details = tsunamiRisk.description,
+            earlyWarning = tsunamiEarlyWarning,
+            activeDisasterInfo = tsunamiActiveInfo
+        ))
+
+        // ── Volcano Lifecycle ──
+        val nearbyActiveVolcanoes = volcanicEvents.filter { it.isNearby }
+        val volcanoPhase = when {
+            nearbyActiveVolcanoes.any { it.alertLevel >= VolcanoAlertLevel.WARNING } -> DisasterLifecyclePhase.ACTIVE_DISASTER
+            nearbyActiveVolcanoes.any { it.alertLevel >= VolcanoAlertLevel.ADVISORY } -> DisasterLifecyclePhase.EARLY_WARNING
+            else -> DisasterLifecyclePhase.NORMAL
+        }
+
+        val volcanoEarlyWarning = if (volcanoPhase == DisasterLifecyclePhase.EARLY_WARNING) {
+            val activeVolcano = nearbyActiveVolcanoes.maxByOrNull { it.alertLevel.level }
+            EarlyWarningData(
+                threatLevel = EarlyWarningLevel.ADVISORY,
+                indicators = listOf(
+                    WarningIndicator(
+                        strings.localized("Alert Level", "Level Peringatan"),
+                        activeVolcano?.alertLevel?.label ?: "-",
+                        "WARNING", activeVolcano?.alertLevel == VolcanoAlertLevel.WARNING,
+                        EscalationTrend.STABLE
+                    ),
+                    WarningIndicator(
+                        strings.localized("Distance", "Jarak"),
+                        "${"%.0f".format(activeVolcano?.distanceFromUserKm ?: 0.0)} km",
+                        "< 50 km", (activeVolcano?.distanceFromUserKm ?: 999.0) < 50.0,
+                        EscalationTrend.STABLE
+                    )
+                ),
+                preparednessChecklist = getVolcanoPreparedness(),
+                escalationTrend = EscalationTrend.STABLE
+            )
+        } else null
+
+        val volcanoActiveInfo = if (volcanoPhase == DisasterLifecyclePhase.ACTIVE_DISASTER) {
+            val erupting = nearbyActiveVolcanoes.filter { it.alertLevel >= VolcanoAlertLevel.WARNING }
+            val volcanoAreas = impactAreas.filter { it.type == ImpactAreaType.VOLCANIC_ERUPTION }
+            ActiveDisasterInfo(
+                severity = ImpactSeverity.CRITICAL,
+                impactArea = volcanoAreas.firstOrNull(),
+                startTime = erupting.firstOrNull()?.lastUpdate ?: now,
+                isUserInDangerZone = volcanoAreas.any { it.userInZone },
+                emergencyContacts = EmergencyContacts.getForLocale()
+            )
+        } else null
+
+        states.add(DisasterLifecycleState(
+            type = DisasterLifecycleType.VOLCANO,
+            phase = volcanoPhase,
+            summary = when (volcanoPhase) {
+                DisasterLifecyclePhase.NORMAL -> strings.localized("No volcanic threats", "Tidak ada ancaman vulkanik")
+                DisasterLifecyclePhase.EARLY_WARNING -> strings.localized("Volcanic activity increasing", "Aktivitas vulkanik meningkat")
+                DisasterLifecyclePhase.ACTIVE_DISASTER -> strings.localized("ERUPTION IN PROGRESS — Evacuate!", "ERUPSI BERLANGSUNG — Evakuasi!")
+                DisasterLifecyclePhase.POST_DISASTER -> strings.localized("Post-eruption monitoring", "Pemantauan pascaerupsi")
+            },
+            details = nearbyActiveVolcanoes.firstOrNull()?.description ?: "",
+            earlyWarning = volcanoEarlyWarning,
+            activeDisasterInfo = volcanoActiveInfo
+        ))
+
+        return states
+    }
+
+    /**
+     * Determine the overall disaster phase (highest severity wins).
+     */
+    private fun determineOverallPhase(
+        lifecycleStates: List<DisasterLifecycleState>,
+        impactAreas: List<DisasterImpactArea>,
+        reliefPoints: List<ReliefPoint>
+    ): DisasterLifecyclePhase {
+        // Check for active disasters first
+        if (lifecycleStates.any { it.phase == DisasterLifecyclePhase.ACTIVE_DISASTER }) {
+            return DisasterLifecyclePhase.ACTIVE_DISASTER
+        }
+        // If no active but we have relief points and past impact areas
+        if (reliefPoints.isNotEmpty() && lifecycleStates.any { it.phase == DisasterLifecyclePhase.POST_DISASTER }) {
+            return DisasterLifecyclePhase.POST_DISASTER
+        }
+        // Early warning
+        if (lifecycleStates.any { it.phase == DisasterLifecyclePhase.EARLY_WARNING }) {
+            return DisasterLifecyclePhase.EARLY_WARNING
+        }
+        return DisasterLifecyclePhase.NORMAL
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  RELIEF POINTS (Post-Disaster)
+    // ═══════════════════════════════════════════════════
+
+    /**
+     * Fetch relief/evacuation points from ReliefWeb disaster reports.
+     * Falls back to known emergency POIs if API unavailable.
+     */
+    private suspend fun fetchReliefPoints(
+        latitude: Double,
+        longitude: Double
+    ): List<ReliefPoint> {
+        val points = mutableListOf<ReliefPoint>()
+
+        try {
+            // Determine country ISO3 from coordinates (simplified)
+            val countryIso3 = estimateCountryISO3(latitude, longitude)
+
+            // Fetch ongoing disasters for the country
+            val disasters = RetrofitClient.reliefWebApi.getDisastersByCountry(
+                filterValue1 = countryIso3
+            )
+
+            disasters.data?.forEach { disaster ->
+                val fields = disaster.fields ?: return@forEach
+                val disasterId = disaster.id ?: return@forEach
+                val disasterName = fields.name ?: ""
+
+                // For each active disaster, create a relief point entry
+                // ReliefWeb doesn't provide exact coordinates for relief posts,
+                // but we can use the disaster info as reference points
+                if (fields.status == "ongoing") {
+                    points.add(ReliefPoint(
+                        id = "rw_$disasterId",
+                        name = disasterName,
+                        type = ReliefPointType.COMMAND_CENTER,
+                        latitude = latitude, // Approximate to user area
+                        longitude = longitude,
+                        distanceFromUserKm = 0.0,
+                        address = fields.country?.firstOrNull()?.name ?: "",
+                        description = fields.description ?: disasterName,
+                        source = "ReliefWeb",
+                        isVerified = true,
+                        lastUpdated = System.currentTimeMillis()
+                    ))
+                }
+            }
+        } catch (_: Exception) {
+            // ReliefWeb may fail — continue without relief data
+        }
+
+        // Add standard emergency locations based on known infrastructure
+        if (points.isNotEmpty() || hasRecentLocalDisaster()) {
+            points.addAll(getStandardReliefPoints(latitude, longitude))
+        }
+
+        return points.sortedBy { it.distanceFromUserKm }
+    }
+
+    /**
+     * Provide standard relief point types when active disaster is detected.
+     * These are general guidance points, not exact locations.
+     */
+    private fun getStandardReliefPoints(lat: Double, lon: Double): List<ReliefPoint> {
+        val strings = AppLocaleManager.strings
+        return listOf(
+            ReliefPoint(
+                id = "std_emergency",
+                name = strings.localized("Emergency Services (112)", "Layanan Darurat (112)"),
+                type = ReliefPointType.COMMAND_CENTER,
+                latitude = lat, longitude = lon,
+                distanceFromUserKm = 0.0,
+                address = strings.localized("Call 112 for emergency", "Hubungi 112 untuk darurat"),
+                description = strings.localized(
+                    "National emergency number — connects to nearest BNPB command center",
+                    "Nomor darurat nasional — terhubung ke posko BNPB terdekat"
+                ),
+                source = "System", isVerified = true
+            ),
+            ReliefPoint(
+                id = "std_sar",
+                name = strings.localized("BASARNAS SAR (115)", "BASARNAS SAR (115)"),
+                type = ReliefPointType.SEARCH_RESCUE,
+                latitude = lat, longitude = lon,
+                distanceFromUserKm = 0.0,
+                address = strings.localized("Call 115 for search & rescue", "Hubungi 115 untuk SAR"),
+                description = strings.localized(
+                    "National Search and Rescue Agency",
+                    "Badan Nasional Pencarian dan Pertolongan"
+                ),
+                source = "System", isVerified = true
+            ),
+            ReliefPoint(
+                id = "std_medical",
+                name = strings.localized("Medical Emergency (118/119)", "Darurat Medis (118/119)"),
+                type = ReliefPointType.MEDICAL_POST,
+                latitude = lat, longitude = lon,
+                distanceFromUserKm = 0.0,
+                address = strings.localized("Call 118 or 119 for ambulance", "Hubungi 118/119 untuk ambulans"),
+                description = strings.localized(
+                    "Emergency medical services and nearest hospital",
+                    "Layanan medis darurat dan rumah sakit terdekat"
+                ),
+                source = "System", isVerified = true
+            )
+        )
+    }
+
+    private fun hasRecentLocalDisaster(): Boolean {
+        // Check if there's cached data indicating recent disaster
+        return prefs.getLong(KEY_LAST_EARTHQUAKE_FETCH, 0L) > 0
+    }
+
+    /**
+     * Simple country ISO3 estimation from coordinates.
+     * Covers major disaster-prone regions.
+     */
+    private fun estimateCountryISO3(lat: Double, lon: Double): String {
+        return when {
+            // Indonesia
+            lat in -11.0..6.0 && lon in 95.0..141.0 -> "IDN"
+            // Philippines
+            lat in 4.5..21.0 && lon in 116.0..127.0 -> "PHL"
+            // Japan
+            lat in 24.0..46.0 && lon in 122.0..146.0 -> "JPN"
+            // Papua New Guinea
+            lat in -12.0..0.0 && lon in 141.0..160.0 -> "PNG"
+            // India
+            lat in 6.0..36.0 && lon in 68.0..97.0 -> "IND"
+            // Bangladesh
+            lat in 20.0..27.0 && lon in 88.0..93.0 -> "BGD"
+            // Myanmar
+            lat in 9.0..29.0 && lon in 92.0..102.0 -> "MMR"
+            // Thailand
+            lat in 5.0..21.0 && lon in 97.0..106.0 -> "THA"
+            // USA
+            lat in 24.0..50.0 && lon in -125.0..-66.0 -> "USA"
+            // Chile
+            lat in -56.0..-17.0 && lon in -76.0..-66.0 -> "CHL"
+            // Mexico
+            lat in 14.0..33.0 && lon in -118.0..-86.0 -> "MEX"
+            // Turkey
+            lat in 36.0..42.0 && lon in 26.0..45.0 -> "TUR"
+            else -> "IDN" // Default to Indonesia
+        }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  PREPAREDNESS CHECKLISTS
+    // ═══════════════════════════════════════════════════
+
+    private fun getEarthquakePreparedness(): List<PreparednessItem> {
+        val strings = AppLocaleManager.strings
+        return listOf(
+            PreparednessItem(strings.localized("Secure heavy furniture", "Amankan furnitur berat"), "🪑", true),
+            PreparednessItem(strings.localized("Prepare emergency kit", "Siapkan tas darurat"), "🎒", true),
+            PreparednessItem(strings.localized("Know your evacuation route", "Kenali rute evakuasi"), "🗺️", true),
+            PreparednessItem(strings.localized("Keep flashlight ready", "Siapkan senter"), "🔦"),
+            PreparednessItem(strings.localized("Store water & food (3 days)", "Simpan air & makanan (3 hari)"), "💧"),
+            PreparednessItem(strings.localized("Charge phone & power banks", "Cas HP & power bank"), "🔋"),
+            PreparednessItem(strings.localized("Identify safe spots (under table, doorframe)", "Identifikasi titik aman (kolong meja, kusen pintu)"), "🏠")
+        )
+    }
+
+    private fun getTsunamiPreparedness(): List<PreparednessItem> {
+        val strings = AppLocaleManager.strings
+        return listOf(
+            PreparednessItem(strings.localized("Know nearest high ground", "Kenali dataran tinggi terdekat"), "⛰️", true),
+            PreparednessItem(strings.localized("Move away from coast immediately", "Segera jauhi pesisir"), "🏃", true),
+            PreparednessItem(strings.localized("Go to elevation >30m above sea level", "Pergi ke ketinggian >30m dpl"), "📐", true),
+            PreparednessItem(strings.localized("Don't return until all-clear", "Jangan kembali sampai situasi aman"), "⚠️"),
+            PreparednessItem(strings.localized("Prepare emergency supplies", "Siapkan perlengkapan darurat"), "🎒"),
+            PreparednessItem(strings.localized("Alert family & neighbors", "Beritahu keluarga & tetangga"), "📢")
+        )
+    }
+
+    private fun getVolcanoPreparedness(): List<PreparednessItem> {
+        val strings = AppLocaleManager.strings
+        return listOf(
+            PreparednessItem(strings.localized("Prepare face mask/respirator", "Siapkan masker/respirator"), "😷", true),
+            PreparednessItem(strings.localized("Know eruption evacuation route", "Kenali rute evakuasi erupsi"), "🗺️", true),
+            PreparednessItem(strings.localized("Stay away from river valleys", "Jauhi lembah sungai"), "🏞️", true),
+            PreparednessItem(strings.localized("Prepare goggles for ash", "Siapkan kacamata pelindung"), "🥽"),
+            PreparednessItem(strings.localized("Cover water sources", "Tutup sumber air"), "💧"),
+            PreparednessItem(strings.localized("Keep windows & doors closed", "Tutup jendela & pintu"), "🪟")
+        )
     }
 
     // ═══════════════════════════════════════════════════

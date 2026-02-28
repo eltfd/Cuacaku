@@ -27,6 +27,7 @@ import com.weather.forecast.data.locale.AppLocaleManager
 
 /**
  * Complete seismic & volcanic monitoring data for display.
+ * Supports full disaster lifecycle: NORMAL → EARLY_WARNING → ACTIVE_DISASTER → POST_DISASTER
  */
 data class SeismicMonitorData(
     val earthquakes: List<EarthquakeEvent>,
@@ -39,7 +40,13 @@ data class SeismicMonitorData(
     val impactAreas: List<DisasterImpactArea>,
     val lastUpdated: Long,
     val userLatitude: Double,
-    val userLongitude: Double
+    val userLongitude: Double,
+    // ── Disaster Lifecycle ──
+    val overallPhase: DisasterLifecyclePhase = DisasterLifecyclePhase.NORMAL,
+    val lifecycleStates: List<DisasterLifecycleState> = emptyList(),
+    val sosState: SOSState = SOSState(),
+    val reliefPoints: List<ReliefPoint> = emptyList(),
+    val emergencyContacts: List<EmergencyContact> = EmergencyContacts.getForLocale()
 ) {
     val hasActiveThreats: Boolean get() =
         nearbyEarthquakes.any { it.magnitude >= 4.0 } ||
@@ -51,6 +58,11 @@ data class SeismicMonitorData(
         nearbyEarthquakes.size +
         volcanicActivity.count { it.alertLevel >= VolcanoAlertLevel.ADVISORY } +
         (if (tsunamiRisk.riskLevel >= TsunamiRiskLevel.ADVISORY) 1 else 0)
+
+    val isPostDisaster: Boolean get() = overallPhase == DisasterLifecyclePhase.POST_DISASTER
+    val isActiveDisaster: Boolean get() = overallPhase == DisasterLifecyclePhase.ACTIVE_DISASTER
+    val isEarlyWarning: Boolean get() = overallPhase == DisasterLifecyclePhase.EARLY_WARNING
+    val showSOS: Boolean get() = sosState.isEligible
 }
 
 // ═══════════════════════════════════════════════════

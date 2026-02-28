@@ -10,6 +10,7 @@ import com.weather.forecast.data.repository.SeismicRepository
 import com.weather.forecast.data.repository.WeatherRepository
 import com.weather.forecast.location.LocationManager
 import com.weather.forecast.notification.WeatherNotificationManager
+import com.weather.forecast.service.SOSManager
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -33,6 +34,7 @@ class WeatherUpdateWorker(
     private val disasterRepository = DisasterRepository(context)
     private val seismicRepository = SeismicRepository(context)
     private val locationManager = LocationManager(context)
+    private val sosManager = SOSManager(context)
     private val notificationManager = WeatherNotificationManager(context)
     private val preferencesManager = PreferencesManager(context)
 
@@ -61,6 +63,9 @@ class WeatherUpdateWorker(
             if (location == null) {
                 return Result.retry()
             }
+
+            // Record location for SOS movement tracking
+            sosManager.recordLocation(location.latitude, location.longitude)
 
             // Fetch weather
             val result = weatherRepository.getWeatherData(location.latitude, location.longitude)

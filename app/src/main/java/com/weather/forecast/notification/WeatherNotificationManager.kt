@@ -742,6 +742,54 @@ class WeatherNotificationManager(private val context: Context) {
 
     // ── Cancel helpers ───────────────────────────────────────────
 
+    /**
+     * Send SOS emergency notification — highest priority, bypass DND,
+     * fullscreen intent, SOS vibration pattern.
+     */
+    fun sendSOSNotification(
+        latitude: Double,
+        longitude: Double,
+        message: String
+    ) {
+        val strings = com.weather.forecast.data.locale.AppLocaleManager.strings
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("sos_active", true)
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context, 9, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val fullScreenIntent = PendingIntent.getActivity(
+            context, 10, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(
+            context,
+            NotificationChannels.SOS_EMERGENCY
+        )
+            .setSmallIcon(R.drawable.ic_weather_splash)
+            .setContentTitle(strings.notifSOSTitle)
+            .setContentText(strings.notifSOSBody)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(pendingIntent)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setVibrate(extremeVibrationPattern)
+            .setLights(android.graphics.Color.RED, 500, 200)
+            .setAutoCancel(false)
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+        notificationManager.notify(NotificationIds.SOS_EMERGENCY_ALERT, notification)
+        vibrate(extremeVibrationPattern, isExtreme = true)
+    }
+
     fun cancelNotification(notificationId: Int) {
         notificationManager.cancel(notificationId)
     }

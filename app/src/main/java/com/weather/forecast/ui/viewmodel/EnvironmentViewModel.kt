@@ -9,6 +9,8 @@ import com.weather.forecast.data.model.AirQualityData
 import com.weather.forecast.data.model.DisasterForecast
 import com.weather.forecast.data.model.SeismicMonitorData
 import com.weather.forecast.data.model.WaterQualityData
+import com.weather.forecast.data.model.SOSState
+import com.weather.forecast.data.model.DisasterLifecyclePhase
 import com.weather.forecast.data.preferences.PreferencesManager
 import com.weather.forecast.data.repository.AirQualityRepository
 import com.weather.forecast.data.repository.DisasterMonitorRepository
@@ -16,6 +18,7 @@ import com.weather.forecast.data.repository.DisasterRepository
 import com.weather.forecast.data.repository.SeismicRepository
 import com.weather.forecast.data.repository.WaterQualityRepository
 import com.weather.forecast.location.LocationManager
+import com.weather.forecast.service.SOSManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -46,6 +49,7 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     private val disasterRepository = DisasterRepository(application)
     private val disasterMonitorRepository = DisasterMonitorRepository(application)
     private val seismicRepository = SeismicRepository(application)
+    private val sosManager = SOSManager(application)
     private val locationManager = LocationManager(application)
     private val preferencesManager = PreferencesManager(application)
 
@@ -271,13 +275,59 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
     private suspend fun loadSeismicData(latitude: Double, longitude: Double) {
         _seismicState.value = SeismicUiState.Loading
 
+        // Record location for SOS movement tracking
+        sosManager.recordLocation(latitude, longitude)
+
         val result = seismicRepository.getSeismicMonitorData(latitude, longitude)
         result.onSuccess { data ->
-            _seismicState.value = SeismicUiState.Success(data)
+            // Evaluate SOS eligibility based on current disaster data
+            val sosState = sosManager.evaluateSOSEligibility(
+                impactAreas = data.impactAreas,
+                userLat = latitude,
+                userLon = longitude
+            )
+            val enrichedData = data.copy(sosState = sosState)
+            _seismicState.value = SeismicUiState.Success(enrichedData)
         }.onFailure { error ->
             _seismicState.value = SeismicUiState.Error(
                 message = error.message ?: AppLocaleManager.strings.failedLoadSeismicData
             )
+        }
+    }
+
+    /**
+     * Activate SOS emergency signal.
+     * Requires user to be in a critical disaster zone and stationary.
+     */
+    fun activateSOS() {
+        viewModelScope.launch {
+            val lat = currentLatitude ?: return@launch
+            val lon = currentLongitude ?: return@launch
+            val currentData = (_seismicState.value as? SeismicUiState.Success)?.data ?: return@launch
+
+            val message = sosManager.activateSOS(lat, lon)
+
+            // Update state to reflect activated SOS
+            val updatedSOS = sosManager.evaluateSOSEligibility(
+                impactAreas = currentData.impactAreas,
+                userLat = lat,
+                userLon = lon
+            )
+            val updatedData = currentData.copy(sosState = updatedSOS)
+            _seismicState.value = SeismicUiState.Success(updatedData)
+        }
+    }
+
+    /**
+     * Deactivate SOS emergency signal.
+     */
+    fun deactivateSOS() {
+        viewModelScope.launch {
+            sosManager.deactivateSOS()
+
+            val currentData = (_seismicState.value as? SeismicUiState.Success)?.data ?: return@launch
+            val updatedData = currentData.copy(sosState = SOSState())
+            _seismicState.value = SeismicUiState.Success(updatedData)
         }
     }
 

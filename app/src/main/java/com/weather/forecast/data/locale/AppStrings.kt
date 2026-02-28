@@ -985,6 +985,144 @@ class AppStrings(val locale: AppLocale) {
     val km = s("km", "km")
     val meters = s("m", "m")
 
+    // ═══════════════════════════════════════════════════
+    //  DISASTER LIFECYCLE
+    // ═══════════════════════════════════════════════════
+
+    // ── Phase Labels ──
+    val phaseNormal = s("Normal", "Normal")
+    val phaseEarlyWarning = s("Peringatan Dini", "Early Warning")
+    val phaseActiveDisaster = s("Bencana Aktif", "Active Disaster")
+    val phasePostDisaster = s("Pasca Bencana", "Post Disaster")
+
+    // ── Phase Descriptions ──
+    val phaseNormalDesc = s(
+        "Kondisi normal — tidak ada ancaman bencana terdeteksi. Tetap pantau untuk keselamatan.",
+        "Normal condition — no disaster threats detected. Keep monitoring for safety."
+    )
+    val phaseEarlyWarningDesc = s(
+        "Peringatan dini aktif — ada indikasi potensi bencana. Persiapkan diri Anda.",
+        "Early warning active — potential disaster indicators detected. Prepare yourself."
+    )
+    val phaseActiveDisasterDesc = s(
+        "BENCANA AKTIF — Ikuti instruksi evakuasi dan tetap waspada!",
+        "ACTIVE DISASTER — Follow evacuation instructions and stay alert!"
+    )
+    val phasePostDisasterDesc = s(
+        "Fase pemulihan pasca bencana — cek posko bantuan terdekat.",
+        "Post-disaster recovery phase — check nearest relief points."
+    )
+
+    // ── Disaster Lifecycle Section ──
+    val disasterLifecycle = s("Siklus Bencana", "Disaster Lifecycle")
+    val currentPhase = s("Fase Saat Ini", "Current Phase")
+    val phaseIndicator = s("Indikator Fase", "Phase Indicator")
+
+    // ── Early Warning System ──
+    val earlyWarningSystem = s("Sistem Peringatan Dini", "Early Warning System")
+    val earlyWarningActive = s("Peringatan Dini Aktif", "Early Warning Active")
+    val warningIndicators = s("Indikator Peringatan", "Warning Indicators")
+    val threshold = s("Ambang Batas", "Threshold")
+    val current = s("Saat Ini", "Current")
+    val exceeded = s("Terlampaui", "Exceeded")
+    val escalationTrend = s("Tren Eskalasi", "Escalation Trend")
+    val trendDecreasing = s("Menurun", "Decreasing")
+    val trendStable = s("Stabil", "Stable")
+    val trendIncreasing = s("Meningkat", "Increasing")
+    val trendRapidIncrease = s("Meningkat Cepat", "Rapid Increase")
+    val estimatedOnset = s("Perkiraan Waktu", "Estimated Onset")
+    val hours = s("jam", "hours")
+    val preparednessChecklist = s("Daftar Kesiapsiagaan", "Preparedness Checklist")
+    val priorityAction = s("Prioritas", "Priority")
+
+    // ── Active Disaster ──
+    val activeDisasterBanner = s("BENCANA AKTIF", "ACTIVE DISASTER")
+    val evacuateNow = s("EVAKUASI SEKARANG!", "EVACUATE NOW!")
+    val seekShelter = s("Cari perlindungan!", "Seek shelter!")
+    val emergencyContacts = s("Kontak Darurat", "Emergency Contacts")
+    val evacuationDirections = s("Arah Evakuasi", "Evacuation Directions")
+    val userInDangerZone = s(
+        "ANDA DI ZONA BAHAYA — Ikuti instruksi evakuasi!",
+        "YOU ARE IN DANGER ZONE — Follow evacuation instructions!"
+    )
+
+    // ── Post Disaster & Relief Points ──
+    val postDisasterRecovery = s("Pemulihan Pasca Bencana", "Post-Disaster Recovery")
+    val reliefPoints = s("Posko Bantuan", "Relief Points")
+    val nearbyReliefPoints = s("Posko Bantuan Terdekat", "Nearby Relief Points")
+    val evacuationShelter = s("Posko Pengungsi", "Evacuation Shelter")
+    val medicalPost = s("Pos Kesehatan", "Medical Post")
+    val foodDistribution = s("Distribusi Makanan", "Food Distribution")
+    val logisticsCenter = s("Pusat Logistik", "Logistics Center")
+    val commandCenter = s("Posko Komando", "Command Center")
+    val searchRescue = s("Posko SAR", "SAR Base")
+    val waterSupply = s("Air Bersih", "Clean Water")
+    val communicationHub = s("Posko Komunikasi", "Communication Hub")
+    val reliefDataSource = s(
+        "Data posko dari ReliefWeb (UN OCHA) dan sistem darurat nasional.",
+        "Relief data from ReliefWeb (UN OCHA) and national emergency systems."
+    )
+
+    // ── SOS System ──
+    val sosEmergency = s("SOS DARURAT", "SOS EMERGENCY")
+    val sosTitle = s("Sinyal Darurat SOS", "SOS Emergency Signal")
+    val sosDescription = s(
+        "Anda terdeteksi terjebak di zona bencana kritis. Tekan tombol SOS untuk mengirim sinyal darurat.",
+        "You have been detected trapped in a critical disaster zone. Press SOS button to send emergency signal."
+    )
+    val sosActivate = s("KIRIM SOS", "SEND SOS")
+    val sosDeactivate = s("Nonaktifkan SOS", "Deactivate SOS")
+    val sosActivated = s("SOS AKTIF — Sinyal darurat dikirim", "SOS ACTIVE — Emergency signal sent")
+    val sosShare = s("Bagikan Lokasi", "Share Location")
+    val sosCall112 = s("Hubungi 112", "Call 112")
+    val sosNotEligible = s("SOS tidak tersedia", "SOS not available")
+    val sosAnalyzing = s("Menganalisis keamanan Anda...", "Analyzing your safety...")
+    val sosAIAnalysis = s("Analisis AI", "AI Analysis")
+    val sosDistressScore = s("Skor Distress", "Distress Score")
+    val sosConfidence = s("Tingkat Kepercayaan", "Confidence Level")
+    val sosMovementData = s("Data Pergerakan", "Movement Data")
+    val sosStationaryHours = s("Jam Tidak Bergerak", "Hours Stationary")
+    val sosTotalDistance = s("Total Jarak (6 jam)", "Total Distance (6h)")
+    val sosMaxSpeed = s("Kecepatan Maks (6 jam)", "Max Speed (6h)")
+    val sosBehaviorFactors = s("Faktor Perilaku", "Behavior Factors")
+    val sosExpiresIn = s("Kedaluwarsa dalam", "Expires in")
+    val sosConfirmTitle = s("Konfirmasi SOS", "Confirm SOS")
+    val sosConfirmMessage = s(
+        "Sinyal SOS akan mengirim koordinat lokasi Anda untuk meminta pertolongan. Lanjutkan?",
+        "SOS signal will send your location coordinates to request help. Continue?"
+    )
+    val sosConfirm = s("Ya, Kirim SOS", "Yes, Send SOS")
+    val sosCancel = s("Batal", "Cancel")
+
+    // ── SOS Eligibility Reasons ──
+    val sosReasonEligible = s(
+        "SOS tersedia — Anda terdeteksi terjebak di zona bencana",
+        "SOS available — You appear to be trapped in a disaster zone"
+    )
+    val sosReasonNotInZone = s(
+        "Anda tidak berada di zona bencana kritis",
+        "You are not in a critical disaster zone"
+    )
+    val sosReasonMoving = s(
+        "Pergerakan terdeteksi — SOS tidak diperlukan jika Anda bisa bergerak",
+        "Movement detected — SOS not needed if you can move"
+    )
+    val sosReasonInsufficientData = s(
+        "Mengumpulkan data lokasi untuk analisis keselamatan...",
+        "Collecting location data for safety analysis..."
+    )
+    val sosReasonAILowConfidence = s(
+        "Analisis AI menunjukkan Anda kemungkinan aman",
+        "AI analysis indicates you are likely safe"
+    )
+
+    // ── SOS Notification ──
+    val notifSOSTitle = s("🆘 SOS DARURAT AKTIF", "🆘 SOS EMERGENCY ACTIVE")
+    val notifSOSBody = s(
+        "Sinyal darurat aktif — lokasi Anda sedang dibagikan untuk pertolongan",
+        "Emergency signal active — your location is being shared for rescue"
+    )
+
     companion object {
         val ID = AppStrings(AppLocale.ID)
         val EN = AppStrings(AppLocale.EN)

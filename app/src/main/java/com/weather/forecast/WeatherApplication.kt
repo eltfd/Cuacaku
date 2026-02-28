@@ -188,12 +188,35 @@ class WeatherApplication : Application() {
                 lightColor = android.graphics.Color.BLUE
             }
 
+            // SOS Emergency Channel — IMPORTANCE_MAX, override everything
+            val sosEmergencyChannel = NotificationChannel(
+                NotificationChannels.SOS_EMERGENCY,
+                "SOS Darurat / SOS Emergency",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Sinyal SOS darurat — hanya aktif saat user terjebak di zona bencana kritis"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 200, 100, 200, 100, 200, 300, 600, 300, 600, 300, 600, 300, 200, 100, 200, 100, 200)
+                setBypassDnd(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                enableLights(true)
+                lightColor = android.graphics.Color.RED
+                setSound(
+                    android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM),
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
+
             notificationManager.createNotificationChannels(
                 listOf(
                     alertChannel, dailyChannel, emergencyChannel,
                     disasterAlertChannel, disasterEmergencyChannel,
                     earthquakeAlertChannel, tsunamiEmergencyChannel,
-                    volcanoAlertChannel, highWaveAlertChannel
+                    volcanoAlertChannel, highWaveAlertChannel,
+                    sosEmergencyChannel
                 )
             )
         }

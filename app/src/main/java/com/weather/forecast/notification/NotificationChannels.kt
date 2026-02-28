@@ -24,6 +24,8 @@ object NotificationChannels {
     const val VOLCANO_ALERTS = "volcano_alerts"
     /** Channel peringatan gelombang tinggi — NO vibration (maritime safety) */
     const val HIGH_WAVE_ALERTS = "high_wave_alerts"
+    /** Channel SOS darurat — IMPORTANCE_MAX, override everything */
+    const val SOS_EMERGENCY = "sos_emergency"
 }
 
 /**
@@ -52,5 +54,7 @@ object NotificationIds {
     const val VOLCANO_ALERT = 1011
     /** Peringatan gelombang tinggi — no vibration */
     const val HIGH_WAVE_ALERT = 1012
+    /** SOS emergency signal */
+    const val SOS_EMERGENCY_ALERT = 1013
     const val WEATHER_UPDATE_SERVICE = 2001
 }

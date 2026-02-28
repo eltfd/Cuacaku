@@ -1,10 +1,13 @@
 package com.weather.forecast.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -23,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,7 +61,9 @@ fun SeismicMonitorScreen(
         is SeismicUiState.Loading -> SeismicLoadingScreen()
         is SeismicUiState.Success -> SeismicContent(
             data = current.data,
-            onRefresh = { viewModel.loadSeismicData() }
+            onRefresh = { viewModel.loadSeismicData() },
+            onActivateSOS = { viewModel.activateSOS() },
+            onDeactivateSOS = { viewModel.deactivateSOS() }
         )
         is SeismicUiState.Error -> SeismicErrorScreen(
             message = current.message,
@@ -139,7 +145,9 @@ private fun SeismicErrorScreen(
 @Composable
 private fun SeismicContent(
     data: SeismicMonitorData,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onActivateSOS: () -> Unit = {},
+    onDeactivateSOS: () -> Unit = {}
 ) {
     val strings = LocalStrings.current
 
@@ -163,6 +171,13 @@ private fun SeismicContent(
             SeismicHeader(data, onRefresh)
         }
 
+        // ── Disaster Phase Banner ──
+        if (data.overallPhase != DisasterLifecyclePhase.NORMAL) {
+            item {
+                DisasterPhaseBanner(data.overallPhase, data.lifecycleStates)
+            }
+        }
+
         // ── Active threats summary ──
         if (data.hasActiveThreats) {
             item {
@@ -174,6 +189,22 @@ private fun SeismicContent(
         if (data.impactAreas.isNotEmpty()) {
             item {
                 ImpactAreaSection(data.impactAreas)
+            }
+        }
+
+        // ── Early Warning System ──
+        val earlyWarningStates = data.lifecycleStates.filter { it.phase == DisasterLifecyclePhase.EARLY_WARNING }
+        if (earlyWarningStates.isNotEmpty()) {
+            item {
+                EarlyWarningSection(earlyWarningStates)
+            }
+        }
+
+        // ── Active Disaster Enhanced Panel ──
+        val activeDisasterStates = data.lifecycleStates.filter { it.phase == DisasterLifecyclePhase.ACTIVE_DISASTER }
+        if (activeDisasterStates.isNotEmpty()) {
+            item {
+                ActiveDisasterPanel(activeDisasterStates)
             }
         }
 
@@ -211,6 +242,31 @@ private fun SeismicContent(
         data.highWaveWarning?.let { wave ->
             item {
                 HighWaveWarningSection(wave)
+            }
+        }
+
+        // ── Post-Disaster Relief Points ──
+        if (data.reliefPoints.isNotEmpty()) {
+            item {
+                PostDisasterReliefSection(data.reliefPoints)
+            }
+        }
+
+        // ── Emergency Contacts ──
+        if (data.emergencyContacts.isNotEmpty() && data.overallPhase != DisasterLifecyclePhase.NORMAL) {
+            item {
+                EmergencyContactsSection(data.emergencyContacts)
+            }
+        }
+
+        // ── SOS System ──
+        if (data.showSOS || data.sosState.isActivated) {
+            item {
+                SOSSection(
+                    sosState = data.sosState,
+                    onActivateSOS = onActivateSOS,
+                    onDeactivateSOS = onDeactivateSOS
+                )
             }
         }
 
@@ -1229,6 +1285,981 @@ private fun HourlyWaveChip(hour: HourlyWaveForecast) {
                 .size(6.dp)
                 .clip(CircleShape)
                 .background(waveColor)
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  DISASTER PHASE BANNER
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun DisasterPhaseBanner(
+    phase: DisasterLifecyclePhase,
+    lifecycleStates: List<DisasterLifecycleState>
+) {
+    val strings = LocalStrings.current
+    val phaseLabel = when (phase) {
+        DisasterLifecyclePhase.NORMAL -> strings.phaseNormal
+        DisasterLifecyclePhase.EARLY_WARNING -> strings.phaseEarlyWarning
+        DisasterLifecyclePhase.ACTIVE_DISASTER -> strings.phaseActiveDisaster
+        DisasterLifecyclePhase.POST_DISASTER -> strings.phasePostDisaster
+    }
+    val phaseDesc = when (phase) {
+        DisasterLifecyclePhase.NORMAL -> strings.phaseNormalDesc
+        DisasterLifecyclePhase.EARLY_WARNING -> strings.phaseEarlyWarningDesc
+        DisasterLifecyclePhase.ACTIVE_DISASTER -> strings.phaseActiveDisasterDesc
+        DisasterLifecyclePhase.POST_DISASTER -> strings.phasePostDisasterDesc
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(phase.colorHex).copy(alpha = 0.2f)),
+        border = BorderStroke(2.dp, Color(phase.colorHex))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(phase.icon, fontSize = 28.sp)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${strings.currentPhase}: $phaseLabel",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(phase.colorHex)
+                    )
+                    Text(
+                        text = phaseDesc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+            }
+
+            // Per-disaster-type lifecycle chips
+            if (lifecycleStates.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(lifecycleStates) { state ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(state.phase.colorHex).copy(alpha = 0.15f))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(state.type.icon, fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = strings.localized(state.type.label, state.type.labelId),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(state.phase.colorHex),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  EARLY WARNING SYSTEM
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun EarlyWarningSection(states: List<DisasterLifecycleState>) {
+    val strings = LocalStrings.current
+    var expanded by remember { mutableStateOf(true) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFC107).copy(alpha = 0.15f)),
+        border = BorderStroke(1.dp, Color(0xFFFFC107).copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = strings.earlyWarningSystem,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFC107)
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    states.forEach { state ->
+                        EarlyWarningCard(state)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EarlyWarningCard(state: DisasterLifecycleState) {
+    val strings = LocalStrings.current
+    val warning = state.earlyWarning ?: return
+    val warningColor = Color(warning.threatLevel.colorHex)
+    var showChecklist by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(warningColor.copy(alpha = 0.1f))
+            .padding(12.dp)
+    ) {
+        // Header
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(state.type.icon, fontSize = 20.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = strings.localized(state.type.label, state.type.labelId),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = strings.localized(warning.threatLevel.label, warning.threatLevel.labelId),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = warningColor
+                )
+            }
+            // Escalation trend
+            val trendText = when (warning.escalationTrend) {
+                EscalationTrend.DECREASING -> "↓ ${strings.trendDecreasing}"
+                EscalationTrend.STABLE -> "→ ${strings.trendStable}"
+                EscalationTrend.INCREASING -> "↑ ${strings.trendIncreasing}"
+                EscalationTrend.RAPID_INCREASE -> "⇑ ${strings.trendRapidIncrease}"
+            }
+            val trendColor = when (warning.escalationTrend) {
+                EscalationTrend.DECREASING -> Color(0xFF4CAF50)
+                EscalationTrend.STABLE -> Color(0xFFFFC107)
+                EscalationTrend.INCREASING -> Color(0xFFFF9800)
+                EscalationTrend.RAPID_INCREASE -> Color(0xFFF44336)
+            }
+            Text(
+                text = trendText,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = trendColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = state.summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White.copy(alpha = 0.8f)
+        )
+
+        // Estimated onset
+        warning.estimatedOnsetHours?.let { onset ->
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Schedule, null, Modifier.size(14.dp), Color.White.copy(alpha = 0.7f))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "${strings.estimatedOnset}: ~$onset ${strings.hours}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+
+        // Warning indicators
+        if (warning.indicators.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = strings.warningIndicators,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            warning.indicators.forEach { indicator ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = indicator.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = indicator.currentValue,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (indicator.isExceeded) Color(0xFFF44336) else Color(0xFF4CAF50)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (indicator.isExceeded) "⚠️" else "✓",
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        // Preparedness checklist toggle
+        if (warning.preparednessChecklist.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showChecklist = !showChecklist },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "📋 ${strings.preparednessChecklist}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+                Icon(
+                    if (showChecklist) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Color.White.copy(alpha = 0.5f)
+                )
+            }
+            AnimatedVisibility(
+                visible = showChecklist,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    warning.preparednessChecklist.forEach { item ->
+                        Row(
+                            modifier = Modifier.padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(item.icon, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = item.text,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (item.isPriority) Color(0xFFFFC107) else Color.White.copy(alpha = 0.7f),
+                                fontWeight = if (item.isPriority) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (item.isPriority) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = strings.priorityAction,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFFC107),
+                                    fontSize = 9.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  ACTIVE DISASTER PANEL
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun ActiveDisasterPanel(states: List<DisasterLifecycleState>) {
+    val context = LocalContext.current
+    val strings = LocalStrings.current
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF44336).copy(alpha = 0.2f)),
+        border = BorderStroke(2.dp, Color(0xFFF44336))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Prominent header
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🚨", fontSize = 28.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = strings.activeDisasterBanner,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFF44336)
+                    )
+                    Text(
+                        text = strings.phaseActiveDisasterDesc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            states.forEach { state ->
+                val info = state.activeDisasterInfo ?: return@forEach
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(state.type.icon, fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = strings.localized(state.type.label, state.type.labelId),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = state.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+
+                    // User in danger zone warning
+                    if (info.isUserInDangerZone) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFF44336).copy(alpha = 0.3f))
+                                .padding(10.dp)
+                        ) {
+                            Text(
+                                text = strings.userInDangerZone,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Yellow,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    // Evacuation directions
+                    if (info.evacuationDirections.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "🧭 ${strings.evacuationDirections}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                        info.evacuationDirections.forEach { dir ->
+                            Row(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("➤", fontSize = 12.sp, color = Color(0xFF4CAF50))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${strings.localized(dir.direction, dir.directionId)} (${"%.1f".format(dir.distanceKm)} km)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White
+                                )
+                            }
+                            Text(
+                                text = strings.localized(dir.description, dir.descriptionId),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(start = 20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Emergency contacts quick buttons
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "📱 ${strings.emergencyContacts}",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val contacts = EmergencyContacts.getForLocale().take(3)
+                contacts.forEach { contact ->
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contact.number}"))
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "${contact.name}\n${contact.number}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  POST-DISASTER RELIEF POINTS
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun PostDisasterReliefSection(reliefPoints: List<ReliefPoint>) {
+    val strings = LocalStrings.current
+    var expanded by remember { mutableStateOf(true) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2196F3).copy(alpha = 0.15f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🏕️", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = strings.nearbyReliefPoints,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "${reliefPoints.size} ${strings.reliefPoints}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.7f)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    reliefPoints.sortedBy { it.distanceFromUserKm }.forEach { point ->
+                        ReliefPointCard(point)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = strings.reliefDataSource,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.4f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReliefPointCard(point: ReliefPoint) {
+    val strings = LocalStrings.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(point.type.icon, fontSize = 24.sp)
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = point.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = strings.localized(point.type.label, point.type.labelId),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF2196F3)
+            )
+            if (point.description.isNotBlank()) {
+                Text(
+                    text = point.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = "${"%.1f".format(point.distanceFromUserKm)} km",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.7f)
+            )
+            if (point.isVerified) {
+                Text("✓", fontSize = 12.sp, color = Color(0xFF4CAF50))
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  EMERGENCY CONTACTS
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun EmergencyContactsSection(contacts: List<EmergencyContact>) {
+    val context = LocalContext.current
+    val strings = LocalStrings.current
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "📱 ${strings.emergencyContacts}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            contacts.forEach { contact ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contact.number}"))
+                            context.startActivity(intent)
+                        }
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = contact.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White
+                    )
+                    Text(
+                        text = contact.number,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  SOS SYSTEM
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun SOSSection(
+    sosState: SOSState,
+    onActivateSOS: () -> Unit,
+    onDeactivateSOS: () -> Unit
+) {
+    val strings = LocalStrings.current
+    val context = LocalContext.current
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    var showAnalysis by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (sosState.isActivated) Color(0xFFD32F2F).copy(alpha = 0.3f)
+            else Color(0xFFF44336).copy(alpha = 0.15f)
+        ),
+        border = BorderStroke(
+            2.dp,
+            if (sosState.isActivated) Color(0xFFD32F2F) else Color(0xFFF44336).copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header
+            Text("🆘", fontSize = 40.sp)
+            Text(
+                text = strings.sosEmergency,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFF44336)
+            )
+
+            if (sosState.isActivated) {
+                // ── SOS IS ACTIVE ──
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = strings.sosActivated,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Yellow,
+                    textAlign = TextAlign.Center
+                )
+
+                // Expiry countdown
+                sosState.expiresAt?.let { expiry ->
+                    val remaining = (expiry - System.currentTimeMillis()) / 3600000.0
+                    if (remaining > 0) {
+                        Text(
+                            text = "${strings.sosExpiresIn}: ${"%.1f".format(remaining)} ${strings.hours}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Share location
+                    Button(
+                        onClick = {
+                            val shareText = "🆘 ${strings.sosEmergency}\n${strings.sosActivated}\n\nCall 112 / 115 BASARNAS"
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            context.startActivity(Intent.createChooser(intent, strings.sosShare))
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(strings.sosShare, style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    // Call 112
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(strings.sosCall112, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Deactivate button
+                OutlinedButton(
+                    onClick = onDeactivateSOS,
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = strings.sosDeactivate,
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            } else {
+                // ── SOS NOT YET ACTIVATED ──
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = strings.sosDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center
+                )
+
+                // AI Analysis toggle
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAnalysis = !showAnalysis },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🤖 ${strings.sosAIAnalysis}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Icon(
+                        if (showAnalysis) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = showAnalysis,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .padding(10.dp)
+                    ) {
+                        // Behavior analysis
+                        sosState.behaviorAnalysis?.let { analysis ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(strings.sosDistressScore, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                                Text(
+                                    text = "${"%.0f".format(analysis.distressScore * 100)}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (analysis.distressScore >= 0.7) Color(0xFFF44336) else Color(0xFF4CAF50)
+                                )
+                            }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(strings.sosConfidence, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                                Text(
+                                    text = "${"%.0f".format(analysis.confidenceLevel * 100)}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = strings.sosBehaviorFactors,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            analysis.factors.forEach { factor ->
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 1.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = factor.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.5f),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        text = "${"%.0f".format(factor.score * 100)}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.7f)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Movement data
+                        sosState.userMovementData?.let { movement ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Divider(color = Color.White.copy(alpha = 0.1f))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = strings.sosMovementData,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(strings.sosStationaryHours, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+                                Text(
+                                    text = "${"%.1f".format(movement.hoursStationary)} ${strings.hours}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (movement.hoursStationary >= 2) Color(0xFFF44336) else Color.White
+                                )
+                            }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(strings.sosTotalDistance, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+                                Text(
+                                    text = "${"%.2f".format(movement.totalDistanceLast6Hours)} km",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White
+                                )
+                            }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(strings.sosMaxSpeed, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.5f))
+                                Text(
+                                    text = "${"%.1f".format(movement.maxSpeed6Hours)} km/h",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // SOS Button
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { showConfirmDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+                    shape = RoundedCornerShape(16.dp),
+                    enabled = sosState.isEligible
+                ) {
+                    Text(
+                        text = strings.sosActivate,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (!sosState.isEligible) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = strings.localized(
+                            sosState.eligibilityReason.message,
+                            sosState.eligibilityReason.messageId
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+
+    // Confirmation dialog
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            title = {
+                Text(
+                    text = "🆘 ${strings.sosConfirmTitle}",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(strings.sosConfirmMessage)
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showConfirmDialog = false
+                        onActivateSOS()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    Text(strings.sosConfirm)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text(strings.sosCancel)
+                }
+            }
         )
     }
 }
