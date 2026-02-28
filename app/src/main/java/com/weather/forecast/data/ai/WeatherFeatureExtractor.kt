@@ -250,7 +250,7 @@ object WeatherFeatureExtractor {
         val fz = hourly.filter { it.freezingLevelHeight > 0 }.minOfOrNull { it.freezingLevelHeight } ?: 5000.0
         features[9] = 1f - norm(fz, 0.0, 6000.0); dataPoints++
 
-        features[10] = norm(hourly.map { it.humidity.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0, 0.0, 100.0)
+        features[10] = norm(hourly.map { it.cloudCover.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0, 0.0, 100.0)
         features[11] = 1f - norm((daily.temperatureMax - (hourly.firstOrNull()?.dewPoint ?: 20.0)).coerceAtLeast(0.0), 0.0, 30.0)
 
         features[12] = if (marine != null) { norm(marine.waveHeightMax, 0.0, 10.0).also { dataPoints++ } } else 0.5f

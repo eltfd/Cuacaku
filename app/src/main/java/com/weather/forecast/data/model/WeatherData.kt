@@ -113,7 +113,9 @@ data class HourlyWeatherData(
     /** Soil moisture 28-100cm (m³/m³) */
     val soilMoistureDeep: Double = 0.0,
     /** Soil temperature at surface (°C) */
-    val soilTemperature: Double = 0.0
+    val soilTemperature: Double = 0.0,
+    /** Cloud cover (%) */
+    val cloudCover: Int = 0
 ) {
     val temperatureFormatted: String
         get() = "${temperature.toInt()}°"

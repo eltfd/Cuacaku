@@ -993,7 +993,7 @@ private fun HourlyForecastItem(hourly: HourlyWeatherData) {
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 Text(
-                    text = "${hourly.windSpeed.toInt()}",
+                    text = "${hourly.windSpeed.toInt()} km/h",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.6f)
                 )
@@ -1410,7 +1410,7 @@ private fun DailyHourlyItem(hourly: HourlyWeatherData) {
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 Text(
-                    text = "${hourly.windSpeed.toInt()}",
+                    text = "${hourly.windSpeed.toInt()} km/h",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 10.sp

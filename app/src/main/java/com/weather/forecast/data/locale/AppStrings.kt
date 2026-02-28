@@ -248,14 +248,14 @@ class AppStrings(val locale: AppLocale) {
     val failedToLoadAnalysis = s("Gagal Memuat Analisis", "Failed to Load Analysis")
     val todayAnalysis = s("Analisis Hari Ini", "Today's Analysis")
     val disasterForecast = s("Prakiraan Bencana", "Disaster Forecast")
-    val neuralNetworkAnalysis = s("Analisis Neural Network", "Neural Network Analysis")
+    val neuralNetworkAnalysis = s("Analisis Cerdas", "Smart Analysis")
     val model = s("Model", "Model")
     val data = s("Data", "Data")
     val learned = s("Learned", "Learned")
     val samples = s("Sampel", "Samples")
     val storage = s("Storage", "Storage")
     fun score(v: String) = s("Skor: $v%", "Score: $v%")
-    fun nnScore(v: String) = s("NN: $v%", "NN: $v%")
+    fun nnScore(v: String) = s("AI: $v%", "AI: $v%")
     fun confidence(v: String) = s("Keyakinan: $v%", "Confidence: $v%")
     val analysisFactors = s("Faktor Analisis:", "Analysis Factors:")
     val riskMap7Days = s("Peta Risiko 7 Hari", "7-Day Risk Map")
@@ -265,22 +265,16 @@ class AppStrings(val locale: AppLocale) {
     val extreme = s("Ekstrem", "Extreme")
     val aboutAnalysis = s("Tentang Analisis", "About Analysis")
     val aboutAnalysisDesc = s(
-        "Analisis ini menggunakan Neural Network (MLP) yang dikombinasikan dengan rule-based analysis " +
+        "Analisis ini menggunakan model kecerdasan buatan yang mengkombinasikan beberapa metode " +
                 "untuk memprediksi potensi bencana berdasarkan data cuaca, laut, dan sungai real-time.\n\n" +
-                "Model MLP v1.1 menggunakan 20 fitur input, 2 hidden layer (32 dan 16 neuron), dan " +
-                "memprediksi 6 jenis bencana. Total parameter: 1.302. Model ini juga dilengkapi " +
-                "Incremental Learning yang memungkinkan model belajar dari data baru secara terus-menerus.\n\n" +
                 "⚠️ Analisis ini bersifat estimasi dan tidak menggantikan peringatan resmi dari BMKG atau badan meteorologi setempat.",
-        "This analysis uses a Neural Network (MLP) combined with rule-based analysis to predict " +
-                "disaster potential based on real-time weather, sea, and river data.\n\n" +
-                "MLP v1.1 model uses 20 input features, 2 hidden layers (32 and 16 neurons), and predicts " +
-                "6 disaster types. Total parameters: 1,302. The model also features Incremental Learning " +
-                "that allows continuous learning from new data.\n\n" +
+        "This analysis uses an AI model combining multiple methods " +
+                "to predict disaster potential based on real-time weather, sea, and river data.\n\n" +
                 "⚠️ This analysis is an estimate and does not replace official warnings from meteorological agencies."
     )
     val aiEngineLine = s(
-        "AI Engine: MLP-v1.1 + Incremental Learning • Open-Meteo • GloFAS",
-        "AI Engine: MLP-v1.1 + Incremental Learning • Open-Meteo • GloFAS"
+        "Data: Open-Meteo • GloFAS",
+        "Data: Open-Meteo • GloFAS"
     )
     fun statusLabel(label: String) = s("Status: $label", "Status: $label")
 
@@ -788,30 +782,22 @@ class AppStrings(val locale: AppLocale) {
     val aboveSeaLevel = s("dpl", "ASL")
 
     // ═══ Disaster Forecast Screen ═══
-    val nnSubtitle = s("Neural Network + Analisis Berbasis Aturan", "Neural Network + Rule-Based Ensemble")
+    val nnSubtitle = s("Analisis Berbasis Data Cuaca Real-time", "Real-time Weather Data Analysis")
     val aboutAnalysisDescV2 = s(
-        "Analisis menggunakan Neural Network (MLP 22→32→16→6) " +
-                "dengan domain-informed initialization + incremental learning. " +
-                "Model belajar otomatis dari data harian (maks 50 sampel, ~16 KB). " +
-                "Data > 30 hari otomatis dihapus. Terrain analysis via Open-Elevation (SRTM 30m), " +
-                "soil moisture via Open-Meteo, event monitoring via NASA EONET v3. " +
-                "Referensi: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017), " +
-                "Sahoo et al. (ICML 2018). " +
-                "Data dari Open-Meteo, Marine API, GloFAS/ECMWF. " +
+        "Analisis menggunakan model kecerdasan buatan yang memproses data cuaca, " +
+                "kelembaban tanah, elevasi, dan kondisi laut secara real-time. " +
+                "Model belajar otomatis dari data terbaru untuk meningkatkan akurasi. " +
+                "Data dari Open-Meteo, Marine API, GloFAS/ECMWF, NASA EONET. " +
                 "Prakiraan bersifat indikatif — ikuti peringatan resmi BMKG.",
-        "Analysis uses Neural Network (MLP 22→32→16→6) " +
-                "with domain-informed initialization + incremental learning. " +
-                "Model auto-learns from daily data (max 50 samples, ~16 KB). " +
-                "Data older than 30 days is auto-deleted. Terrain analysis via Open-Elevation (SRTM 30m), " +
-                "soil moisture via Open-Meteo, event monitoring via NASA EONET v3. " +
-                "References: Gorishniy et al. (NeurIPS 2021), Guo et al. (ICML 2017), " +
-                "Sahoo et al. (ICML 2018). " +
-                "Data from Open-Meteo, Marine API, GloFAS/ECMWF. " +
+        "Analysis uses an AI model processing weather data, " +
+                "soil moisture, elevation, and sea conditions in real-time. " +
+                "The model auto-learns from recent data to improve accuracy. " +
+                "Data from Open-Meteo, Marine API, GloFAS/ECMWF, NASA EONET. " +
                 "Forecast is indicative — follow official warnings from meteorological agencies."
     )
     val aiEngineLineV2 = s(
-        "AI Engine: MLP-v1.2 + Incremental Learning • Open-Meteo • GloFAS • NASA EONET",
-        "AI Engine: MLP-v1.2 + Incremental Learning • Open-Meteo • GloFAS • NASA EONET"
+        "Data: Open-Meteo • GloFAS • NASA EONET",
+        "Data: Open-Meteo • GloFAS • NASA EONET"
     )
 
     // ═══ DisasterAnalysisEngine summary ═══

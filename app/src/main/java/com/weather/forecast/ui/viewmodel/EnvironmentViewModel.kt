@@ -364,6 +364,11 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             null
         }
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        disasterRepository.close()
+    }
 }
 
 /**

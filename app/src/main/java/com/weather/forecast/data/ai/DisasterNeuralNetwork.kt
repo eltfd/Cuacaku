@@ -7,7 +7,7 @@ import kotlin.math.sqrt
  * DisasterNeuralNetwork — Multi-Layer Perceptron untuk prediksi risiko bencana
  *
  * Arsitektur: Input(22) → Hidden(32, LeakyReLU) → Hidden(16, LeakyReLU) → Output(6, Sigmoid)
- * Total parameter: 22×32 + 32 + 32×16 + 16 + 16×6 + 6 = 1,286
+ * Total parameter: 22×32 + 32 + 32×16 + 16 + 16×6 + 6 = 1,366
  *
  * ── Referensi Ilmiah ──
  * [1] Gorishniy et al. (2021) "Revisiting Deep Learning Models for Tabular Data"

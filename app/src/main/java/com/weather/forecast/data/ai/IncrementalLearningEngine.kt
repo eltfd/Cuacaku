@@ -143,6 +143,7 @@ class IncrementalLearningEngine(private val context: Context) {
      * Mendapatkan delta weights untuk diterapkan ke DisasterNeuralNetwork.
      * Delta ini mewakili pelajaran dari data observasi sebelumnya.
      */
+    @Synchronized
     fun getWeightDeltas(): WeightDeltas {
         return WeightDeltas(
             w3Delta = w3Delta.copyOf(),
@@ -300,6 +301,7 @@ class IncrementalLearningEngine(private val context: Context) {
      *
      * @param replayWeight Bobot relatif dari update ini (1.0 = sampel baru, 0.3 = replay)
      */
+    @Synchronized
     private fun updateWeights(
         nnPredictions: FloatArray,
         targets: FloatArray,
@@ -321,8 +323,8 @@ class IncrementalLearningEngine(private val context: Context) {
                 // Task gradient
                 val taskGrad = (delta * h2[i]).clip()
 
-                // EWC penalty: λ × F_i × (θ_i - θ*_i)
-                val ewcPenalty = EWC_LAMBDA * fisherW3[idx] * (w3Delta[idx] - anchorW3[idx])
+                // EWC penalty: λ × F_i × (θ_i - θ*_i), clipped to prevent freezing
+                val ewcPenalty = (EWC_LAMBDA * fisherW3[idx] * (w3Delta[idx] - anchorW3[idx])).clip()
 
                 // Total gradient = task + EWC + L2
                 val totalGrad = taskGrad + ewcPenalty
@@ -334,7 +336,7 @@ class IncrementalLearningEngine(private val context: Context) {
 
             // Update b3 bias
             val bGrad = delta.clip()
-            val ewcBiasPenalty = EWC_LAMBDA * fisherB3[j] * (b3Delta[j] - anchorB3[j])
+            val ewcBiasPenalty = (EWC_LAMBDA * fisherB3[j] * (b3Delta[j] - anchorB3[j])).clip()
             val totalBGrad = bGrad + ewcBiasPenalty
 
             b3Momentum[j] = MOMENTUM * b3Momentum[j] + (1 - MOMENTUM) * totalBGrad
@@ -515,9 +517,9 @@ class IncrementalLearningEngine(private val context: Context) {
         driftErrorVariance = DRIFT_EMA_ALPHA * (diff * diff) +
                 (1 - DRIFT_EMA_ALPHA) * driftErrorVariance
 
-        // Deteksi drift: error jauh di atas rata-rata
+        // Deteksi drift: error jauh di atas rata-rata (use prevEma for unbiased check)
         val stdDev = sqrt(driftErrorVariance.toDouble()).toFloat().coerceAtLeast(0.01f)
-        val deviation = (currentError - driftErrorEma) / stdDev
+        val deviation = (currentError - prevEma) / stdDev
 
         if (deviation > DRIFT_THRESHOLD && driftStepsSinceDetected > DRIFT_COOLDOWN_STEPS) {
             // DRIFT DETECTED!

@@ -122,7 +122,12 @@ private fun MonitorEmptyContent(onRefresh: () -> Unit) {
             modifier = Modifier.padding(32.dp)
         ) {
             val s = LocalStrings.current
-            Text("✅", fontSize = 64.sp)
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = Color.White
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 s.allClear,
@@ -176,7 +181,12 @@ private fun MonitorErrorContent(message: String, onRetry: () -> Unit) {
             modifier = Modifier.padding(32.dp)
         ) {
             val s = LocalStrings.current
-            Text("⚠️", fontSize = 48.sp)
+            Icon(
+                imageVector = Icons.Default.CloudOff,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = Color.White.copy(alpha = 0.7f)
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 s.failedToLoadData,
@@ -534,7 +544,7 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
                             if (it.province.isNotBlank()) "${it.name} (${it.province})" else it.name
                         }
                         Text(
-                            text = "📍 $locStr",
+                            text = locStr,
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.5f),
                             maxLines = 1,
@@ -575,7 +585,7 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
                     System.currentTimeMillis() - disaster.startDate
                 ).toInt()
                 Text(
-                    text = "⏱️ ${formatDuration(daysSince, s)}",
+                    text = formatDuration(daysSince, s),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.5f)
                 )
@@ -644,16 +654,16 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         impact.affectedPeople?.let {
-                            Text("👥 ${s.peopleAffected(it)}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                            Text(s.peopleAffected(it), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                         }
                         impact.affectedAreaKm2?.let {
-                            Text("📏 ${s.areaAffected("%.1f".format(it))}", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                            Text(s.areaAffected("%.1f".format(it)), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                         }
                         impact.infrastructureDamage?.let {
-                            Text("🏗️ $it", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                         }
                         impact.aidStatus?.let {
-                            Text("🆘 $it", style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                         }
                     }
 
@@ -719,7 +729,7 @@ private fun RecoveryProgressSection(disaster: ActiveDisaster) {
 
             if (disaster.phase == DisasterPhase.RESOLVED && disaster.daysUntilHidden > 0) {
                 Text(
-                    text = "⏳ ${disaster.daysUntilHidden}d",
+                    text = s.hiddenInDays(disaster.daysUntilHidden),
                     style = MaterialTheme.typography.labelSmall,
                     color = phaseColor.copy(alpha = 0.6f)
                 )

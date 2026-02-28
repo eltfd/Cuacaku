@@ -394,7 +394,9 @@ object DisasterAnalysisEngine {
         var score = 0.0
 
         // Faktor 1: Tekanan sangat rendah (bobot 0.30)
-        val pressure = current?.pressure ?: hourly.map { it.pressure }.minOrNull() ?: 1013.0
+        val pressure = current?.pressure
+            ?: hourly.map { it.pressure }.filter { it > 0 }.minOrNull()
+            ?: 1013.0
         val minPressure = hourly.map { it.pressure }.filter { it > 0 }.minOrNull() ?: pressure
         val effectivePressure = minOf(pressure, minPressure)
         val pressureScore = when {
@@ -1016,7 +1018,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.THUNDERSTORM, riskScore = score, riskLevel = riskLevel,
             confidence = 0.8, factors = emptyList(),
-            description = AppLocaleManager.strings.thunderstormAnalysis(maxCape.toInt().toString()) + if (hasTs) "" else "",
+            description = AppLocaleManager.strings.thunderstormAnalysis(maxCape.toInt().toString()),
             recommendation = ""
         )
     }

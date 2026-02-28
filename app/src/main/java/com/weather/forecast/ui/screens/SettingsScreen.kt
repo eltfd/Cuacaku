@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.weather.forecast.BuildConfig
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -152,7 +153,7 @@ fun SettingsScreen(
                 
                 InfoItem(
                     title = s.appVersion,
-                    subtitle = "1.0.0"
+                    subtitle = BuildConfig.VERSION_NAME
                 )
             }
 

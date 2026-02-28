@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
@@ -1117,10 +1118,10 @@ private fun FloodReportSection(reports: List<CrowdsourcedDisasterReport>) {
 
     // Depth distribution
     val depthCounts = mapOf(
-        "Rendah" to reports.count { (it.floodDepthCm ?: 0) in 1..29 },
-        "Sedang" to reports.count { (it.floodDepthCm ?: 0) in 30..69 },
-        "Dalam" to reports.count { (it.floodDepthCm ?: 0) in 70..149 },
-        "Sangat Dalam" to reports.count { (it.floodDepthCm ?: 0) >= 150 }
+        strings.localized("Low", "Rendah") to reports.count { (it.floodDepthCm ?: 0) in 1..29 },
+        strings.localized("Medium", "Sedang") to reports.count { (it.floodDepthCm ?: 0) in 30..69 },
+        strings.localized("Deep", "Dalam") to reports.count { (it.floodDepthCm ?: 0) in 70..149 },
+        strings.localized("Very Deep", "Sangat Dalam") to reports.count { (it.floodDepthCm ?: 0) >= 150 }
     )
 
     val floodBlue = Color(0xFF2196F3)
@@ -2414,10 +2415,10 @@ private fun LandslideMonitorSection(
     }
 
     val riskLabel = when (riskLevel) {
-        RiskLevel.EXTREME -> strings.localized("BAHAYA", "EXTREME")
-        RiskLevel.HIGH -> strings.localized("Tinggi", "High")
-        RiskLevel.MODERATE -> strings.localized("Sedang", "Moderate")
-        else -> strings.localized("Rendah", "Low")
+        RiskLevel.EXTREME -> strings.localized("EXTREME", "BAHAYA")
+        RiskLevel.HIGH -> strings.localized("High", "Tinggi")
+        RiskLevel.MODERATE -> strings.localized("Moderate", "Sedang")
+        else -> strings.localized("Low", "Rendah")
     }
 
     Card(
@@ -2439,15 +2440,15 @@ private fun LandslideMonitorSection(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = strings.localized("Pemantauan Longsor", "Landslide Monitoring"),
+                            text = strings.localized("Landslide Monitoring", "Pemantauan Longsor"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Text(
                             text = strings.localized(
-                                "Analisis 8 faktor real-time",
-                                "Real-time 8-factor analysis"
+                                "Real-time risk analysis",
+                                "Analisis risiko real-time"
                             ),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.6f)
@@ -2482,7 +2483,7 @@ private fun LandslideMonitorSection(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "${strings.localized("Risiko", "Risk")}: $riskLabel",
+                            text = "${strings.localized("Risk", "Risiko")}: $riskLabel",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             color = riskColor
@@ -2522,7 +2523,7 @@ private fun LandslideMonitorSection(
             // ── Confidence ──
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "${strings.localized("Keyakinan", "Confidence")}: ${(analysis.confidence * 100).toInt()}%",
+                text = "${strings.localized("Confidence", "Keyakinan")}: ${(analysis.confidence * 100).toInt()}%",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.5f)
             )
@@ -2537,22 +2538,22 @@ private fun LandslideMonitorSection(
                     terrainData?.let { terrain ->
                         Row(modifier = Modifier.fillMaxWidth()) {
                             LandslideStatBox(
-                                label = strings.localized("Kemiringan", "Slope"),
+                                label = strings.localized("Slope", "Kemiringan"),
                                 value = "%.1f°".format(terrain.slopeAngle),
                                 subLabel = strings.localized(
-                                    terrain.slopeCategory.labelId,
-                                    terrain.slopeCategory.label
+                                    terrain.slopeCategory.label,
+                                    terrain.slopeCategory.labelId
                                 ),
                                 color = Color(terrain.slopeCategory.colorHex),
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             LandslideStatBox(
-                                label = strings.localized("Saturasi Tanah", "Soil Saturation"),
+                                label = strings.localized("Soil Saturation", "Saturasi Tanah"),
                                 value = "${(terrain.soilSaturationIndex * 100).toInt()}%",
                                 subLabel = when {
-                                    terrain.soilSaturationIndex > 0.8 -> strings.localized("Jenuh", "Saturated")
-                                    terrain.soilSaturationIndex > 0.5 -> strings.localized("Basah", "Wet")
+                                    terrain.soilSaturationIndex > 0.8 -> strings.localized("Saturated", "Jenuh")
+                                    terrain.soilSaturationIndex > 0.5 -> strings.localized("Wet", "Basah")
                                     else -> strings.localized("Normal", "Normal")
                                 },
                                 color = when {
@@ -2564,12 +2565,12 @@ private fun LandslideMonitorSection(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             LandslideStatBox(
-                                label = strings.localized("Vegetasi", "Vegetation"),
+                                label = strings.localized("Vegetation", "Vegetasi"),
                                 value = "${(terrain.vegetationIndex * 100).toInt()}%",
                                 subLabel = when {
-                                    terrain.vegetationIndex < 0.3 -> strings.localized("Gundul", "Bare")
-                                    terrain.vegetationIndex < 0.6 -> strings.localized("Jarang", "Sparse")
-                                    else -> strings.localized("Lebat", "Dense")
+                                    terrain.vegetationIndex < 0.3 -> strings.localized("Bare", "Gundul")
+                                    terrain.vegetationIndex < 0.6 -> strings.localized("Sparse", "Jarang")
+                                    else -> strings.localized("Dense", "Lebat")
                                 },
                                 color = when {
                                     terrain.vegetationIndex < 0.3 -> Color(0xFFF44336)
@@ -2585,13 +2586,13 @@ private fun LandslideMonitorSection(
                         // ── Rainfall Metrics ──
                         Row(modifier = Modifier.fillMaxWidth()) {
                             LandslideStatBox(
-                                label = strings.localized("Hujan Hari Ini", "Rain Today"),
+                                label = strings.localized("Rain Today", "Hujan Hari Ini"),
                                 value = "%.1f mm".format(terrain.todayPrecipitation),
                                 subLabel = when {
-                                    terrain.todayPrecipitation > 100 -> strings.localized("Sangat Lebat", "Very Heavy")
-                                    terrain.todayPrecipitation > 50 -> strings.localized("Lebat", "Heavy")
-                                    terrain.todayPrecipitation > 20 -> strings.localized("Sedang", "Moderate")
-                                    else -> strings.localized("Ringan", "Light")
+                                    terrain.todayPrecipitation > 100 -> strings.localized("Very Heavy", "Sangat Lebat")
+                                    terrain.todayPrecipitation > 50 -> strings.localized("Heavy", "Lebat")
+                                    terrain.todayPrecipitation > 20 -> strings.localized("Moderate", "Sedang")
+                                    else -> strings.localized("Light", "Ringan")
                                 },
                                 color = when {
                                     terrain.todayPrecipitation > 100 -> Color(0xFFD32F2F)
@@ -2603,13 +2604,13 @@ private fun LandslideMonitorSection(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             LandslideStatBox(
-                                label = strings.localized("Hujan 3 Hari", "Rain 3-Day"),
+                                label = strings.localized("Rain 3-Day", "Hujan 3 Hari"),
                                 value = "%.0f mm".format(terrain.antecedentRainfall),
                                 subLabel = when {
-                                    terrain.antecedentRainfall > 150 -> strings.localized("Kritis", "Critical")
-                                    terrain.antecedentRainfall > 100 -> strings.localized("Tinggi", "High")
-                                    terrain.antecedentRainfall > 50 -> strings.localized("Waspada", "Alert")
-                                    else -> strings.localized("Aman", "Safe")
+                                    terrain.antecedentRainfall > 150 -> strings.localized("Critical", "Kritis")
+                                    terrain.antecedentRainfall > 100 -> strings.localized("High", "Tinggi")
+                                    terrain.antecedentRainfall > 50 -> strings.localized("Alert", "Waspada")
+                                    else -> strings.localized("Safe", "Aman")
                                 },
                                 color = when {
                                     terrain.antecedentRainfall > 150 -> Color(0xFFD32F2F)
@@ -2621,13 +2622,13 @@ private fun LandslideMonitorSection(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             LandslideStatBox(
-                                label = strings.localized("Intensitas Maks", "Max Intensity"),
+                                label = strings.localized("Max Intensity", "Intensitas Maks"),
                                 value = "%.1f mm/h".format(terrain.maxRainfallIntensity),
                                 subLabel = when {
-                                    terrain.maxRainfallIntensity > 50 -> strings.localized("Ekstrem", "Extreme")
-                                    terrain.maxRainfallIntensity > 20 -> strings.localized("Deras", "Heavy")
-                                    terrain.maxRainfallIntensity > 10 -> strings.localized("Sedang", "Moderate")
-                                    else -> strings.localized("Ringan", "Light")
+                                    terrain.maxRainfallIntensity > 50 -> strings.localized("Extreme", "Ekstrem")
+                                    terrain.maxRainfallIntensity > 20 -> strings.localized("Heavy", "Deras")
+                                    terrain.maxRainfallIntensity > 10 -> strings.localized("Moderate", "Sedang")
+                                    else -> strings.localized("Light", "Ringan")
                                 },
                                 color = when {
                                     terrain.maxRainfallIntensity > 50 -> Color(0xFFD32F2F)
@@ -2642,24 +2643,24 @@ private fun LandslideMonitorSection(
                         // ── Soil Moisture Layers ──
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "💧 ${strings.localized("Kelembaban Tanah", "Soil Moisture")}",
+                            text = "${strings.localized("Soil Moisture", "Kelembaban Tanah")}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White.copy(alpha = 0.8f)
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         SoilLayerBar(
-                            label = strings.localized("Dangkal (0-7cm)", "Shallow (0-7cm)"),
+                            label = strings.localized("Shallow (0-7cm)", "Dangkal (0-7cm)"),
                             value = terrain.soilMoistureShallow,
                             maxValue = 0.5
                         )
                         SoilLayerBar(
-                            label = strings.localized("Sedang (7-28cm)", "Medium (7-28cm)"),
+                            label = strings.localized("Medium (7-28cm)", "Sedang (7-28cm)"),
                             value = terrain.soilMoistureMedium,
                             maxValue = 0.5
                         )
                         SoilLayerBar(
-                            label = strings.localized("Dalam (28-100cm)", "Deep (28-100cm)"),
+                            label = strings.localized("Deep (28-100cm)", "Dalam (28-100cm)"),
                             value = terrain.soilMoistureDeep,
                             maxValue = 0.5
                         )
@@ -2668,7 +2669,7 @@ private fun LandslideMonitorSection(
                         if (terrain.elevationGrid.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "🏔️ ${strings.localized("Elevasi", "Elevation")}: ${"%.0f".format(terrain.elevation)} m",
+                                text = "${strings.localized("Elevation", "Elevasi")}: ${"%.0f".format(terrain.elevation)} m",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White.copy(alpha = 0.8f)
@@ -2707,7 +2708,7 @@ private fun LandslideMonitorSection(
                     Divider(color = Color.White.copy(alpha = 0.1f))
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "📊 ${strings.localized("Faktor Risiko (8 Faktor)", "Risk Factors (8 Factors)")}",
+                        text = "${strings.localized("Risk Factors", "Faktor Risiko")}",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White.copy(alpha = 0.8f)
@@ -2757,8 +2758,8 @@ private fun LandslideMonitorSection(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = strings.localized(
-                            "Sumber: Open-Elevation (SRTM) • Open-Meteo (curah hujan & tanah) • 8 faktor berbobot",
-                            "Source: Open-Elevation (SRTM) • Open-Meteo (rainfall & soil) • 8 weighted factors"
+                            "Source: Open-Elevation (SRTM) • Open-Meteo (rainfall & soil)",
+                            "Sumber: Open-Elevation (SRTM) • Open-Meteo (curah hujan & tanah)"
                         ),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.35f)
@@ -4324,16 +4325,17 @@ private fun formatTime(epochMillis: Long): String {
 }
 
 private fun formatRelativeTime(epochMillis: Long): String {
+    val s = AppLocaleManager.strings
     val diff = System.currentTimeMillis() - epochMillis
     val minutes = diff / 60000
     val hours = minutes / 60
     val days = hours / 24
 
     return when {
-        minutes < 1 -> "Just now"
-        minutes < 60 -> "${minutes}m ago"
-        hours < 24 -> "${hours}h ago"
-        else -> "${days}d ago"
+        minutes < 1 -> s.localized("Just now", "Baru saja")
+        minutes < 60 -> s.localized("${minutes}m ago", "${minutes}m lalu")
+        hours < 24 -> s.localized("${hours}h ago", "${hours}j lalu")
+        else -> s.localized("${days}d ago", "${days}h lalu")
     }
 }
 

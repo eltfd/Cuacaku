@@ -65,6 +65,11 @@ class DisasterRepository(context: Context) {
         private const val KEY_LAST_LEARN_TIME = "last_learn_time"
     }
 
+    /** Cancel background learning scope — call when repository is no longer needed */
+    fun close() {
+        learningScope.cancel()
+    }
+
     /**
      * Ambil + analisis prakiraan bencana.
      *

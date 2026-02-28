@@ -228,7 +228,7 @@ class LandslideTerrainRepository(context: Context) {
         val deep = hourly.map { it.soilMoistureDeep }
             .filter { it > 0 }.average().takeIf { !it.isNaN() } ?: 0.0
         val temp = hourly.map { it.soilTemperature }
-            .filter { it != 0.0 }.average().takeIf { !it.isNaN() } ?: 20.0
+            .filter { it > -50.0 && it < 70.0 }.average().takeIf { !it.isNaN() } ?: 15.0
 
         return SoilData(shallow, medium, deep, temp)
     }
@@ -279,9 +279,9 @@ class LandslideTerrainRepository(context: Context) {
             return null
         }
 
-        val elevation = prefs.getFloat(KEY_CACHED_ELEVATION, 0f).toDouble()
-        val slope = prefs.getFloat(KEY_CACHED_SLOPE, 0f).toDouble()
-        if (elevation == 0.0 && slope == 0.0) return null
+        val elevation = prefs.getFloat(KEY_CACHED_ELEVATION, Float.MIN_VALUE).toDouble()
+        val slope = prefs.getFloat(KEY_CACHED_SLOPE, Float.MIN_VALUE).toDouble()
+        if (elevation == Float.MIN_VALUE.toDouble() && slope == Float.MIN_VALUE.toDouble()) return null
 
         return SlopeResult(
             centerElevation = elevation,

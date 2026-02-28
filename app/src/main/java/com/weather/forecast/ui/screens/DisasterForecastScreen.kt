@@ -118,7 +118,12 @@ private fun DisasterErrorContent(message: String, onRetry: () -> Unit) {
             modifier = Modifier.padding(32.dp)
         ) {
             val s = LocalStrings.current
-            Text("⚠️", fontSize = 48.sp)
+            Icon(
+                imageVector = Icons.Default.CloudOff,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = Color.White.copy(alpha = 0.7f)
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = s.failedToLoadAnalysis,
@@ -300,65 +305,18 @@ private fun AiSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🧠", fontSize = 20.sp)
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = Color(0xFF00E676)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = LocalStrings.current.neuralNetworkAnalysis,
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
-                }
-
-                // AI Model badge
-                if (aiModelVersion.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF00C853).copy(alpha = 0.25f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = if (learningSteps > 0) "AI+L" else "AI",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            ),
-                            color = Color(0xFF00E676)
-                        )
-                    }
-                }
-            }
-
-            // Model info row
-            if (aiModelVersion.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                val s = LocalStrings.current
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    AiInfoChip(label = s.model, value = aiModelVersion.substringBefore("-incremental"))
-                    AiInfoChip(
-                        label = s.data,
-                        value = "${"%.0f".format(aiDataCompleteness * 100)}%"
-                    )
-                    if (learningSteps > 0) {
-                        AiInfoChip(label = s.learned, value = "${learningSteps}x")
-                    }
-                }
-
-                // Learning status row
-                if (learningSteps > 0 || learningSamples > 0) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        AiInfoChip(label = s.samples, value = "$learningSamples")
-                        if (storageUsed.isNotEmpty()) {
-                            AiInfoChip(label = s.storage, value = storageUsed)
-                        }
-                    }
                 }
             }
 
@@ -371,28 +329,6 @@ private fun AiSummaryCard(
                 lineHeight = 22.sp
             )
         }
-    }
-}
-
-@Composable
-private fun AiInfoChip(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.08f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "$label: ",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.5f)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-            color = Color.White.copy(alpha = 0.8f)
-        )
     }
 }
 
