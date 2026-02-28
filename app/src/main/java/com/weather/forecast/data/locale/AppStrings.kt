@@ -52,6 +52,11 @@ class AppStrings(val locale: AppLocale) {
     val locationNotAvailable = s("Lokasi tidak tersedia", "Location not available")
     val locationPermissionRequired = s("Izin lokasi diperlukan", "Location permission required")
     val grantLocationPermission = s("Berikan Izin Lokasi", "Grant Location Permission")
+    val locationAccuracyWarning = s(
+        "Lokasi GPS tidak tersedia. Informasi yang ditampilkan mungkin tidak akurat karena menggunakan lokasi perkiraan. Berikan izin lokasi untuk hasil terbaik.",
+        "GPS location unavailable. The information displayed may not be accurate as it uses an estimated location. Grant location permission for best results."
+    )
+    val openSettings = s("Buka Pengaturan", "Open Settings")
     val errorOccurred = s("Terjadi kesalahan", "An error occurred")
     val open = s("Buka", "Open")
     val dataSource = s("Sumber Data", "Data Source")
