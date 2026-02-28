@@ -178,66 +178,34 @@ object DisasterAnalysisEngine {
         daily: DailyWeatherData?,
         flood: FloodData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         val factors = mutableListOf<ContributingFactor>()
         var score = 0.0
         var dataPoints = 0
 
         // Faktor 1: Curah hujan kumulatif (bobot 0.35)
         val totalPrecip = daily?.precipitationSum ?: hourly.sumOf { it.precipitation }
-        val precipScore = when {
-            totalPrecip > 100 -> 1.0   // >100mm/hari = sangat bahaya
-            totalPrecip > 50 -> 0.8
-            totalPrecip > 20 -> 0.5
-            totalPrecip > 10 -> 0.3
-            totalPrecip > 5 -> 0.15
-            else -> 0.0
-        }
-        score += precipScore * 0.35
+        val precipScore = scored(totalPrecip, 100.0 to 1.0, 50.0 to 0.8, 20.0 to 0.5, 10.0 to 0.3, 5.0 to 0.15)
+        score += factors.weighted(s.factorRainfall, "%.1f mm".format(totalPrecip), precipScore, 0.35)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRainfall,
-            value = "%.1f mm".format(totalPrecip),
-            contribution = precipScore,
-            isElevating = precipScore > 0.3
-        ))
 
         // Faktor 2: Intensitas hujan per jam tertinggi (bobot 0.25)
         val maxRainHourly = hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0
-        val intensityScore = when {
-            maxRainHourly > 50 -> 1.0   // >50mm/jam = sangat lebat
-            maxRainHourly > 20 -> 0.8
-            maxRainHourly > 10 -> 0.5
-            maxRainHourly > 5 -> 0.3
-            else -> 0.0
-        }
-        score += intensityScore * 0.25
+        val intensityScore = scored(maxRainHourly, 50.0 to 1.0, 20.0 to 0.8, 10.0 to 0.5, 5.0 to 0.3)
+        score += factors.weighted(s.factorRainIntensity, "%.1f mm/jam".format(maxRainHourly), intensityScore, 0.25)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRainIntensity,
-            value = "%.1f mm/jam".format(maxRainHourly),
-            contribution = intensityScore,
-            isElevating = intensityScore > 0.3
-        ))
 
         // Faktor 3: Debit sungai vs rata-rata (bobot 0.25)
         val floodDaily = flood?.dailyForecast?.firstOrNull()
         if (floodDaily != null && floodDaily.dischargeMean > 0) {
             val ratio = floodDaily.riverDischarge / floodDaily.dischargeMean
-            val dischargeScore = when {
-                ratio > 5.0 -> 1.0
-                ratio > 3.0 -> 0.8
-                ratio > 2.0 -> 0.5
-                ratio > 1.5 -> 0.3
-                else -> 0.0
-            }
-            score += dischargeScore * 0.25
+            val dischargeScore = scored(ratio, 5.0 to 1.0, 3.0 to 0.8, 2.0 to 0.5, 1.5 to 0.3)
+            score += factors.weighted(
+                s.factorRiverDischarge,
+                "%.1f m³/s (%.1fx rata-rata)".format(floodDaily.riverDischarge, ratio),
+                dischargeScore, 0.25
+            )
             dataPoints++
-            factors.add(ContributingFactor(
-                name = AppLocaleManager.strings.factorRiverDischarge,
-                value = "%.1f m³/s (%.1fx rata-rata)".format(floodDaily.riverDischarge, ratio),
-                contribution = dischargeScore,
-                isElevating = dischargeScore > 0.3
-            ))
         }
 
         // Faktor 4: Kelembaban tinggi & tekanan rendah (bobot 0.15)
@@ -249,14 +217,12 @@ object DisasterAnalysisEngine {
             avgHumidity > 80 -> 0.3
             else -> 0.0
         }
-        score += atmosphereScore * 0.15
+        score += factors.weighted(
+            s.factorAtmosphere,
+            s.factorAtmosphereDesc(avgHumidity.toInt().toString(), avgPressure.toInt().toString()),
+            atmosphereScore, 0.15
+        )
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorAtmosphere,
-            value = AppLocaleManager.strings.factorAtmosphereDesc(avgHumidity.toInt().toString(), avgPressure.toInt().toString()),
-            contribution = atmosphereScore,
-            isElevating = atmosphereScore > 0.3
-        ))
 
         val confidence = (dataPoints.toDouble() / 4.0).coerceIn(0.5, 1.0)
         val riskLevel = scoreToRiskLevel(score)
@@ -281,6 +247,7 @@ object DisasterAnalysisEngine {
         marine: MarineData?,
         current: CurrentWeatherData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         val factors = mutableListOf<ContributingFactor>()
         var score = 0.0
         var dataPoints = 0
@@ -290,84 +257,30 @@ object DisasterAnalysisEngine {
         val waveHeight = marine?.current?.waveHeight ?: 0.0
         val waveDailyMax = marine?.dailyForecast?.firstOrNull()?.waveHeightMax ?: waveHeight
         val maxWave = maxOf(waveHeight, waveDailyMax)
-
-        val waveScore = when {
-            maxWave > 4.0 -> 1.0   // >4m = sangat berbahaya
-            maxWave > 2.5 -> 0.8
-            maxWave > 1.5 -> 0.5
-            maxWave > 1.0 -> 0.3
-            else -> 0.0
-        }
-        score += waveScore * 0.40
+        val waveScore = scored(maxWave, 4.0 to 1.0, 2.5 to 0.8, 1.5 to 0.5, 1.0 to 0.3)
+        score += factors.weighted(s.factorWaveHeight, "%.1f m".format(maxWave), waveScore, 0.40)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorWaveHeight,
-            value = "%.1f m".format(maxWave),
-            contribution = waveScore,
-            isElevating = waveScore > 0.3
-        ))
 
-        // Faktor 2: Swell wave (bobot 0.20) — gelombang panjang dari laut lepas
+        // Faktor 2: Swell wave (bobot 0.20)
         val swellHeight = marine?.current?.swellWaveHeight ?: 0.0
-        val swellScore = when {
-            swellHeight > 3.0 -> 1.0
-            swellHeight > 2.0 -> 0.7
-            swellHeight > 1.0 -> 0.4
-            else -> 0.0
-        }
-        score += swellScore * 0.20
+        val swellScore = scored(swellHeight, 3.0 to 1.0, 2.0 to 0.7, 1.0 to 0.4)
+        score += factors.weighted(s.factorSwell, "%.1f m".format(swellHeight), swellScore, 0.20)
         if (swellHeight > 0) dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorSwell,
-            value = "%.1f m".format(swellHeight),
-            contribution = swellScore,
-            isElevating = swellScore > 0.3
-        ))
 
         // Faktor 3: Angin kencang dari laut (bobot 0.20)
         val windSpeed = current?.windSpeed ?: hourly.firstOrNull()?.windSpeed ?: 0.0
         val windGusts = current?.windGusts ?: hourly.maxOfOrNull { it.windGusts } ?: 0.0
-        val windScore = when {
-            windGusts > 70 -> 1.0
-            windGusts > 50 -> 0.7
-            windGusts > 35 -> 0.4
-            windGusts > 20 -> 0.2
-            else -> 0.0
-        }
-        score += windScore * 0.20
+        val windScore = scored(windGusts, 70.0 to 1.0, 50.0 to 0.7, 35.0 to 0.4, 20.0 to 0.2)
+        score += factors.weighted(s.factorWindGust, "%.0f / %.0f km/h".format(windSpeed, windGusts), windScore, 0.20)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorWindGust,
-            value = "%.0f / %.0f km/h".format(windSpeed, windGusts),
-            contribution = windScore,
-            isElevating = windScore > 0.3
-        ))
 
-        // Faktor 4: Tekanan rendah (bobot 0.20) — indikator cuaca buruk di pesisir
+        // Faktor 4: Tekanan rendah (bobot 0.20)
         val pressure = current?.pressure ?: hourly.firstOrNull()?.pressure ?: 1013.0
-        val pressureScore = when {
-            pressure < 995 -> 1.0
-            pressure < 1000 -> 0.7
-            pressure < 1005 -> 0.4
-            pressure < 1010 -> 0.2
-            else -> 0.0
-        }
-        score += pressureScore * 0.20
+        val pressureScore = scoredBelow(pressure, 995.0 to 1.0, 1000.0 to 0.7, 1005.0 to 0.4, 1010.0 to 0.2)
+        score += factors.weighted(s.factorAirPressure, "${pressure.toInt()} hPa", pressureScore, 0.20)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorAirPressure,
-            value = "${pressure.toInt()} hPa",
-            contribution = pressureScore,
-            isElevating = pressureScore > 0.3
-        ))
 
-        // Jika tidak ada data laut, kurangi confidence
-        val confidence = if (hasMarineData) {
-            (dataPoints.toDouble() / 4.0).coerceIn(0.5, 1.0)
-        } else {
-            0.3 // Low confidence tanpa data laut
-        }
-
+        val confidence = if (hasMarineData) (dataPoints.toDouble() / 4.0).coerceIn(0.5, 1.0) else 0.3
         val riskLevel = scoreToRiskLevel(score)
 
         return DisasterPrediction(
@@ -390,6 +303,7 @@ object DisasterAnalysisEngine {
         current: CurrentWeatherData?,
         daily: DailyWeatherData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         val factors = mutableListOf<ContributingFactor>()
         var score = 0.0
 
@@ -399,84 +313,32 @@ object DisasterAnalysisEngine {
             ?: 1013.0
         val minPressure = hourly.map { it.pressure }.filter { it > 0 }.minOrNull() ?: pressure
         val effectivePressure = minOf(pressure, minPressure)
-        val pressureScore = when {
-            effectivePressure < 980 -> 1.0   // Siklon kuat
-            effectivePressure < 990 -> 0.8
-            effectivePressure < 1000 -> 0.5
-            effectivePressure < 1005 -> 0.2
-            else -> 0.0
-        }
-        score += pressureScore * 0.30
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorMinPressure,
-            value = "${effectivePressure.toInt()} hPa",
-            contribution = pressureScore,
-            isElevating = pressureScore > 0.3
-        ))
+        val pressureScore = scoredBelow(effectivePressure, 980.0 to 1.0, 990.0 to 0.8, 1000.0 to 0.5, 1005.0 to 0.2)
+        score += factors.weighted(s.factorMinPressure, "${effectivePressure.toInt()} hPa", pressureScore, 0.30)
 
         // Faktor 2: Angin sustained + gusts (bobot 0.35)
-        val maxWindSpeed = maxOf(
-            current?.windSpeed ?: 0.0,
-            hourly.maxOfOrNull { it.windSpeed } ?: 0.0
-        )
-        val maxGusts = maxOf(
-            current?.windGusts ?: 0.0,
-            daily?.windGustsMax ?: 0.0,
-            hourly.maxOfOrNull { it.windGusts } ?: 0.0
-        )
-        // Skala Beaufort/Saffir-Simpson sederhana
+        val maxWindSpeed = maxOf(current?.windSpeed ?: 0.0, hourly.maxOfOrNull { it.windSpeed } ?: 0.0)
+        val maxGusts = maxOf(current?.windGusts ?: 0.0, daily?.windGustsMax ?: 0.0, hourly.maxOfOrNull { it.windGusts } ?: 0.0)
         val windCycloneScore = when {
-            maxWindSpeed > 119 -> 1.0   // Badai tropis (>119 km/h)
-            maxWindSpeed > 89 -> 0.8    // Depresi tropis kuat
-            maxWindSpeed > 63 -> 0.6    // Depresi tropis
+            maxWindSpeed > 119 -> 1.0
+            maxWindSpeed > 89 -> 0.8
+            maxWindSpeed > 63 -> 0.6
             maxGusts > 90 -> 0.5
             maxGusts > 70 -> 0.3
             maxGusts > 50 -> 0.15
             else -> 0.0
         }
-        score += windCycloneScore * 0.35
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorWindSpeed,
-            value = "%.0f km/h (gust %.0f)".format(maxWindSpeed, maxGusts),
-            contribution = windCycloneScore,
-            isElevating = windCycloneScore > 0.3
-        ))
+        score += factors.weighted(s.factorWindSpeed, "%.0f km/h (gust %.0f)".format(maxWindSpeed, maxGusts), windCycloneScore, 0.35)
 
-        // Faktor 3: CAPE tinggi (bobot 0.15) — energi konvektif
-        val maxCape = maxOf(
-            current?.cape ?: 0.0,
-            hourly.maxOfOrNull { it.cape } ?: 0.0
-        )
-        val capeScore = when {
-            maxCape > 3500 -> 1.0
-            maxCape > 2500 -> 0.7
-            maxCape > 1500 -> 0.4
-            maxCape > 1000 -> 0.2
-            else -> 0.0
-        }
-        score += capeScore * 0.15
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorCAPE,
-            value = "${maxCape.toInt()} J/kg",
-            contribution = capeScore,
-            isElevating = capeScore > 0.3
-        ))
+        // Faktor 3: CAPE tinggi (bobot 0.15)
+        val maxCape = maxOf(current?.cape ?: 0.0, hourly.maxOfOrNull { it.cape } ?: 0.0)
+        val capeScore = scored(maxCape, 3500.0 to 1.0, 2500.0 to 0.7, 1500.0 to 0.4, 1000.0 to 0.2)
+        score += factors.weighted(s.factorCAPE, "${maxCape.toInt()} J/kg", capeScore, 0.15)
 
         // Faktor 4: Curah hujan masif (bobot 0.20)
         val totalPrecip = daily?.precipitationSum ?: hourly.sumOf { it.precipitation }
-        val precipCycloneScore = when {
-            totalPrecip > 100 -> 1.0
-            totalPrecip > 50 -> 0.7
-            totalPrecip > 30 -> 0.4
-            else -> 0.0
-        }
-        score += precipCycloneScore * 0.20
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRainfall,
-            value = "%.1f mm".format(totalPrecip),
-            contribution = precipCycloneScore,
-            isElevating = precipCycloneScore > 0.3
-        ))
+        val precipCycloneScore = scored(totalPrecip, 100.0 to 1.0, 50.0 to 0.7, 30.0 to 0.4)
+        score += factors.weighted(s.factorRainfall, "%.1f mm".format(totalPrecip), precipCycloneScore, 0.20)
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
@@ -500,28 +362,14 @@ object DisasterAnalysisEngine {
         current: CurrentWeatherData?,
         daily: DailyWeatherData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         val factors = mutableListOf<ContributingFactor>()
         var score = 0.0
 
         // Faktor 1: CAPE (bobot 0.35)
-        val maxCape = maxOf(
-            current?.cape ?: 0.0,
-            hourly.maxOfOrNull { it.cape } ?: 0.0
-        )
-        val capeScore = when {
-            maxCape > 3500 -> 1.0
-            maxCape > 2500 -> 0.8
-            maxCape > 1500 -> 0.5
-            maxCape > 500 -> 0.2
-            else -> 0.0
-        }
-        score += capeScore * 0.35
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorCAPE,
-            value = "${maxCape.toInt()} J/kg",
-            contribution = capeScore,
-            isElevating = capeScore > 0.3
-        ))
+        val maxCape = maxOf(current?.cape ?: 0.0, hourly.maxOfOrNull { it.cape } ?: 0.0)
+        val capeScore = scored(maxCape, 3500.0 to 1.0, 2500.0 to 0.8, 1500.0 to 0.5, 500.0 to 0.2)
+        score += factors.weighted(s.factorCAPE, "${maxCape.toInt()} J/kg", capeScore, 0.35)
 
         // Faktor 2: Kode cuaca WMO (bobot 0.25)
         val hasThunderstormCode = hourly.any { it.weatherCode in listOf(95, 96, 99) } ||
@@ -533,35 +381,14 @@ object DisasterAnalysisEngine {
             hourly.any { it.weatherCode in listOf(61, 63, 65, 80, 81, 82) } -> 0.3
             else -> 0.0
         }
-        score += wmoScore * 0.25
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorWMO,
-            value = if (hasThunderstormCode) AppLocaleManager.strings.wmoDetected else AppLocaleManager.strings.wmoNone,
-            contribution = wmoScore,
-            isElevating = wmoScore > 0.3
-        ))
+        score += factors.weighted(s.factorWMO, if (hasThunderstormCode) s.wmoDetected else s.wmoNone, wmoScore, 0.25)
 
         // Faktor 3: Wind shear (bobot 0.20)
-        val maxGusts = maxOf(
-            current?.windGusts ?: 0.0,
-            hourly.maxOfOrNull { it.windGusts } ?: 0.0
-        )
+        val maxGusts = maxOf(current?.windGusts ?: 0.0, hourly.maxOfOrNull { it.windGusts } ?: 0.0)
         val avgWind = hourly.map { it.windSpeed }.average().takeIf { !it.isNaN() } ?: 0.0
         val windShear = maxGusts - avgWind
-        val shearScore = when {
-            windShear > 40 -> 1.0
-            windShear > 30 -> 0.7
-            windShear > 20 -> 0.4
-            windShear > 10 -> 0.2
-            else -> 0.0
-        }
-        score += shearScore * 0.20
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorWindShear,
-            value = "%.0f km/h".format(windShear),
-            contribution = shearScore,
-            isElevating = shearScore > 0.3
-        ))
+        val shearScore = scored(windShear, 40.0 to 1.0, 30.0 to 0.7, 20.0 to 0.4, 10.0 to 0.2)
+        score += factors.weighted(s.factorWindShear, "%.0f km/h".format(windShear), shearScore, 0.20)
 
         // Faktor 4: Freezing level rendah + CAPE → hujan es (bobot 0.20)
         val minFreezing = hourly.filter { it.freezingLevelHeight > 0 }
@@ -572,13 +399,11 @@ object DisasterAnalysisEngine {
             maxCape > 1000 && minFreezing < 3500 -> 0.3
             else -> 0.0
         }
-        score += hailScore * 0.20
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorHailPotential,
-            value = "Freezing ${(minFreezing / 1000).toInt()} km, CAPE ${maxCape.toInt()}",
-            contribution = hailScore,
-            isElevating = hailScore > 0.3
-        ))
+        score += factors.weighted(
+            s.factorHailPotential,
+            "Freezing ${(minFreezing / 1000).toInt()} km, CAPE ${maxCape.toInt()}",
+            hailScore, 0.20
+        )
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
@@ -621,164 +446,76 @@ object DisasterAnalysisEngine {
         allDaily: List<DailyWeatherData>?,
         terrain: LandslideTerrainData? = null
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         val factors = mutableListOf<ContributingFactor>()
         var score = 0.0
         var dataPoints = 0
 
-        // Faktor 1: Kemiringan lereng (bobot 0.20) — BARU
+        // Faktor 1: Kemiringan lereng (bobot 0.20)
         val slopeAngle = terrain?.slopeAngle ?: 0.0
         val slopeCategory = terrain?.slopeCategory ?: SlopeCategory.FLAT
         val slopeScore = slopeCategory.riskFactor
-        score += slopeScore * 0.20
+        score += factors.weighted(
+            s.factorSlopeGradient,
+            "%.1f° (%s)".format(slopeAngle, s.localized(slopeCategory.label, slopeCategory.labelId)),
+            slopeScore, 0.20
+        )
         if (terrain != null && terrain.elevationGrid.isNotEmpty()) dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorSlopeGradient,
-            value = "%.1f° (%s)".format(slopeAngle, AppLocaleManager.strings.localized(slopeCategory.label, slopeCategory.labelId)),
-            contribution = slopeScore,
-            isElevating = slopeScore > 0.3
-        ))
 
-        // Faktor 2: Kejenuhan tanah / soil saturation (bobot 0.15) — BARU
+        // Faktor 2: Kejenuhan tanah (bobot 0.15)
         val saturationIndex = terrain?.soilSaturationIndex ?: run {
-            // Fallback: estimasi dari soil moisture hourly
             val sm = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
             if (sm.isNotEmpty()) (sm.average() / 0.50).coerceIn(0.0, 1.0) else 0.0
         }
-        val saturationScore = when {
-            saturationIndex > 0.9 -> 1.0   // Tanah hampir jenuh penuh
-            saturationIndex > 0.75 -> 0.7
-            saturationIndex > 0.6 -> 0.4
-            saturationIndex > 0.4 -> 0.2
-            else -> 0.0
-        }
-        score += saturationScore * 0.15
+        val saturationScore = scored(saturationIndex, 0.9 to 1.0, 0.75 to 0.7, 0.6 to 0.4, 0.4 to 0.2)
+        score += factors.weighted(s.factorSoilSaturation, "%.0f%%".format(saturationIndex * 100), saturationScore, 0.15)
         if (saturationIndex > 0) dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorSoilSaturation,
-            value = "%.0f%%".format(saturationIndex * 100),
-            contribution = saturationScore,
-            isElevating = saturationScore > 0.3
-        ))
 
         // Faktor 3: Curah hujan kumulatif hari ini (bobot 0.15)
         val todayPrecip = daily?.precipitationSum ?: hourly.sumOf { it.precipitation }
-        val precipScore = when {
-            todayPrecip > 100 -> 1.0
-            todayPrecip > 50 -> 0.7
-            todayPrecip > 20 -> 0.4
-            todayPrecip > 10 -> 0.2
-            else -> 0.0
-        }
-        score += precipScore * 0.15
+        val precipScore = scored(todayPrecip, 100.0 to 1.0, 50.0 to 0.7, 20.0 to 0.4, 10.0 to 0.2)
+        score += factors.weighted(s.factorRainfallToday, "%.1f mm".format(todayPrecip), precipScore, 0.15)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRainfallToday,
-            value = "%.1f mm".format(todayPrecip),
-            contribution = precipScore,
-            isElevating = precipScore > 0.3
-        ))
 
-        // Faktor 4: Hujan kumulatif 3 hari sebelumnya — tanah jenuh (bobot 0.15)
+        // Faktor 4: Hujan kumulatif 3 hari sebelumnya (bobot 0.15)
         val recentDays = allDaily?.take(3) ?: emptyList()
         val antecedentRain = recentDays.sumOf { it.precipitationSum }
-        val antecedentScore = when {
-            antecedentRain > 150 -> 1.0  // Tanah sangat jenuh
-            antecedentRain > 100 -> 0.8
-            antecedentRain > 50 -> 0.5
-            antecedentRain > 20 -> 0.2
-            else -> 0.0
-        }
-        score += antecedentScore * 0.15
+        val antecedentScore = scored(antecedentRain, 150.0 to 1.0, 100.0 to 0.8, 50.0 to 0.5, 20.0 to 0.2)
+        score += factors.weighted(s.factorRain3Day, "%.0f mm".format(antecedentRain), antecedentScore, 0.15)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRain3Day,
-            value = "%.0f mm".format(antecedentRain),
-            contribution = antecedentScore,
-            isElevating = antecedentScore > 0.3
-        ))
 
-        // Faktor 5: Intensitas hujan per jam maks (bobot 0.10) — BARU
-        val maxIntensity = terrain?.maxRainfallIntensity
-            ?: (hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0)
-        val intensityScore = when {
-            maxIntensity > 50 -> 1.0   // Sangat lebat — pemicu longsor cepat
-            maxIntensity > 20 -> 0.7
-            maxIntensity > 10 -> 0.4
-            maxIntensity > 5 -> 0.2
-            else -> 0.0
-        }
-        score += intensityScore * 0.10
+        // Faktor 5: Intensitas hujan per jam maks (bobot 0.10)
+        val maxIntensity = terrain?.maxRainfallIntensity ?: (hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0)
+        val intensityScore = scored(maxIntensity, 50.0 to 1.0, 20.0 to 0.7, 10.0 to 0.4, 5.0 to 0.2)
+        score += factors.weighted(s.factorRainIntensityMax, "%.1f mm/h".format(maxIntensity), intensityScore, 0.10)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRainIntensityMax,
-            value = "%.1f mm/h".format(maxIntensity),
-            contribution = intensityScore,
-            isElevating = intensityScore > 0.3
-        ))
 
         // Faktor 6: Durasi hujan terus-menerus (bobot 0.10)
-        val rainHours = terrain?.continuousRainHours
-            ?: hourly.count { it.precipitation > 0.5 }
-        val durationScore = when {
-            rainHours > 18 -> 1.0
-            rainHours > 12 -> 0.7
-            rainHours > 8 -> 0.4
-            rainHours > 4 -> 0.2
-            else -> 0.0
-        }
-        score += durationScore * 0.10
+        val rainHours = terrain?.continuousRainHours ?: hourly.count { it.precipitation > 0.5 }
+        val durationScore = scored(rainHours.toDouble(), 18.0 to 1.0, 12.0 to 0.7, 8.0 to 0.4, 4.0 to 0.2)
+        score += factors.weighted(s.factorRainDuration, "$rainHours h", durationScore, 0.10)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRainDuration,
-            value = "$rainHours h",
-            contribution = durationScore,
-            isElevating = durationScore > 0.3
-        ))
 
-        // Faktor 7: Indeks tutupan vegetasi (bobot 0.05) — BARU
-        // Vegetasi rendah → destabilisasi lereng
+        // Faktor 7: Indeks tutupan vegetasi (bobot 0.05)
         val vegIndex = terrain?.vegetationIndex ?: 0.5
-        val vegScore = when {
-            vegIndex < 0.2 -> 0.8   // Lahan gundul → risiko tinggi
-            vegIndex < 0.4 -> 0.5
-            vegIndex < 0.6 -> 0.2
-            else -> 0.0             // Vegetasi padat → penahan longsor
-        }
-        score += vegScore * 0.05
+        val vegScore = scoredBelow(vegIndex, 0.2 to 0.8, 0.4 to 0.5, 0.6 to 0.2)
+        score += factors.weighted(s.factorVegetation, "%.0f%%".format(vegIndex * 100), vegScore, 0.05)
         if (terrain != null) dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorVegetation,
-            value = "%.0f%%".format(vegIndex * 100),
-            contribution = vegScore,
-            isElevating = vegScore > 0.3
-        ))
 
-        // Faktor 8: Kelembaban udara (bobot 0.10) — tanah basah
+        // Faktor 8: Kelembaban udara (bobot 0.10)
         val avgHumidity = hourly.map { it.humidity }.average().takeIf { !it.isNaN() } ?: 50.0
-        val humidityScore = when {
-            avgHumidity > 95 -> 0.8
-            avgHumidity > 90 -> 0.5
-            avgHumidity > 85 -> 0.3
-            else -> 0.0
-        }
-        score += humidityScore * 0.10
+        val humidityScore = scored(avgHumidity, 95.0 to 0.8, 90.0 to 0.5, 85.0 to 0.3)
+        score += factors.weighted(s.factorAvgHumidity, "${avgHumidity.toInt()}%", humidityScore, 0.10)
         dataPoints++
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorAvgHumidity,
-            value = "${avgHumidity.toInt()}%",
-            contribution = humidityScore,
-            isElevating = humidityScore > 0.3
-        ))
 
         // Confidence berdasarkan kelengkapan data
         val hasTerrainData = terrain != null && terrain.elevationGrid.isNotEmpty()
         val hasSoilData = saturationIndex > 0
         val baseConfidence = (dataPoints.toDouble() / 8.0).coerceIn(0.5, 1.0)
         val confidence = when {
-            hasTerrainData && hasSoilData -> baseConfidence // Full data
-            hasSoilData -> baseConfidence * 0.85  // No terrain
-            hasTerrainData -> baseConfidence * 0.85  // No soil
-            else -> 0.6 // Minimal data (only rainfall + humidity)
+            hasTerrainData && hasSoilData -> baseConfidence
+            hasSoilData || hasTerrainData -> baseConfidence * 0.85
+            else -> 0.6
         }
 
         val riskLevel = scoreToRiskLevel(score)
@@ -805,25 +542,14 @@ object DisasterAnalysisEngine {
         allDaily: List<DailyWeatherData>?,
         flood: FloodData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         val factors = mutableListOf<ContributingFactor>()
         var score = 0.0
 
         // Faktor 1: Akumulasi hujan berkepanjangan (bobot 0.35)
         val weeklyPrecip = allDaily?.sumOf { it.precipitationSum } ?: 0.0
-        val prolongedScore = when {
-            weeklyPrecip > 300 -> 1.0
-            weeklyPrecip > 200 -> 0.7
-            weeklyPrecip > 100 -> 0.4
-            weeklyPrecip > 50 -> 0.2
-            else -> 0.0
-        }
-        score += prolongedScore * 0.35
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorRain7Day,
-            value = "%.0f mm".format(weeklyPrecip),
-            contribution = prolongedScore,
-            isElevating = prolongedScore > 0.3
-        ))
+        val prolongedScore = scored(weeklyPrecip, 300.0 to 1.0, 200.0 to 0.7, 100.0 to 0.4, 50.0 to 0.2)
+        score += factors.weighted(s.factorRain7Day, "%.0f mm".format(weeklyPrecip), prolongedScore, 0.35)
 
         // Faktor 2: Debit sungai tinggi berkepanjangan (bobot 0.25)
         val avgDischargeRatio = flood?.dailyForecast?.let { days ->
@@ -832,58 +558,25 @@ object DisasterAnalysisEngine {
             }
             ratios.average().takeIf { !it.isNaN() }
         } ?: 1.0
-        val dischargeScore = when {
-            avgDischargeRatio > 4.0 -> 1.0
-            avgDischargeRatio > 2.5 -> 0.6
-            avgDischargeRatio > 1.5 -> 0.3
-            else -> 0.0
-        }
-        score += dischargeScore * 0.25
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorDischargeRatio,
-            value = "%.1fx rata-rata".format(avgDischargeRatio),
-            contribution = dischargeScore,
-            isElevating = dischargeScore > 0.3
-        ))
+        val dischargeScore = scored(avgDischargeRatio, 4.0 to 1.0, 2.5 to 0.6, 1.5 to 0.3)
+        score += factors.weighted(s.factorDischargeRatio, "%.1fx rata-rata".format(avgDischargeRatio), dischargeScore, 0.25)
 
-        // Faktor 3: Durasi genangan (jam hujan terus-menerus) (bobot 0.25)
+        // Faktor 3: Durasi genangan — hari hujan berturut-turut (bobot 0.25)
         val consecutiveRainDays = allDaily?.takeWhile { it.precipitationSum > 5 }?.size ?: 0
-        val durationDayScore = when {
-            consecutiveRainDays >= 5 -> 1.0
-            consecutiveRainDays >= 3 -> 0.6
-            consecutiveRainDays >= 2 -> 0.3
-            else -> 0.0
-        }
-        score += durationDayScore * 0.25
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorConsecutiveRain,
-            value = "$consecutiveRainDays hari",
-            contribution = durationDayScore,
-            isElevating = durationDayScore > 0.3
-        ))
+        val durationDayScore = scored(consecutiveRainDays.toDouble(), 5.0 to 1.0, 3.0 to 0.6, 2.0 to 0.3)
+        score += factors.weighted(s.factorConsecutiveRain, "$consecutiveRainDays hari", durationDayScore, 0.25)
 
         // Faktor 4: Kelembaban tinggi berkepanjangan (bobot 0.15)
         val avgHumidity = hourly.map { it.humidity }.average().takeIf { !it.isNaN() } ?: 50.0
-        val humidScore = when {
-            avgHumidity > 95 -> 0.8
-            avgHumidity > 90 -> 0.5
-            avgHumidity > 85 -> 0.2
-            else -> 0.0
-        }
-        score += humidScore * 0.15
-        factors.add(ContributingFactor(
-            name = AppLocaleManager.strings.factorHumidity,
-            value = "${avgHumidity.toInt()}%",
-            contribution = humidScore,
-            isElevating = humidScore > 0.3
-        ))
+        val humidScore = scored(avgHumidity, 95.0 to 0.8, 90.0 to 0.5, 85.0 to 0.2)
+        score += factors.weighted(s.factorHumidity, "${avgHumidity.toInt()}%", humidScore, 0.15)
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.GROUND_SUBSIDENCE,
             riskScore = score,
             riskLevel = riskLevel,
-            confidence = 0.6, // Tanpa data geologi, confidence rendah
+            confidence = 0.6,
             factors = factors,
             description = buildSubsidenceDescription(riskLevel, weeklyPrecip, consecutiveRainDays),
             recommendation = buildSubsidenceRecommendation(riskLevel)
@@ -900,31 +593,23 @@ object DisasterAnalysisEngine {
         hourly: List<HourlyWeatherData>,
         flood: DailyFloodData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         var score = 0.0
         val totalPrecip = daily.precipitationSum
         val maxRain = hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0
 
-        score += (when {
-            totalPrecip > 100 -> 1.0; totalPrecip > 50 -> 0.8; totalPrecip > 20 -> 0.5
-            totalPrecip > 10 -> 0.3; else -> 0.0
-        }) * 0.40
-
-        score += (when {
-            maxRain > 50 -> 1.0; maxRain > 20 -> 0.8; maxRain > 10 -> 0.5; else -> 0.0
-        }) * 0.30
-
+        score += scored(totalPrecip, 100.0 to 1.0, 50.0 to 0.8, 20.0 to 0.5, 10.0 to 0.3) * 0.40
+        score += scored(maxRain, 50.0 to 1.0, 20.0 to 0.8, 10.0 to 0.5) * 0.30
         if (flood != null && flood.dischargeMean > 0) {
             val ratio = flood.riverDischarge / flood.dischargeMean
-            score += (when {
-                ratio > 5 -> 1.0; ratio > 3 -> 0.7; ratio > 2 -> 0.4; else -> 0.0
-            }) * 0.30
+            score += scored(ratio, 5.0 to 1.0, 3.0 to 0.7, 2.0 to 0.4) * 0.30
         }
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.FLOOD, riskScore = score, riskLevel = riskLevel,
             confidence = 0.7, factors = emptyList(),
-            description = AppLocaleManager.strings.floodAnalysis("%.0f".format(totalPrecip)),
+            description = s.floodAnalysis("%.0f".format(totalPrecip)),
             recommendation = ""
         )
     }
@@ -935,26 +620,20 @@ object DisasterAnalysisEngine {
         hourly: List<HourlyWeatherData>,
         marine: DailyMarineData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         var score = 0.0
         val wave = marine?.waveHeightMax ?: 0.0
         val swell = marine?.swellWaveHeightMax ?: 0.0
-        val gusts = daily.windGustsMax
 
-        score += (when {
-            wave > 4 -> 1.0; wave > 2.5 -> 0.8; wave > 1.5 -> 0.5; wave > 1.0 -> 0.3; else -> 0.0
-        }) * 0.40
-        score += (when {
-            swell > 3 -> 1.0; swell > 2 -> 0.7; swell > 1 -> 0.4; else -> 0.0
-        }) * 0.25
-        score += (when {
-            gusts > 70 -> 1.0; gusts > 50 -> 0.6; gusts > 35 -> 0.3; else -> 0.0
-        }) * 0.35
+        score += scored(wave, 4.0 to 1.0, 2.5 to 0.8, 1.5 to 0.5, 1.0 to 0.3) * 0.40
+        score += scored(swell, 3.0 to 1.0, 2.0 to 0.7, 1.0 to 0.4) * 0.25
+        score += scored(daily.windGustsMax, 70.0 to 1.0, 50.0 to 0.6, 35.0 to 0.3) * 0.35
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.TIDAL_FLOOD, riskScore = score, riskLevel = riskLevel,
             confidence = if (marine != null) 0.7 else 0.3, factors = emptyList(),
-            description = AppLocaleManager.strings.tidalFloodAnalysis("%.1f".format(wave), "%.1f".format(swell)),
+            description = s.tidalFloodAnalysis("%.1f".format(wave), "%.1f".format(swell)),
             recommendation = ""
         )
     }
@@ -963,31 +642,26 @@ object DisasterAnalysisEngine {
         daily: DailyWeatherData,
         hourly: List<HourlyWeatherData>
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         var score = 0.0
         val pressure = hourly.map { it.pressure }.filter { it > 0 }.minOrNull() ?: 1013.0
         val maxWind = daily.windSpeedMax
         val maxGusts = daily.windGustsMax
         val maxCape = hourly.maxOfOrNull { it.cape } ?: 0.0
 
-        score += (when {
-            pressure < 980 -> 1.0; pressure < 990 -> 0.8; pressure < 1000 -> 0.5; else -> 0.0
-        }) * 0.30
+        score += scoredBelow(pressure, 980.0 to 1.0, 990.0 to 0.8, 1000.0 to 0.5) * 0.30
         score += (when {
             maxWind > 119 -> 1.0; maxWind > 89 -> 0.8; maxWind > 63 -> 0.6
             maxGusts > 90 -> 0.5; maxGusts > 70 -> 0.3; else -> 0.0
         }) * 0.40
-        score += (when {
-            maxCape > 3500 -> 1.0; maxCape > 2500 -> 0.6; maxCape > 1500 -> 0.3; else -> 0.0
-        }) * 0.15
-        score += (when {
-            daily.precipitationSum > 100 -> 1.0; daily.precipitationSum > 50 -> 0.5; else -> 0.0
-        }) * 0.15
+        score += scored(maxCape, 3500.0 to 1.0, 2500.0 to 0.6, 1500.0 to 0.3) * 0.15
+        score += scored(daily.precipitationSum, 100.0 to 1.0, 50.0 to 0.5) * 0.15
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.CYCLONE, riskScore = score, riskLevel = riskLevel,
             confidence = 0.7, factors = emptyList(),
-            description = AppLocaleManager.strings.cycloneAnalysis("%.0f".format(maxWind), pressure.toInt().toString()),
+            description = s.cycloneAnalysis("%.0f".format(maxWind), pressure.toInt().toString()),
             recommendation = ""
         )
     }
@@ -996,19 +670,15 @@ object DisasterAnalysisEngine {
         daily: DailyWeatherData,
         hourly: List<HourlyWeatherData>
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         var score = 0.0
         val maxCape = hourly.maxOfOrNull { it.cape } ?: 0.0
         val hasTs = hourly.any { it.weatherCode in listOf(95, 96, 99) } || daily.weatherCode in listOf(95, 96, 99)
-        val maxGusts = daily.windGustsMax
         val avgWind = hourly.map { it.windSpeed }.average().takeIf { !it.isNaN() } ?: 0.0
 
-        score += (when {
-            maxCape > 3500 -> 1.0; maxCape > 2500 -> 0.8; maxCape > 1500 -> 0.5; else -> 0.0
-        }) * 0.35
+        score += scored(maxCape, 3500.0 to 1.0, 2500.0 to 0.8, 1500.0 to 0.5) * 0.35
         score += (if (hasTs) 0.8 else 0.0) * 0.30
-        score += (when {
-            maxGusts - avgWind > 40 -> 1.0; maxGusts - avgWind > 25 -> 0.5; else -> 0.0
-        }) * 0.20
+        score += scored(daily.windGustsMax - avgWind, 40.0 to 1.0, 25.0 to 0.5) * 0.20
         val minFreeze = hourly.filter { it.freezingLevelHeight > 0 }.minOfOrNull { it.freezingLevelHeight } ?: 5000.0
         score += (when {
             maxCape > 2000 && minFreeze < 2500 -> 1.0; maxCape > 1500 && minFreeze < 3000 -> 0.5; else -> 0.0
@@ -1018,7 +688,7 @@ object DisasterAnalysisEngine {
         return DisasterPrediction(
             type = DisasterType.THUNDERSTORM, riskScore = score, riskLevel = riskLevel,
             confidence = 0.8, factors = emptyList(),
-            description = AppLocaleManager.strings.thunderstormAnalysis(maxCape.toInt().toString()),
+            description = s.thunderstormAnalysis(maxCape.toInt().toString()),
             recommendation = ""
         )
     }
@@ -1030,54 +700,30 @@ object DisasterAnalysisEngine {
         dayIndex: Int,
         terrain: LandslideTerrainData? = null
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         var score = 0.0
         val todayPrecip = daily.precipitationSum
         val rainHours = hourly.count { it.precipitation > 0.5 }
         val antecedentRain = allDaily.take(dayIndex + 1).sumOf { it.precipitationSum }
 
-        // Slope factor (0.15)
-        val slopeScore = terrain?.slopeCategory?.riskFactor ?: 0.0
-        score += slopeScore * 0.15
-
-        // Soil saturation factor (0.10)
+        score += (terrain?.slopeCategory?.riskFactor ?: 0.0) * 0.15
         val satIdx = terrain?.soilSaturationIndex ?: run {
             val sm = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
             if (sm.isNotEmpty()) (sm.average() / 0.50).coerceIn(0.0, 1.0) else 0.0
         }
-        score += (when {
-            satIdx > 0.9 -> 1.0; satIdx > 0.75 -> 0.7; satIdx > 0.6 -> 0.4; else -> 0.0
-        }) * 0.10
-
-        // Precipitation factor (0.20)
-        score += (when {
-            todayPrecip > 100 -> 1.0; todayPrecip > 50 -> 0.7; todayPrecip > 20 -> 0.4; else -> 0.0
-        }) * 0.20
-
-        // Rain duration factor (0.15)
-        score += (when {
-            rainHours > 18 -> 1.0; rainHours > 12 -> 0.6; rainHours > 6 -> 0.3; else -> 0.0
-        }) * 0.15
-
-        // Antecedent rainfall factor (0.20)
-        score += (when {
-            antecedentRain > 150 -> 1.0; antecedentRain > 100 -> 0.7; antecedentRain > 50 -> 0.4; else -> 0.0
-        }) * 0.20
-
-        // Rainfall intensity factor (0.10)
-        val maxIntensity = hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0
-        score += (when {
-            maxIntensity > 50 -> 1.0; maxIntensity > 20 -> 0.7; maxIntensity > 10 -> 0.4; else -> 0.0
-        }) * 0.10
-
-        // Humidity factor (0.10)
+        score += scored(satIdx, 0.9 to 1.0, 0.75 to 0.7, 0.6 to 0.4) * 0.10
+        score += scored(todayPrecip, 100.0 to 1.0, 50.0 to 0.7, 20.0 to 0.4) * 0.20
+        score += scored(rainHours.toDouble(), 18.0 to 1.0, 12.0 to 0.6, 6.0 to 0.3) * 0.15
+        score += scored(antecedentRain, 150.0 to 1.0, 100.0 to 0.7, 50.0 to 0.4) * 0.20
+        score += scored(hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0, 50.0 to 1.0, 20.0 to 0.7, 10.0 to 0.4) * 0.10
         val humid = hourly.map { it.humidity }.average().takeIf { !it.isNaN() } ?: 50.0
-        score += (when { humid > 95 -> 0.8; humid > 90 -> 0.4; else -> 0.0 }) * 0.10
+        score += scored(humid, 95.0 to 0.8, 90.0 to 0.4) * 0.10
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.LANDSLIDE, riskScore = score, riskLevel = riskLevel,
             confidence = if (terrain != null) 0.8 else 0.6, factors = emptyList(),
-            description = AppLocaleManager.strings.landslideAnalysis("%.0f".format(todayPrecip), "%.0f".format(antecedentRain)),
+            description = s.landslideAnalysis("%.0f".format(todayPrecip), "%.0f".format(antecedentRain)),
             recommendation = ""
         )
     }
@@ -1090,26 +736,23 @@ object DisasterAnalysisEngine {
         dayIndex: Int,
         flood: DailyFloodData?
     ): DisasterPrediction {
+        val s = AppLocaleManager.strings
         var score = 0.0
         val cumulPrecip = allDaily.take(dayIndex + 1).sumOf { it.precipitationSum }
         val rDays = allDaily.take(dayIndex + 1).count { it.precipitationSum > 5 }
 
-        score += (when {
-            cumulPrecip > 300 -> 1.0; cumulPrecip > 200 -> 0.7; cumulPrecip > 100 -> 0.4; else -> 0.0
-        }) * 0.40
-        score += (when {
-            rDays >= 5 -> 1.0; rDays >= 3 -> 0.5; else -> 0.0
-        }) * 0.30
+        score += scored(cumulPrecip, 300.0 to 1.0, 200.0 to 0.7, 100.0 to 0.4) * 0.40
+        score += scored(rDays.toDouble(), 5.0 to 1.0, 3.0 to 0.5) * 0.30
         if (flood != null && flood.dischargeMean > 0) {
             val ratio = flood.riverDischarge / flood.dischargeMean
-            score += (when { ratio > 4 -> 1.0; ratio > 2.5 -> 0.5; else -> 0.0 }) * 0.30
+            score += scored(ratio, 4.0 to 1.0, 2.5 to 0.5) * 0.30
         }
 
         val riskLevel = scoreToRiskLevel(score)
         return DisasterPrediction(
             type = DisasterType.GROUND_SUBSIDENCE, riskScore = score, riskLevel = riskLevel,
             confidence = 0.5, factors = emptyList(),
-            description = AppLocaleManager.strings.subsidenceAnalysis("%.0f".format(cumulPrecip), rDays),
+            description = s.subsidenceAnalysis("%.0f".format(cumulPrecip), rDays),
             recommendation = ""
         )
     }
@@ -1118,13 +761,31 @@ object DisasterAnalysisEngine {
     //  HELPERS
     // ══════════════════════════════════════════════════
 
-    private fun scoreToRiskLevel(score: Double): RiskLevel {
-        return when {
-            score >= 0.7 -> RiskLevel.EXTREME
-            score >= 0.45 -> RiskLevel.HIGH
-            score >= 0.25 -> RiskLevel.MODERATE
-            else -> RiskLevel.LOW
-        }
+    private fun scoreToRiskLevel(score: Double): RiskLevel = when {
+        score >= 0.7 -> RiskLevel.EXTREME
+        score >= 0.45 -> RiskLevel.HIGH
+        score >= 0.25 -> RiskLevel.MODERATE
+        else -> RiskLevel.LOW
+    }
+
+    /** Stepped score: returns score paired with first threshold value exceeds (descending). */
+    private fun scored(value: Double, vararg levels: Pair<Double, Double>): Double {
+        for ((threshold, score) in levels) if (value > threshold) return score
+        return 0.0
+    }
+
+    /** Stepped score (inverted): returns score for first threshold value falls below (ascending). */
+    private fun scoredBelow(value: Double, vararg levels: Pair<Double, Double>): Double {
+        for ((threshold, score) in levels) if (value < threshold) return score
+        return 0.0
+    }
+
+    /** Add a ContributingFactor and return its weighted contribution to total score. */
+    private fun MutableList<ContributingFactor>.weighted(
+        name: String, value: String, contribution: Double, weight: Double
+    ): Double {
+        add(ContributingFactor(name, value, contribution, isElevating = contribution > 0.3))
+        return contribution * weight
     }
 
     // ── Description Builders (delegating to AppStrings) ──

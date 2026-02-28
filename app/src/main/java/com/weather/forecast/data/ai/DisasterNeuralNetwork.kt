@@ -62,39 +62,18 @@ object DisasterNeuralNetwork {
     // ════════════════════════════════════════════════
 
     /**
-     * Prediksi risiko bencana dari vektor fitur ternormalisasi.
+     * Predict disaster risk from normalized feature vector.
      *
-     * @param features FloatArray ukuran 20 — fitur cuaca [0, 1]
-     * @param deltas Delta bobot dari incremental learning (nullable)
-     * @return FloatArray ukuran 6 — skor risiko [0, 1] per jenis bencana
+     * @param features FloatArray size 22 — weather features [0, 1]
+     * @param deltas Weight deltas from incremental learning (nullable)
+     * @return FloatArray size 6 — risk scores [0, 1] per disaster type
      */
     fun predict(features: FloatArray, deltas: WeightDeltas? = null): FloatArray {
-        require(features.size == INPUT) {
-            "Expected $INPUT features, got ${features.size}"
-        }
+        require(features.size == INPUT) { "Expected $INPUT features, got ${features.size}" }
 
-        // Layer 1: Input → Hidden1 (LeakyReLU)
-        val h1 = FloatArray(H1)
-        for (j in 0 until H1) {
-            var sum = b1[j]
-            for (i in 0 until INPUT) {
-                sum += features[i] * w1[i * H1 + j]
-            }
-            h1[j] = leakyReLU(sum)
-        }
+        val h2 = forwardToH2(features)
 
-        // Layer 2: Hidden1 → Hidden2 (LeakyReLU)
-        val h2 = FloatArray(H2)
-        for (j in 0 until H2) {
-            var sum = b2[j]
-            for (i in 0 until H1) {
-                sum += h1[i] * w2[i * H2 + j]
-            }
-            h2[j] = leakyReLU(sum)
-        }
-
-        // Layer 3: Hidden2 → Output (Sigmoid + Temperature Scaling)
-        // Terapkan delta dari incremental learning jika tersedia
+        // Layer 3: Hidden2 → Output (Sigmoid + Temperature Scaling) with learning deltas
         val out = FloatArray(OUTPUT)
         for (j in 0 until OUTPUT) {
             var sum = b3[j]
@@ -109,31 +88,24 @@ object DisasterNeuralNetwork {
             }
             out[j] = sigmoid(sum / TEMPERATURE)
         }
-
         return out
     }
 
-    /**
-     * Forward pass hingga hidden layer 2 saja.
-     * Dibutuhkan oleh IncrementalLearningEngine untuk menghitung gradient.
-     */
+    /** Forward pass up to hidden layer 2 (used by IncrementalLearningEngine for gradients). */
     fun forwardToH2(features: FloatArray): FloatArray {
         require(features.size == INPUT)
-
         val h1 = FloatArray(H1)
         for (j in 0 until H1) {
             var sum = b1[j]
             for (i in 0 until INPUT) sum += features[i] * w1[i * H1 + j]
             h1[j] = leakyReLU(sum)
         }
-
         val h2 = FloatArray(H2)
         for (j in 0 until H2) {
             var sum = b2[j]
             for (i in 0 until H1) sum += h1[i] * w2[i * H2 + j]
             h2[j] = leakyReLU(sum)
         }
-
         return h2
     }
 

@@ -556,19 +556,8 @@ object KnownVolcanoes {
      */
     fun findNearby(lat: Double, lon: Double, maxDistanceKm: Double = 300.0): List<VolcanoRecord> {
         return list.filter { v ->
-            haversineDistance(lat, lon, v.latitude, v.longitude) <= maxDistanceKm
+            com.weather.forecast.data.haversineDistance(lat, lon, v.latitude, v.longitude) <= maxDistanceKm
         }
-    }
-
-    fun haversineDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371.0
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
-        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-        return r * c
     }
 }
 

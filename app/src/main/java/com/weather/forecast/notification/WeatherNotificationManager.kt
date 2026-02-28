@@ -103,17 +103,57 @@ class WeatherNotificationManager(private val context: Context) {
     private fun vibrate(pattern: LongArray, isExtreme: Boolean = false) {
         val vibrator = getVibrator()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val amplitudes = if (isExtreme) {
-                // All bursts at MAX amplitude
-                IntArray(pattern.size) { VibrationEffect.DEFAULT_AMPLITUDE }
-            } else {
-                IntArray(pattern.size) { VibrationEffect.DEFAULT_AMPLITUDE }
-            }
+            val amplitude = if (isExtreme) 255 else VibrationEffect.DEFAULT_AMPLITUDE
+            val amplitudes = IntArray(pattern.size) { amplitude }
             vibrator.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, -1))
         } else {
             @Suppress("DEPRECATION")
             vibrator.vibrate(pattern, -1)
         }
+    }
+
+    /**
+     * Shared builder for extreme/emergency notifications with full-screen intent,
+     * aggressive vibration, and persistent banner.
+     */
+    private fun sendExtremeNotification(
+        channelId: String,
+        title: String,
+        content: String,
+        extraKey: String,
+        requestCodeBase: Int,
+        notifId: Int,
+        autoCancel: Boolean = true
+    ) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(extraKey, true)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, requestCodeBase, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val fullScreenIntent = PendingIntent.getActivity(
+            context, requestCodeBase + 1, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_weather_splash)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(pendingIntent)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setVibrate(extremeVibrationPattern)
+            .setLights(android.graphics.Color.RED, 500, 200)
+            .setAutoCancel(autoCancel)
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+        notificationManager.notify(notifId, notification)
+        vibrate(extremeVibrationPattern, isExtreme = true)
     }
 
     // ── Standard notifications ───────────────────────────────────
@@ -328,49 +368,13 @@ class WeatherNotificationManager(private val context: Context) {
             append("\n${s.notifSeekShelter}")
         }
 
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("open_weather_alert", true)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            1,  // unique requestCode
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        sendExtremeNotification(
+            channelId = NotificationChannels.EXTREME_WEATHER_EMERGENCY,
+            title = title, content = content,
+            extraKey = "open_weather_alert",
+            requestCodeBase = 1,
+            notifId = NotificationIds.EXTREME_RISK_ALERT
         )
-
-        // Full-screen intent — shows on lock screen for true emergency feel
-        val fullScreenIntent = PendingIntent.getActivity(
-            context,
-            2,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(
-            context,
-            NotificationChannels.EXTREME_WEATHER_EMERGENCY
-        )
-            .setSmallIcon(R.drawable.ic_weather_splash)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setContentIntent(pendingIntent)
-            .setFullScreenIntent(fullScreenIntent, true)
-            .setVibrate(extremeVibrationPattern)
-            .setLights(android.graphics.Color.RED, 500, 200)
-            .setAutoCancel(true)
-            .setOngoing(true) // Tidak bisa di-swipe, harus dibuka
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
-
-        notificationManager.notify(NotificationIds.EXTREME_RISK_ALERT, notification)
-
-        // Trigger aggressive vibration explicitly
-        vibrate(extremeVibrationPattern, isExtreme = true)
     }
 
     // ── Disaster risk alerts (AI-based predictions) ────────────
@@ -471,42 +475,13 @@ class WeatherNotificationManager(private val context: Context) {
             append(s.notifSeekShelter)
         }
 
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra("open_disaster_alert", true)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context, 3, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        sendExtremeNotification(
+            channelId = NotificationChannels.DISASTER_EMERGENCY,
+            title = title, content = content,
+            extraKey = "open_disaster_alert",
+            requestCodeBase = 3,
+            notifId = NotificationIds.DISASTER_EXTREME_ALERT
         )
-
-        val fullScreenIntent = PendingIntent.getActivity(
-            context, 4, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(
-            context,
-            NotificationChannels.DISASTER_EMERGENCY
-        )
-            .setSmallIcon(R.drawable.ic_weather_splash)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setContentIntent(pendingIntent)
-            .setFullScreenIntent(fullScreenIntent, true)
-            .setVibrate(extremeVibrationPattern)
-            .setLights(android.graphics.Color.RED, 500, 200)
-            .setAutoCancel(true)
-            .setOngoing(true)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
-
-        notificationManager.notify(NotificationIds.DISASTER_EXTREME_ALERT, notification)
-        vibrate(extremeVibrationPattern, isExtreme = true)
     }
 
     // ── Seismic & volcanic alerts ──────────────────────────────
@@ -660,48 +635,20 @@ class WeatherNotificationManager(private val context: Context) {
     }
 
     /**
-     * Extreme seismic emergency — SOS vibration, bypass DND, fullscreen intent.
+     * Extreme seismic emergency — delegates to shared extreme notification builder.
      */
     private fun sendExtremeSeismicNotification(
         title: String,
         content: String,
         extraKey: String
     ) {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            putExtra(extraKey, true)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context, 5, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        sendExtremeNotification(
+            channelId = NotificationChannels.TSUNAMI_EMERGENCY,
+            title = title, content = content,
+            extraKey = extraKey,
+            requestCodeBase = 5,
+            notifId = NotificationIds.TSUNAMI_EMERGENCY_ALERT
         )
-        val fullScreenIntent = PendingIntent.getActivity(
-            context, 6, intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = NotificationCompat.Builder(
-            context,
-            NotificationChannels.TSUNAMI_EMERGENCY
-        )
-            .setSmallIcon(R.drawable.ic_weather_splash)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setContentIntent(pendingIntent)
-            .setFullScreenIntent(fullScreenIntent, true)
-            .setVibrate(extremeVibrationPattern)
-            .setLights(android.graphics.Color.RED, 500, 200)
-            .setAutoCancel(true)
-            .setOngoing(true)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
-
-        notificationManager.notify(NotificationIds.TSUNAMI_EMERGENCY_ALERT, notification)
-        vibrate(extremeVibrationPattern, isExtreme = true)
     }
 
     // ── Notification builder ─────────────────────────────────────

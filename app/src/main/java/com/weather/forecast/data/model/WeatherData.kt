@@ -34,18 +34,18 @@ data class LocationInfo(
  * Data cuaca saat ini (UI-ready)
  */
 data class CurrentWeatherData(
-    val temperature: Double,
-    val apparentTemperature: Double,
-    val humidity: Int,
-    val weatherCode: Int,
-    val weatherCondition: WeatherCondition,
-    val windSpeed: Double,
-    val windDirection: Int,
-    val windGusts: Double,
-    val pressure: Double,
-    val cloudCover: Int,
-    val precipitation: Double,
-    val isDay: Boolean,
+    val temperature: Double = 0.0,
+    val apparentTemperature: Double = 0.0,
+    val humidity: Int = 0,
+    val weatherCode: Int = 0,
+    val weatherCondition: WeatherCondition = WeatherCondition.CLEAR,
+    val windSpeed: Double = 0.0,
+    val windDirection: Int = 0,
+    val windGusts: Double = 0.0,
+    val pressure: Double = 0.0,
+    val cloudCover: Int = 0,
+    val precipitation: Double = 0.0,
+    val isDay: Boolean = true,
     val rain: Double = 0.0,
     val showers: Double = 0.0,
     val snowfall: Double = 0.0,
@@ -192,7 +192,12 @@ data class WeatherPotential(
     val maxWindGusts: Double = 0.0,
     val maxPrecipitation: Double = 0.0,
     val alerts: List<WeatherAlert> = emptyList()
-)
+) {
+    /** True if any risk exceeds LOW */
+    val hasRisk: Boolean get() = stormRisk > RiskLevel.LOW ||
+        heavyRainRisk > RiskLevel.LOW || hailRisk > RiskLevel.LOW ||
+        strongWindRisk > RiskLevel.LOW || tornadoRisk > RiskLevel.LOW
+}
 
 /**
  * Level risiko cuaca

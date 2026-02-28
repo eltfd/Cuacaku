@@ -450,8 +450,7 @@ class IncrementalLearningEngine(private val context: Context) {
         if (samplesWithOutcome.isEmpty()) return
 
         // Decay existing Fisher (agar model tetap plastis)
-        for (i in fisherW3.indices) fisherW3[i] *= FISHER_DECAY
-        for (i in fisherB3.indices) fisherB3[i] *= FISHER_DECAY
+        scaleFisher(FISHER_DECAY)
 
         // Akumulasi gradient² dari sampel dengan outcome
         val n = samplesWithOutcome.size.toFloat()
@@ -540,8 +539,7 @@ class IncrementalLearningEngine(private val context: Context) {
 
         // Soft-reset Fisher: kurangi 50% agar model lebih plastis
         // Tidak full reset karena masih ada pengetahuan yang berguna
-        for (i in fisherW3.indices) fisherW3[i] *= 0.5f
-        for (i in fisherB3.indices) fisherB3[i] *= 0.5f
+        scaleFisher(0.5f)
 
         saveFisher()
     }
@@ -636,59 +634,54 @@ class IncrementalLearningEngine(private val context: Context) {
             .apply()
     }
 
+    /** Load a JSON map from prefs and populate float arrays */
+    private fun Map<String, List<Float>>.loadInto(key: String, target: FloatArray) {
+        this[key]?.forEachIndexed { i, v -> if (i < target.size) target[i] = v }
+    }
+
+    private fun scaleFisher(factor: Float) {
+        for (i in fisherW3.indices) fisherW3[i] *= factor
+        for (i in fisherB3.indices) fisherB3[i] *= factor
+    }
+
+    private inline fun <reified T> loadPrefsJson(key: String): T? {
+        val json = prefs.getString(key, null) ?: return null
+        return try {
+            gson.fromJson<T>(json, object : TypeToken<T>() {}.type)
+        } catch (_: Exception) { null }
+    }
+
     private fun loadState() {
         learningStep = prefs.getLong(KEY_LEARNING_STEP, 0)
 
         // Load weight deltas + momentum
-        val json = prefs.getString(KEY_WEIGHT_DELTAS, null)
-        if (json != null) {
-            try {
-                val type = object : TypeToken<Map<String, List<Float>>>() {}.type
-                val data: Map<String, List<Float>> = gson.fromJson(json, type)
-                data["w3"]?.forEachIndexed { i, v -> if (i < w3Delta.size) w3Delta[i] = v }
-                data["b3"]?.forEachIndexed { i, v -> if (i < b3Delta.size) b3Delta[i] = v }
-                data["w3m"]?.forEachIndexed { i, v -> if (i < w3Momentum.size) w3Momentum[i] = v }
-                data["b3m"]?.forEachIndexed { i, v -> if (i < b3Momentum.size) b3Momentum[i] = v }
-            } catch (_: Exception) { }
+        loadPrefsJson<Map<String, List<Float>>>(KEY_WEIGHT_DELTAS)?.let { data ->
+            data.loadInto("w3", w3Delta)
+            data.loadInto("b3", b3Delta)
+            data.loadInto("w3m", w3Momentum)
+            data.loadInto("b3m", b3Momentum)
         }
 
         // Load Fisher Information + Anchors
-        val fisherJson = prefs.getString(KEY_FISHER, null)
-        if (fisherJson != null) {
-            try {
-                val type = object : TypeToken<Map<String, List<Float>>>() {}.type
-                val data: Map<String, List<Float>> = gson.fromJson(fisherJson, type)
-                data["fw3"]?.forEachIndexed { i, v -> if (i < fisherW3.size) fisherW3[i] = v }
-                data["fb3"]?.forEachIndexed { i, v -> if (i < fisherB3.size) fisherB3[i] = v }
-                data["aw3"]?.forEachIndexed { i, v -> if (i < anchorW3.size) anchorW3[i] = v }
-                data["ab3"]?.forEachIndexed { i, v -> if (i < anchorB3.size) anchorB3[i] = v }
-            } catch (_: Exception) { }
+        loadPrefsJson<Map<String, List<Float>>>(KEY_FISHER)?.let { data ->
+            data.loadInto("fw3", fisherW3)
+            data.loadInto("fb3", fisherB3)
+            data.loadInto("aw3", anchorW3)
+            data.loadInto("ab3", anchorB3)
         }
 
         // Load Drift State
-        val driftJson = prefs.getString(KEY_DRIFT_STATE, null)
-        if (driftJson != null) {
-            try {
-                val type = object : TypeToken<Map<String, Float>>() {}.type
-                val data: Map<String, Float> = gson.fromJson(driftJson, type)
-                driftErrorEma = data["ema"] ?: 0f
-                driftErrorVariance = data["var"] ?: 0f
-                driftStepsSinceDetected = (data["steps"] ?: Int.MAX_VALUE.toFloat()).toInt()
-                driftDetectedCount = (data["count"] ?: 0f).toInt()
-                driftInitialized = (data["init"] ?: 0f) > 0.5f
-            } catch (_: Exception) { }
+        loadPrefsJson<Map<String, Float>>(KEY_DRIFT_STATE)?.let { data ->
+            driftErrorEma = data["ema"] ?: 0f
+            driftErrorVariance = data["var"] ?: 0f
+            driftStepsSinceDetected = (data["steps"] ?: Int.MAX_VALUE.toFloat()).toInt()
+            driftDetectedCount = (data["count"] ?: 0f).toInt()
+            driftInitialized = (data["init"] ?: 0f) > 0.5f
         }
     }
 
-    private fun loadSamples(): List<LearningSample> {
-        val json = prefs.getString(KEY_SAMPLES, null) ?: return emptyList()
-        return try {
-            val type = object : TypeToken<List<LearningSample>>() {}.type
-            gson.fromJson(json, type)
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
+    private fun loadSamples(): List<LearningSample> =
+        loadPrefsJson<List<LearningSample>>(KEY_SAMPLES) ?: emptyList()
 
     private fun saveSamples(samples: List<LearningSample>) {
         prefs.edit()

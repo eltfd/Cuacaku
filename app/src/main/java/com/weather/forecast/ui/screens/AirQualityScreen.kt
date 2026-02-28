@@ -29,6 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
+import com.weather.forecast.ui.components.SimpleErrorContent
+import com.weather.forecast.ui.components.SimpleLoadingContent
+import com.weather.forecast.ui.components.toggle
 import com.weather.forecast.ui.viewmodel.AirQualityUiState
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
 
@@ -42,62 +45,16 @@ fun AirQualityScreen(
     val uiState by viewModel.airQualityState.collectAsState()
 
     when (val state = uiState) {
-        is AirQualityUiState.Loading -> {
-            AqLoadingContent()
-        }
-        is AirQualityUiState.Success -> {
-            AirQualityContent(data = state.data)
-        }
-        is AirQualityUiState.Error -> {
-            AqErrorContent(
-                message = state.message,
-                onRetry = { viewModel.loadAirQualityData() }
-            )
-        }
+        is AirQualityUiState.Loading -> SimpleLoadingContent(LocalStrings.current.loadingAirQuality)
+        is AirQualityUiState.Success -> AirQualityContent(data = state.data)
+        is AirQualityUiState.Error -> SimpleErrorContent(
+            message = state.message,
+            onRetry = { viewModel.loadAirQualityData() }
+        )
     }
 }
 
-@Composable
-private fun AqLoadingContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(LocalStrings.current.loadingAirQuality)
-        }
-    }
-}
 
-@Composable
-private fun AqErrorContent(message: String, onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.CloudOff,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.error
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onRetry) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(LocalStrings.current.retry)
-            }
-        }
-    }
-}
 
 @Composable
 private fun AirQualityContent(data: AirQualityData) {
@@ -432,18 +389,10 @@ private fun DailyAqiForecastSection(dailyData: List<DailyAirQualityData>) {
         )
 
         dailyData.forEach { daily ->
-            val isExpanded = daily.date in expandedDays
-
             DailyAqiItem(
                 data = daily,
-                isExpanded = isExpanded,
-                onToggle = {
-                    expandedDays = if (isExpanded) {
-                        expandedDays - daily.date
-                    } else {
-                        expandedDays + daily.date
-                    }
-                }
+                isExpanded = daily.date in expandedDays,
+                onToggle = { expandedDays = expandedDays.toggle(daily.date) }
             )
         }
     }

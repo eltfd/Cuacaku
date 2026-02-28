@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.weather.forecast.data.api.RetrofitClient
+import com.weather.forecast.data.haversineDistance
 import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.*
 import kotlinx.coroutines.Dispatchers
@@ -324,23 +325,7 @@ class DisasterMonitorRepository(private val context: Context) {
         return disasters.distinctBy { it.id }
     }
 
-    /**
-     * Hitung jarak antara dua titik koordinat menggunakan formula Haversine.
-     * @return Jarak dalam kilometer
-     */
-    private fun haversineDistance(
-        lat1: Double, lon1: Double,
-        lat2: Double, lon2: Double
-    ): Double {
-        val r = 6371.0 // Radius bumi (km)
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2)
-        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        return r * c
-    }
+
 
     /**
      * Map ReliefWeb response ke ActiveDisaster list.
@@ -500,122 +485,85 @@ class DisasterMonitorRepository(private val context: Context) {
 
         try {
             // Fetch landslide events (last 90 days)
-            val landslideResponse = try {
-                eonetApi.getEvents(
-                    category = "landslides",
-                    days = 90,
-                    status = "open",
-                    limit = 30
-                )
-            } catch (_: Exception) { null }
-
-            landslideResponse?.events?.forEach { event ->
-                val lat = event.geometry?.firstOrNull()?.latitude
-                val lon = event.geometry?.firstOrNull()?.longitude
-                if (lat != null && lon != null) {
-                    val distance = haversineDistance(latitude, longitude, lat, lon)
-                    if (distance <= PROXIMITY_RADIUS_KM) {
-                        val phase = if (event.closed == null) DisasterPhase.ACTIVE else DisasterPhase.RECOVERY
-                        val eventDate = try {
-                            val dateStr = event.geometry?.firstOrNull()?.date
-                            if (dateStr != null) {
-                                Instant.parse(dateStr).toEpochMilli()
-                            } else System.currentTimeMillis()
-                        } catch (_: Exception) { System.currentTimeMillis() }
-
-                        disasters.add(
-                            ActiveDisaster(
-                                id = "eonet-${event.id}",
-                                title = event.title ?: "Landslide Event",
-                                type = ActiveDisasterType.LANDSLIDE,
-                                phase = phase,
-                                locations = listOf(
-                                    AffectedLocation(
-                                        name = event.title ?: "Unknown Location",
-                                        latitude = lat,
-                                        longitude = lon,
-                                        radiusKm = 50.0
-                                    )
-                                ),
-                                severity = DisasterSeverity.MODERATE,
-                                startDate = eventDate,
-                                lastUpdate = eventDate,
-                                currentSituation = buildString {
-                                    append(s.eonetLandslideDetected)
-                                    append(" ")
-                                    append(s.eonetDistance("%.0f".format(distance)))
-                                    event.description?.let { desc ->
-                                        if (desc.isNotBlank()) {
-                                            append("\n")
-                                            append(desc.take(200))
-                                        }
-                                    }
-                                },
-                                source = "NASA EONET v3",
-                                sourceUrl = event.link
-                            )
-                        )
+            disasters.addAll(fetchEonetByCategory(
+                category = "landslides", days = 90, limit = 30,
+                userLat = latitude, userLon = longitude,
+                disasterType = ActiveDisasterType.LANDSLIDE,
+                defaultTitle = "Landslide Event",
+                situationBuilder = { distance, event ->
+                    buildString {
+                        append(s.eonetLandslideDetected)
+                        append(" ")
+                        append(s.eonetDistance("%.0f".format(distance)))
+                        event.description?.takeIf { it.isNotBlank() }?.let {
+                            append("\n"); append(it.take(200))
+                        }
                     }
                 }
-            }
+            ))
 
-            // Also fetch flood events from EONET (complementary to Open-Meteo)
-            val floodResponse = try {
-                eonetApi.getEvents(
-                    category = "floods",
-                    days = 60,
-                    status = "open",
-                    limit = 20
-                )
-            } catch (_: Exception) { null }
-
-            floodResponse?.events?.forEach { event ->
-                val lat = event.geometry?.firstOrNull()?.latitude
-                val lon = event.geometry?.firstOrNull()?.longitude
-                if (lat != null && lon != null) {
-                    val distance = haversineDistance(latitude, longitude, lat, lon)
-                    if (distance <= PROXIMITY_RADIUS_KM) {
-                        val phase = if (event.closed == null) DisasterPhase.ACTIVE else DisasterPhase.RECOVERY
-                        val eventDate = try {
-                            val dateStr = event.geometry?.firstOrNull()?.date
-                            if (dateStr != null) Instant.parse(dateStr).toEpochMilli()
-                            else System.currentTimeMillis()
-                        } catch (_: Exception) { System.currentTimeMillis() }
-
-                        disasters.add(
-                            ActiveDisaster(
-                                id = "eonet-${event.id}",
-                                title = event.title ?: "Flood Event",
-                                type = ActiveDisasterType.FLOOD,
-                                phase = phase,
-                                locations = listOf(
-                                    AffectedLocation(
-                                        name = event.title ?: "Unknown Location",
-                                        latitude = lat,
-                                        longitude = lon,
-                                        radiusKm = 50.0
-                                    )
-                                ),
-                                severity = DisasterSeverity.MODERATE,
-                                startDate = eventDate,
-                                lastUpdate = eventDate,
-                                currentSituation = buildString {
-                                    append(s.eonetFloodDetected)
-                                    append(" ")
-                                    append(s.eonetDistance("%.0f".format(distance)))
-                                },
-                                source = "NASA EONET v3",
-                                sourceUrl = event.link
-                            )
-                        )
-                    }
+            // Fetch flood events from EONET (complementary to Open-Meteo)
+            disasters.addAll(fetchEonetByCategory(
+                category = "floods", days = 60, limit = 20,
+                userLat = latitude, userLon = longitude,
+                disasterType = ActiveDisasterType.FLOOD,
+                defaultTitle = "Flood Event",
+                situationBuilder = { distance, _ ->
+                    "${s.eonetFloodDetected} ${s.eonetDistance("%.0f".format(distance))}"
                 }
-            }
+            ))
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
         return disasters
+    }
+
+    /**
+     * Fetch EONET events by category, filter by proximity.
+     */
+    private suspend fun fetchEonetByCategory(
+        category: String, days: Int, limit: Int,
+        userLat: Double, userLon: Double,
+        disasterType: ActiveDisasterType,
+        defaultTitle: String,
+        situationBuilder: (distance: Double, event: EonetEvent) -> String
+    ): List<ActiveDisaster> {
+        val response = try {
+            eonetApi.getEvents(category = category, days = days, status = "open", limit = limit)
+        } catch (_: Exception) { return emptyList() }
+
+        return response.events?.mapNotNull { event ->
+            val lat = event.geometry?.firstOrNull()?.latitude ?: return@mapNotNull null
+            val lon = event.geometry?.firstOrNull()?.longitude ?: return@mapNotNull null
+            val distance = haversineDistance(userLat, userLon, lat, lon)
+            if (distance > PROXIMITY_RADIUS_KM) return@mapNotNull null
+
+            val phase = if (event.closed == null) DisasterPhase.ACTIVE else DisasterPhase.RECOVERY
+            val eventDate = try {
+                event.geometry?.firstOrNull()?.date?.let { Instant.parse(it).toEpochMilli() }
+                    ?: System.currentTimeMillis()
+            } catch (_: Exception) { System.currentTimeMillis() }
+
+            ActiveDisaster(
+                id = "eonet-${event.id}",
+                title = event.title ?: defaultTitle,
+                type = disasterType,
+                phase = phase,
+                locations = listOf(
+                    AffectedLocation(
+                        name = event.title ?: "Unknown Location",
+                        latitude = lat, longitude = lon, radiusKm = 50.0
+                    )
+                ),
+                severity = DisasterSeverity.MODERATE,
+                startDate = eventDate,
+                lastUpdate = eventDate,
+                currentSituation = situationBuilder(distance, event),
+                source = "NASA EONET v3",
+                sourceUrl = event.link
+            )
+        } ?: emptyList()
     }
 
     // ════════════════════════════════════════════════

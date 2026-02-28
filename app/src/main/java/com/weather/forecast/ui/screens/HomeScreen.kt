@@ -111,7 +111,7 @@ fun HomeScreen(
         ) {
             when (val state = uiState) {
                 is WeatherUiState.Loading -> {
-                    LoadingContent()
+                    SimpleLoadingContent(LocalStrings.current.loadingWeather)
                 }
                 
                 is WeatherUiState.Success -> {
@@ -219,21 +219,6 @@ private fun WeatherTopBar(
                 actionIconContentColor = MaterialTheme.colorScheme.onPrimary
             )
         )
-    }
-}
-
-@Composable
-private fun LoadingContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(16.dp))
-            val s = LocalStrings.current
-            Text(s.loadingWeather)
-        }
     }
 }
 
@@ -412,13 +397,9 @@ private fun CurrentWeatherCard(
 
 @Composable
 private fun WeatherDetailsCard(current: CurrentWeatherData) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.2f)
-        )
+    GlassCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        alpha = 0.2f
     ) {
         val s = LocalStrings.current
         Column(modifier = Modifier.padding(16.dp)) {
@@ -506,13 +487,9 @@ private fun WeatherDetailItem(
 
 @Composable
 private fun WindInfoCard(current: CurrentWeatherData) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.2f)
-        )
+    GlassCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        alpha = 0.2f
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             val s = LocalStrings.current
@@ -678,20 +655,11 @@ private fun WindCompass(
 
 @Composable
 private fun WeatherPotentialCard(potential: WeatherPotential) {
-    // Only show if there's at least one non-low risk
-    val hasRisk = potential.stormRisk > RiskLevel.LOW ||
-            potential.heavyRainRisk > RiskLevel.LOW ||
-            potential.hailRisk > RiskLevel.LOW ||
-            potential.strongWindRisk > RiskLevel.LOW ||
-            potential.tornadoRisk > RiskLevel.LOW
+    val hasRisk = potential.hasRisk
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.2f)
-        )
+    GlassCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        alpha = 0.2f
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             val s = LocalStrings.current
@@ -869,13 +837,9 @@ private fun AlertItem(alert: WeatherAlert) {
 
 @Composable
 private fun PrecipitationDetailCard(current: CurrentWeatherData) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.2f)
-        )
+    GlassCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        alpha = 0.2f
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             val s = LocalStrings.current
@@ -1011,13 +975,9 @@ private fun DailyForecastSection(dailyData: List<DailyWeatherData>) {
     // Track which days are expanded by their date string
     var expandedDays by remember { mutableStateOf(setOf<String>()) }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.2f)
-        )
+    GlassCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        alpha = 0.2f
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             val s = LocalStrings.current
@@ -1029,18 +989,10 @@ private fun DailyForecastSection(dailyData: List<DailyWeatherData>) {
             )
 
             dailyData.forEachIndexed { index, daily ->
-                val isExpanded = daily.date in expandedDays
-
                 DailyForecastItem(
                     daily = daily,
-                    isExpanded = isExpanded,
-                    onToggleExpand = {
-                        expandedDays = if (isExpanded) {
-                            expandedDays - daily.date
-                        } else {
-                            expandedDays + daily.date
-                        }
-                    }
+                    isExpanded = daily.date in expandedDays,
+                    onToggleExpand = { expandedDays = expandedDays.toggle(daily.date) }
                 )
 
                 if (index < dailyData.lastIndex) {
@@ -1272,11 +1224,7 @@ private fun DailyHourlyDetail(daily: DailyWeatherData) {
 
         // Weather Potential badges (for this day)
         daily.weatherPotential?.let { potential ->
-            val hasRisk = potential.stormRisk > RiskLevel.LOW ||
-                    potential.heavyRainRisk > RiskLevel.LOW ||
-                    potential.hailRisk > RiskLevel.LOW ||
-                    potential.strongWindRisk > RiskLevel.LOW ||
-                    potential.tornadoRisk > RiskLevel.LOW
+            val hasRisk = potential.hasRisk
 
             if (hasRisk) {
                 val s = LocalStrings.current
@@ -1422,13 +1370,9 @@ private fun DailyHourlyItem(hourly: HourlyWeatherData) {
 
 @Composable
 private fun SunInfoCard(sunrise: String, sunset: String) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.2f)
-        )
+    GlassCard(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        alpha = 0.2f
     ) {
         Row(
             modifier = Modifier

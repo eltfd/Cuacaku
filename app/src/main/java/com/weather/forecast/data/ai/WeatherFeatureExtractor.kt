@@ -34,186 +34,45 @@ object WeatherFeatureExtractor {
     )
 
     // ══════════════════════════════════════════════════
-    //  Ekstraksi untuk hari ini (menggunakan current + hourly 24h)
+    //  Extraction for today (using current + hourly 24h)
     // ══════════════════════════════════════════════════
 
     fun extractForToday(
         weather: WeatherData?,
         waterData: WaterQualityData?
     ): WeatherFeatures {
-        val features = FloatArray(FEATURE_COUNT) { 0.5f } // Default: nilai netral
-        var dataPoints = 0
-
         val hourly = weather?.hourly?.take(24) ?: emptyList()
         val current = weather?.current
         val daily = weather?.daily?.firstOrNull()
         val marine = waterData?.marine
         val flood = waterData?.flood
-
-        // [0] Curah hujan total (mm) — norm by 200 mm
-        val precipTotal = daily?.precipitationSum ?: hourly.sumOf { it.precipitation }
-        features[0] = norm(precipTotal, 0.0, 200.0)
-        if (weather != null) dataPoints++
-
-        // [1] Intensitas hujan maks per jam (mm/h) — norm by 50
-        val maxRain = hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0
-        features[1] = norm(maxRain, 0.0, 50.0)
-        if (hourly.isNotEmpty()) dataPoints++
-
-        // [2] Kecepatan angin maks (km/h) — norm by 200
-        val maxWind = maxOf(
-            current?.windSpeed ?: 0.0,
-            hourly.maxOfOrNull { it.windSpeed } ?: 0.0
-        )
-        features[2] = norm(maxWind, 0.0, 200.0)
-        if (weather != null) dataPoints++
-
-        // [3] Gust maks (km/h) — norm by 200
-        val maxGusts = maxOf(
-            current?.windGusts ?: 0.0,
-            daily?.windGustsMax ?: 0.0,
-            hourly.maxOfOrNull { it.windGusts } ?: 0.0
-        )
-        features[3] = norm(maxGusts, 0.0, 200.0)
-        if (weather != null) dataPoints++
-
-        // [4] Wind shear (gust - rata2 wind) — norm by 80
-        val avgWind = hourly.map { it.windSpeed }.average().takeIf { !it.isNaN() } ?: maxWind
-        features[4] = norm(maxGusts - avgWind, 0.0, 80.0)
-        if (hourly.isNotEmpty()) dataPoints++
-
-        // [5] Tekanan rendah (inverted: lebih rendah = skor lebih tinggi) — range 900-1050
-        val pressure = current?.pressure ?: hourly.firstOrNull()?.pressure ?: 1013.0
-        val minPressure = hourly.map { it.pressure }.filter { it > 0 }.minOrNull() ?: pressure
-        features[5] = 1f - norm(minOf(pressure, minPressure), 900.0, 1050.0)
-        if (weather != null) dataPoints++
-
-        // [6] Penurunan tekanan (rate drop dalam 24h) — norm by 30 hPa
-        val pressures = hourly.map { it.pressure }.filter { it > 0 }
-        val pressureDrop = if (pressures.size >= 2) {
-            (pressures.first() - pressures.last()).coerceAtLeast(0.0)
-        } else 0.0
-        features[6] = norm(pressureDrop, 0.0, 30.0)
-        if (pressures.size >= 2) dataPoints++
-
-        // [7] Kelembaban rata-rata — norm by 100
-        val avgHumidity = hourly.map { it.humidity.toDouble() }.average()
-            .takeIf { !it.isNaN() }
-            ?: current?.humidity?.toDouble() ?: 50.0
-        features[7] = norm(avgHumidity, 0.0, 100.0)
-        if (weather != null) dataPoints++
-
-        // [8] CAPE maks (J/kg) — norm by 5000
-        val maxCape = maxOf(
-            current?.cape ?: 0.0,
-            hourly.maxOfOrNull { it.cape } ?: 0.0
-        )
-        features[8] = norm(maxCape, 0.0, 5000.0)
-        if (weather != null) dataPoints++
-
-        // [9] Freezing level rendah (inverted) — norm by 6000 m
-        val minFreezing = hourly.filter { it.freezingLevelHeight > 0 }
-            .minOfOrNull { it.freezingLevelHeight } ?: 5000.0
-        features[9] = 1f - norm(minFreezing, 0.0, 6000.0)
-        if (hourly.any { it.freezingLevelHeight > 0 }) dataPoints++
-
-        // [10] Tutupan awan — norm by 100
-        val avgCloud = current?.cloudCover?.toDouble()
-            ?: hourly.map { it.humidity.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0
-        features[10] = norm(avgCloud, 0.0, 100.0)
-        if (weather != null) dataPoints++
-
-        // [11] Dew point spread (inverted: semakin kecil = semakin lembab) — norm by 30
-        val temp = current?.temperature ?: hourly.firstOrNull()?.temperature ?: 25.0
-        val dewPoint = current?.dewPoint ?: hourly.firstOrNull()?.dewPoint ?: 20.0
-        features[11] = 1f - norm((temp - dewPoint).coerceAtLeast(0.0), 0.0, 30.0)
-        if (weather != null) dataPoints++
-
-        // [12] Tinggi gelombang (m) — norm by 10
-        val waveHeight = marine?.current?.waveHeight
-            ?: marine?.dailyForecast?.firstOrNull()?.waveHeightMax ?: 0.0
-        features[12] = if (marine != null) norm(waveHeight, 0.0, 10.0) else 0.5f
-        if (marine != null) dataPoints++
-
-        // [13] Swell height (m) — norm by 5
-        val swellHeight = marine?.current?.swellWaveHeight ?: 0.0
-        features[13] = if (marine != null) norm(swellHeight, 0.0, 5.0) else 0.5f
-        if (marine != null) dataPoints++
-
-        // [14] Rasio debit sungai / rata-rata — norm by 10
-        val floodToday = flood?.dailyForecast?.firstOrNull()
-        val dischargeRatio = if (floodToday != null && floodToday.dischargeMean > 0) {
-            floodToday.riverDischarge / floodToday.dischargeMean
-        } else 1.0
-        features[14] = if (flood != null) norm(dischargeRatio, 0.0, 10.0) else 0.5f
-        if (flood != null) dataPoints++
-
-        // [15] Durasi hujan (jam hujan / 24) — norm by 24
-        val rainHours = hourly.count { it.precipitation > 0.5 }
-        features[15] = norm(rainHours.toDouble(), 0.0, 24.0)
-        if (hourly.isNotEmpty()) dataPoints++
-
-        // [16] Antecedent rainfall 3 hari (mm) — norm by 300
         val allDaily = weather?.daily ?: emptyList()
-        val antecedent = allDaily.take(3).sumOf { it.precipitationSum }
-        features[16] = norm(antecedent, 0.0, 300.0)
-        if (allDaily.isNotEmpty()) dataPoints++
+        val floodToday = flood?.dailyForecast?.firstOrNull()
 
-        // [17] Hari hujan berturut — norm by 7
-        val consecDays = allDaily.takeWhile { it.precipitationSum > 5 }.size
-        features[17] = norm(consecDays.toDouble(), 0.0, 7.0)
-        if (allDaily.isNotEmpty()) dataPoints++
-
-        // [18] Keparahan kode WMO — skala 0-1
-        val severity = maxOf(
-            wmoSeverity(current?.weatherCode ?: 0),
-            hourly.maxOfOrNull { wmoSeverity(it.weatherCode) } ?: 0f
-        )
-        features[18] = severity
-        if (weather != null) dataPoints++
-
-        // [19] Suhu tinggi — norm 20-50°C
-        val tempMax = daily?.temperatureMax ?: hourly.maxOfOrNull { it.temperature } ?: 25.0
-        features[19] = norm(tempMax, 20.0, 50.0)
-        if (weather != null) dataPoints++
-
-        // [20] Kejenuhan tanah (soil saturation index) — rata-rata kelembaban tanah / titik jenuh
-        val soilShallow = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
-        val soilMedium = hourly.map { it.soilMoistureMedium }.filter { it > 0 }
-        val soilDeep = hourly.map { it.soilMoistureDeep }.filter { it > 0 }
-        val hasSoilData = soilShallow.isNotEmpty()
-        if (hasSoilData) {
-            val avgShallow = soilShallow.average()
-            val avgMedium = soilMedium.average().takeIf { !it.isNaN() } ?: avgShallow
-            val avgDeep = soilDeep.average().takeIf { !it.isNaN() } ?: avgShallow
-            // Weighted: shallow 50%, medium 30%, deep 20% — divisi titik jenuh 0.50 m³/m³
-            val saturation = (avgShallow * 0.5 + avgMedium * 0.3 + avgDeep * 0.2) / 0.50
-            features[20] = norm(saturation, 0.0, 1.5)
-            dataPoints++
-        }
-
-        // [21] Laju perubahan kelembaban tanah (rising = semakin jenuh)
-        if (hasSoilData && soilShallow.size >= 6) {
-            val firstHalf = soilShallow.take(soilShallow.size / 2).average()
-            val secondHalf = soilShallow.drop(soilShallow.size / 2).average()
-            val rate = (secondHalf - firstHalf) / firstHalf.coerceAtLeast(0.01)
-            // rate > 0 = tanah semakin basah, norm by 100% increase
-            features[21] = norm(rate, -0.5, 1.0)
-            dataPoints++
-        }
-
-        return WeatherFeatures(
-            features = features,
-            featureNames = FEATURE_NAMES,
-            dataCompleteness = (dataPoints.toDouble() / FEATURE_COUNT).coerceIn(0.0, 1.0),
-            hasMarineData = marine != null,
-            hasFloodData = flood != null,
-            hasHourlyData = hourly.isNotEmpty()
+        return extractCommon(
+            hourly = hourly,
+            precipTotal = daily?.precipitationSum ?: hourly.sumOf { it.precipitation },
+            maxWind = maxOf(current?.windSpeed ?: 0.0, hourly.maxOfOrNull { it.windSpeed } ?: 0.0),
+            maxGusts = maxOf(current?.windGusts ?: 0.0, daily?.windGustsMax ?: 0.0, hourly.maxOfOrNull { it.windGusts } ?: 0.0),
+            maxCape = maxOf(current?.cape ?: 0.0, hourly.maxOfOrNull { it.cape } ?: 0.0),
+            cloudCover = current?.cloudCover?.toDouble() ?: hourly.map { it.cloudCover.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0,
+            temp = current?.temperature ?: hourly.firstOrNull()?.temperature ?: 25.0,
+            dewPoint = current?.dewPoint ?: hourly.firstOrNull()?.dewPoint ?: 20.0,
+            tempMax = daily?.temperatureMax ?: hourly.maxOfOrNull { it.temperature } ?: 25.0,
+            waveHeight = marine?.current?.waveHeight ?: marine?.dailyForecast?.firstOrNull()?.waveHeightMax ?: 0.0,
+            swellHeight = marine?.current?.swellWaveHeight ?: 0.0,
+            dischargeRatio = if (floodToday != null && floodToday.dischargeMean > 0) floodToday.riverDischarge / floodToday.dischargeMean else 1.0,
+            wmoCodes = listOfNotNull(current?.weatherCode) + hourly.map { it.weatherCode },
+            antecedentDays = allDaily.take(3),
+            hasWeather = weather != null,
+            hasMarine = marine != null,
+            hasFlood = flood != null,
+            initPressure = current?.pressure ?: hourly.firstOrNull()?.pressure ?: 1013.0
         )
     }
 
     // ══════════════════════════════════════════════════
-    //  Ekstraksi untuk per-hari (7 day forecast)
+    //  Extraction for a specific day (7-day forecast)
     // ══════════════════════════════════════════════════
 
     fun extractForDay(
@@ -224,88 +83,121 @@ object WeatherFeatureExtractor {
         flood: DailyFloodData?,
         allDaily: List<DailyWeatherData>
     ): WeatherFeatures {
-        val features = FloatArray(FEATURE_COUNT) { 0.5f }
-        var dataPoints = 0
-
-        features[0] = norm(daily.precipitationSum, 0.0, 200.0); dataPoints++
-        features[1] = norm(hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0, 0.0, 50.0)
-        if (hourly.isNotEmpty()) dataPoints++
-        features[2] = norm(daily.windSpeedMax, 0.0, 200.0); dataPoints++
-        features[3] = norm(daily.windGustsMax, 0.0, 200.0); dataPoints++
-
-        val avgW = hourly.map { it.windSpeed }.average().takeIf { !it.isNaN() } ?: daily.windSpeedMax
-        features[4] = norm(daily.windGustsMax - avgW, 0.0, 80.0)
-        if (hourly.isNotEmpty()) dataPoints++
-
-        val minP = hourly.map { it.pressure }.filter { it > 0 }.minOrNull() ?: 1013.0
-        features[5] = 1f - norm(minP, 900.0, 1050.0); dataPoints++
-
-        val pl = hourly.map { it.pressure }.filter { it > 0 }
-        features[6] = norm(if (pl.size >= 2) (pl.first() - pl.last()).coerceAtLeast(0.0) else 0.0, 0.0, 30.0)
-        if (pl.size >= 2) dataPoints++
-
-        features[7] = norm(hourly.map { it.humidity.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0, 0.0, 100.0); dataPoints++
-        features[8] = norm(hourly.maxOfOrNull { it.cape } ?: 0.0, 0.0, 5000.0); dataPoints++
-
-        val fz = hourly.filter { it.freezingLevelHeight > 0 }.minOfOrNull { it.freezingLevelHeight } ?: 5000.0
-        features[9] = 1f - norm(fz, 0.0, 6000.0); dataPoints++
-
-        features[10] = norm(hourly.map { it.cloudCover.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0, 0.0, 100.0)
-        features[11] = 1f - norm((daily.temperatureMax - (hourly.firstOrNull()?.dewPoint ?: 20.0)).coerceAtLeast(0.0), 0.0, 30.0)
-
-        features[12] = if (marine != null) { norm(marine.waveHeightMax, 0.0, 10.0).also { dataPoints++ } } else 0.5f
-        features[13] = if (marine != null) norm(marine.swellWaveHeightMax, 0.0, 5.0) else 0.5f
-
-        val dr = if (flood != null && flood.dischargeMean > 0) flood.riverDischarge / flood.dischargeMean else 1.0
-        features[14] = if (flood != null) { norm(dr, 0.0, 10.0).also { dataPoints++ } } else 0.5f
-
-        features[15] = norm(hourly.count { it.precipitation > 0.5 }.toDouble(), 0.0, 24.0)
-        if (hourly.isNotEmpty()) dataPoints++
-
-        val ante = allDaily.take(dayIndex + 1).sumOf { it.precipitationSum }
-        features[16] = norm(ante, 0.0, 300.0); dataPoints++
-
-        features[17] = norm(allDaily.take(dayIndex + 1).count { it.precipitationSum > 5 }.toDouble(), 0.0, 7.0); dataPoints++
-
-        val sev = maxOf(
-            wmoSeverity(daily.weatherCode),
-            hourly.maxOfOrNull { wmoSeverity(it.weatherCode) } ?: 0f
+        return extractCommon(
+            hourly = hourly,
+            precipTotal = daily.precipitationSum,
+            maxWind = daily.windSpeedMax,
+            maxGusts = daily.windGustsMax,
+            maxCape = hourly.maxOfOrNull { it.cape } ?: 0.0,
+            cloudCover = hourly.map { it.cloudCover.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0,
+            temp = daily.temperatureMax,
+            dewPoint = hourly.firstOrNull()?.dewPoint ?: 20.0,
+            tempMax = daily.temperatureMax,
+            waveHeight = marine?.waveHeightMax ?: 0.0,
+            swellHeight = marine?.swellWaveHeightMax ?: 0.0,
+            dischargeRatio = if (flood != null && flood.dischargeMean > 0) flood.riverDischarge / flood.dischargeMean else 1.0,
+            wmoCodes = listOf(daily.weatherCode) + hourly.map { it.weatherCode },
+            antecedentDays = allDaily.take(dayIndex + 1),
+            hasWeather = true,
+            hasMarine = marine != null,
+            hasFlood = flood != null,
+            initPressure = 1013.0
         )
-        features[18] = sev; dataPoints++
+    }
 
-        features[19] = norm(daily.temperatureMax, 20.0, 50.0); dataPoints++
+    // ══════════════════════════════════════════════════
+    //  Shared extraction logic
+    // ══════════════════════════════════════════════════
 
-        // [20] Kejenuhan tanah (soil saturation)
-        val soilShallow = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
-        val soilMedium = hourly.map { it.soilMoistureMedium }.filter { it > 0 }
-        val soilDeep = hourly.map { it.soilMoistureDeep }.filter { it > 0 }
-        val hasSoilData = soilShallow.isNotEmpty()
-        if (hasSoilData) {
-            val avgShallow = soilShallow.average()
-            val avgMedium = soilMedium.average().takeIf { !it.isNaN() } ?: avgShallow
-            val avgDeep = soilDeep.average().takeIf { !it.isNaN() } ?: avgShallow
-            val saturation = (avgShallow * 0.5 + avgMedium * 0.3 + avgDeep * 0.2) / 0.50
-            features[20] = norm(saturation, 0.0, 1.5)
-            dataPoints++
-        }
+    private fun extractCommon(
+        hourly: List<HourlyWeatherData>,
+        precipTotal: Double, maxWind: Double, maxGusts: Double, maxCape: Double,
+        cloudCover: Double, temp: Double, dewPoint: Double, tempMax: Double,
+        waveHeight: Double, swellHeight: Double, dischargeRatio: Double,
+        wmoCodes: List<Int>, antecedentDays: List<DailyWeatherData>,
+        hasWeather: Boolean, hasMarine: Boolean, hasFlood: Boolean,
+        initPressure: Double
+    ): WeatherFeatures {
+        val features = FloatArray(FEATURE_COUNT) { 0.5f }
+        var dp = 0
 
-        // [21] Laju perubahan kelembaban tanah
-        if (hasSoilData && soilShallow.size >= 6) {
-            val firstHalf = soilShallow.take(soilShallow.size / 2).average()
-            val secondHalf = soilShallow.drop(soilShallow.size / 2).average()
-            val rate = (secondHalf - firstHalf) / firstHalf.coerceAtLeast(0.01)
-            features[21] = norm(rate, -0.5, 1.0)
-            dataPoints++
-        }
+        // [0] Precipitation total
+        features[0] = norm(precipTotal, 0.0, 200.0); if (hasWeather) dp++
+        // [1] Max rain intensity
+        features[1] = norm(hourly.maxOfOrNull { it.rain + it.showers } ?: 0.0, 0.0, 50.0)
+        if (hourly.isNotEmpty()) dp++
+        // [2] Max wind speed
+        features[2] = norm(maxWind, 0.0, 200.0); if (hasWeather) dp++
+        // [3] Max gusts
+        features[3] = norm(maxGusts, 0.0, 200.0); if (hasWeather) dp++
+        // [4] Wind shear
+        val avgWind = hourly.map { it.windSpeed }.average().takeIf { !it.isNaN() } ?: maxWind
+        features[4] = norm(maxGusts - avgWind, 0.0, 80.0); if (hourly.isNotEmpty()) dp++
+        // [5] Low pressure (inverted)
+        val pressures = hourly.map { it.pressure }.filter { it > 0 }
+        val minP = pressures.minOrNull() ?: initPressure
+        features[5] = 1f - norm(minOf(initPressure, minP), 900.0, 1050.0); if (hasWeather) dp++
+        // [6] Pressure drop
+        features[6] = norm(if (pressures.size >= 2) (pressures.first() - pressures.last()).coerceAtLeast(0.0) else 0.0, 0.0, 30.0)
+        if (pressures.size >= 2) dp++
+        // [7] Humidity
+        features[7] = norm(hourly.map { it.humidity.toDouble() }.average().takeIf { !it.isNaN() } ?: 50.0, 0.0, 100.0)
+        if (hasWeather) dp++
+        // [8] CAPE energy
+        features[8] = norm(maxCape, 0.0, 5000.0); if (hasWeather) dp++
+        // [9] Freezing level (inverted)
+        val fz = hourly.filter { it.freezingLevelHeight > 0 }.minOfOrNull { it.freezingLevelHeight } ?: 5000.0
+        features[9] = 1f - norm(fz, 0.0, 6000.0); if (hourly.any { it.freezingLevelHeight > 0 }) dp++
+        // [10] Cloud cover
+        features[10] = norm(cloudCover, 0.0, 100.0); if (hasWeather) dp++
+        // [11] Dew point spread (inverted)
+        features[11] = 1f - norm((temp - dewPoint).coerceAtLeast(0.0), 0.0, 30.0); if (hasWeather) dp++
+        // [12] Wave height
+        features[12] = if (hasMarine) { norm(waveHeight, 0.0, 10.0).also { dp++ } } else 0.5f
+        // [13] Swell height
+        features[13] = if (hasMarine) norm(swellHeight, 0.0, 5.0) else 0.5f
+        // [14] Discharge ratio
+        features[14] = if (hasFlood) { norm(dischargeRatio, 0.0, 10.0).also { dp++ } } else 0.5f
+        // [15] Rain duration
+        features[15] = norm(hourly.count { it.precipitation > 0.5 }.toDouble(), 0.0, 24.0)
+        if (hourly.isNotEmpty()) dp++
+        // [16] Antecedent rainfall
+        features[16] = norm(antecedentDays.sumOf { it.precipitationSum }, 0.0, 300.0)
+        if (antecedentDays.isNotEmpty()) dp++
+        // [17] Consecutive rain days
+        features[17] = norm(antecedentDays.count { it.precipitationSum > 5 }.toDouble(), 0.0, 7.0)
+        if (antecedentDays.isNotEmpty()) dp++
+        // [18] WMO severity
+        features[18] = wmoCodes.maxOfOrNull { wmoSeverity(it) } ?: 0f; if (hasWeather) dp++
+        // [19] High temperature
+        features[19] = norm(tempMax, 20.0, 50.0); if (hasWeather) dp++
+        // [20-21] Soil saturation & rate
+        extractSoilFeatures(hourly, features) { dp++ }
 
         return WeatherFeatures(
             features = features,
             featureNames = FEATURE_NAMES,
-            dataCompleteness = (dataPoints.toDouble() / FEATURE_COUNT).coerceIn(0.0, 1.0),
-            hasMarineData = marine != null,
-            hasFloodData = flood != null,
+            dataCompleteness = (dp.toDouble() / FEATURE_COUNT).coerceIn(0.0, 1.0),
+            hasMarineData = hasMarine,
+            hasFloodData = hasFlood,
             hasHourlyData = hourly.isNotEmpty()
         )
+    }
+
+    private inline fun extractSoilFeatures(hourly: List<HourlyWeatherData>, features: FloatArray, onData: () -> Unit) {
+        val soilShallow = hourly.map { it.soilMoistureShallow }.filter { it > 0 }
+        if (soilShallow.isEmpty()) return
+        val avgShallow = soilShallow.average()
+        val avgMedium = hourly.map { it.soilMoistureMedium }.filter { it > 0 }.average().takeIf { !it.isNaN() } ?: avgShallow
+        val avgDeep = hourly.map { it.soilMoistureDeep }.filter { it > 0 }.average().takeIf { !it.isNaN() } ?: avgShallow
+        features[20] = norm((avgShallow * 0.5 + avgMedium * 0.3 + avgDeep * 0.2) / 0.50, 0.0, 1.5)
+        onData()
+        if (soilShallow.size >= 6) {
+            val firstHalf = soilShallow.take(soilShallow.size / 2).average()
+            val secondHalf = soilShallow.drop(soilShallow.size / 2).average()
+            features[21] = norm((secondHalf - firstHalf) / firstHalf.coerceAtLeast(0.01), -0.5, 1.0)
+            onData()
+        }
     }
 
     // ══════════════════════════════════════════════════

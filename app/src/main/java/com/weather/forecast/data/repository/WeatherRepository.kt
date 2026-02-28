@@ -145,9 +145,40 @@ class WeatherRepository {
      * Mengambil data per jam dari jam sekarang sampai 24 jam ke depan
      * untuk ditampilkan di horizontal scroll "Prakiraan Per Jam" utama.
      */
+    /** Map a single index of HourlyForecast to HourlyWeatherData */
+    private fun mapHourlyAt(hourly: HourlyForecast, index: Int, hour: String, timeStr: String) =
+        HourlyWeatherData(
+            time = timeStr,
+            hour = hour,
+            temperature = hourly.temperature.getOrNull(index) ?: 0.0,
+            apparentTemperature = hourly.apparentTemperature.getOrNull(index) ?: 0.0,
+            humidity = hourly.humidity.getOrNull(index) ?: 0,
+            weatherCode = hourly.weatherCode.getOrNull(index) ?: 0,
+            weatherCondition = WeatherCondition.fromCode(hourly.weatherCode.getOrNull(index) ?: 0),
+            precipitationProbability = hourly.precipitationProbability.getOrNull(index) ?: 0,
+            precipitation = hourly.precipitation.getOrNull(index) ?: 0.0,
+            windSpeed = hourly.windSpeed.getOrNull(index) ?: 0.0,
+            uvIndex = hourly.uvIndex.getOrNull(index) ?: 0.0,
+            isDay = (hourly.isDay.getOrNull(index) ?: 1) == 1,
+            visibility = hourly.visibility.getOrNull(index) ?: 0.0,
+            windDirection = hourly.windDirection.getOrNull(index) ?: 0,
+            windGusts = hourly.windGusts?.getOrNull(index) ?: 0.0,
+            dewPoint = hourly.dewPoint?.getOrNull(index) ?: 0.0,
+            cape = hourly.cape?.getOrNull(index) ?: 0.0,
+            freezingLevelHeight = hourly.freezingLevelHeight?.getOrNull(index) ?: 0.0,
+            rain = hourly.rain.getOrNull(index) ?: 0.0,
+            showers = hourly.showers.getOrNull(index) ?: 0.0,
+            snowfall = hourly.snowfall.getOrNull(index) ?: 0.0,
+            pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0,
+            soilMoistureShallow = hourly.soilMoisture0to7?.getOrNull(index) ?: 0.0,
+            soilMoistureMedium = hourly.soilMoisture7to28?.getOrNull(index) ?: 0.0,
+            soilMoistureDeep = hourly.soilMoisture28to100?.getOrNull(index) ?: 0.0,
+            soilTemperature = hourly.soilTemperature0cm?.getOrNull(index) ?: 0.0,
+            cloudCover = hourly.cloudCover.getOrNull(index) ?: 0
+        )
+
     private fun transformHourlyData(hourly: HourlyForecast?): List<HourlyWeatherData> {
         if (hourly == null) return emptyList()
-
         val formatter = DateTimeFormatter.ISO_DATE_TIME
         val hourFormatter = DateTimeFormatter.ofPattern("HH:mm")
         val now = LocalDateTime.now()
@@ -155,109 +186,26 @@ class WeatherRepository {
         return hourly.time.mapIndexedNotNull { index, timeStr ->
             try {
                 val time = LocalDateTime.parse(timeStr, formatter)
-                
-                // Hanya ambil data dari jam sekarang sampai 24 jam ke depan
-                if (time.isBefore(now.minusHours(1)) || time.isAfter(now.plusHours(24))) {
-                    return@mapIndexedNotNull null
-                }
-
-                HourlyWeatherData(
-                    time = timeStr,
-                    hour = time.format(hourFormatter),
-                    temperature = hourly.temperature.getOrNull(index) ?: 0.0,
-                    apparentTemperature = hourly.apparentTemperature.getOrNull(index) ?: 0.0,
-                    humidity = hourly.humidity.getOrNull(index) ?: 0,
-                    weatherCode = hourly.weatherCode.getOrNull(index) ?: 0,
-                    weatherCondition = WeatherCondition.fromCode(hourly.weatherCode.getOrNull(index) ?: 0),
-                    precipitationProbability = hourly.precipitationProbability.getOrNull(index) ?: 0,
-                    precipitation = hourly.precipitation.getOrNull(index) ?: 0.0,
-                    windSpeed = hourly.windSpeed.getOrNull(index) ?: 0.0,
-                    uvIndex = hourly.uvIndex.getOrNull(index) ?: 0.0,
-                    isDay = (hourly.isDay.getOrNull(index) ?: 1) == 1,
-                    visibility = hourly.visibility.getOrNull(index) ?: 0.0,
-                    windDirection = hourly.windDirection.getOrNull(index) ?: 0,
-                    windGusts = hourly.windGusts?.getOrNull(index) ?: 0.0,
-                    dewPoint = hourly.dewPoint?.getOrNull(index) ?: 0.0,
-                    cape = hourly.cape?.getOrNull(index) ?: 0.0,
-                    freezingLevelHeight = hourly.freezingLevelHeight?.getOrNull(index) ?: 0.0,
-                    rain = hourly.rain.getOrNull(index) ?: 0.0,
-                    showers = hourly.showers.getOrNull(index) ?: 0.0,
-                    snowfall = hourly.snowfall.getOrNull(index) ?: 0.0,
-                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0,
-                    soilMoistureShallow = hourly.soilMoisture0to7?.getOrNull(index) ?: 0.0,
-                    soilMoistureMedium = hourly.soilMoisture7to28?.getOrNull(index) ?: 0.0,
-                    soilMoistureDeep = hourly.soilMoisture28to100?.getOrNull(index) ?: 0.0,
-                    soilTemperature = hourly.soilTemperature0cm?.getOrNull(index) ?: 0.0,
-                    cloudCover = hourly.cloudCover.getOrNull(index) ?: 0
-                )
-            } catch (e: Exception) {
-                null
-            }
+                if (time.isBefore(now.minusHours(1)) || time.isAfter(now.plusHours(24))) return@mapIndexedNotNull null
+                mapHourlyAt(hourly, index, time.format(hourFormatter), timeStr)
+            } catch (_: Exception) { null }
         }
     }
 
-    /**
-     * Transform SEMUA data hourly dan kelompokkan berdasarkan tanggal
-     *
-     * Mengembalikan Map<String, List<HourlyWeatherData>> dimana key = tanggal (yyyy-MM-dd)
-     * dan value = list 24 data per jam untuk hari tersebut.
-     *
-     * Digunakan untuk menyisipkan prakiraan per jam ke dalam setiap item prakiraan harian
-     * sehingga pengguna bisa melihat detail cuaca setiap jam dalam 1 hari.
-     */
+    /** Transform all hourly data grouped by date (yyyy-MM-dd) for daily detail */
     private fun transformAllHourlyDataByDate(hourly: HourlyForecast?): Map<String, List<HourlyWeatherData>> {
         if (hourly == null) return emptyMap()
-
         val formatter = DateTimeFormatter.ISO_DATE_TIME
         val hourFormatter = DateTimeFormatter.ofPattern("HH:mm")
-        val dateFormatter = DateTimeFormatter.ISO_DATE
 
-        val allHourly = hourly.time.mapIndexedNotNull { index, timeStr ->
+        return hourly.time.mapIndexedNotNull { index, timeStr ->
             try {
                 val time = LocalDateTime.parse(timeStr, formatter)
-
-                HourlyWeatherData(
-                    time = timeStr,
-                    hour = time.format(hourFormatter),
-                    temperature = hourly.temperature.getOrNull(index) ?: 0.0,
-                    apparentTemperature = hourly.apparentTemperature.getOrNull(index) ?: 0.0,
-                    humidity = hourly.humidity.getOrNull(index) ?: 0,
-                    weatherCode = hourly.weatherCode.getOrNull(index) ?: 0,
-                    weatherCondition = WeatherCondition.fromCode(hourly.weatherCode.getOrNull(index) ?: 0),
-                    precipitationProbability = hourly.precipitationProbability.getOrNull(index) ?: 0,
-                    precipitation = hourly.precipitation.getOrNull(index) ?: 0.0,
-                    windSpeed = hourly.windSpeed.getOrNull(index) ?: 0.0,
-                    uvIndex = hourly.uvIndex.getOrNull(index) ?: 0.0,
-                    isDay = (hourly.isDay.getOrNull(index) ?: 1) == 1,
-                    visibility = hourly.visibility.getOrNull(index) ?: 0.0,
-                    windDirection = hourly.windDirection.getOrNull(index) ?: 0,
-                    windGusts = hourly.windGusts?.getOrNull(index) ?: 0.0,
-                    dewPoint = hourly.dewPoint?.getOrNull(index) ?: 0.0,
-                    cape = hourly.cape?.getOrNull(index) ?: 0.0,
-                    freezingLevelHeight = hourly.freezingLevelHeight?.getOrNull(index) ?: 0.0,
-                    rain = hourly.rain.getOrNull(index) ?: 0.0,
-                    showers = hourly.showers.getOrNull(index) ?: 0.0,
-                    snowfall = hourly.snowfall.getOrNull(index) ?: 0.0,
-                    pressure = hourly.pressureMsl?.getOrNull(index) ?: 0.0,
-                    soilMoistureShallow = hourly.soilMoisture0to7?.getOrNull(index) ?: 0.0,
-                    soilMoistureMedium = hourly.soilMoisture7to28?.getOrNull(index) ?: 0.0,
-                    soilMoistureDeep = hourly.soilMoisture28to100?.getOrNull(index) ?: 0.0,
-                    soilTemperature = hourly.soilTemperature0cm?.getOrNull(index) ?: 0.0,
-                    cloudCover = hourly.cloudCover.getOrNull(index) ?: 0
-                )
-            } catch (e: Exception) {
-                null
-            }
-        }
-
-        // Kelompokkan berdasarkan tanggal (yyyy-MM-dd)
-        return allHourly.groupBy { hourlyItem ->
-            try {
-                val time = LocalDateTime.parse(hourlyItem.time, formatter)
-                time.toLocalDate().format(dateFormatter)
-            } catch (e: Exception) {
-                ""
-            }
+                mapHourlyAt(hourly, index, time.format(hourFormatter), timeStr)
+            } catch (_: Exception) { null }
+        }.groupBy { item ->
+            try { LocalDateTime.parse(item.time, formatter).toLocalDate().format(DateTimeFormatter.ISO_DATE) }
+            catch (_: Exception) { "" }
         }.filterKeys { it.isNotEmpty() }
     }
 
@@ -331,30 +279,7 @@ class WeatherRepository {
         }
     }
 
-    /**
-     * Create default current weather jika API tidak mengembalikan data
-     */
-    private fun createDefaultCurrentWeather(): CurrentWeatherData {
-        return CurrentWeatherData(
-            temperature = 0.0,
-            apparentTemperature = 0.0,
-            humidity = 0,
-            weatherCode = 0,
-            weatherCondition = WeatherCondition.CLEAR,
-            windSpeed = 0.0,
-            windDirection = 0,
-            windGusts = 0.0,
-            pressure = 0.0,
-            cloudCover = 0,
-            precipitation = 0.0,
-            isDay = true,
-            rain = 0.0,
-            showers = 0.0,
-            snowfall = 0.0,
-            dewPoint = 0.0,
-            cape = 0.0
-        )
-    }
+    private fun createDefaultCurrentWeather() = CurrentWeatherData()
 
     // ──────────────────────────────────────────────────────────
     // Weather Potential Calculation

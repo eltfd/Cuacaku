@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
+import com.weather.forecast.ui.components.GradientErrorContent
+import com.weather.forecast.ui.components.GradientLoadingContent
 import com.weather.forecast.ui.viewmodel.DisasterMonitorUiState
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
 import java.text.SimpleDateFormat
@@ -52,7 +54,10 @@ fun DisasterMonitorScreen(
     val uiState by viewModel.disasterMonitorState.collectAsState()
 
     when (val state = uiState) {
-        is DisasterMonitorUiState.Loading -> MonitorLoadingContent()
+        is DisasterMonitorUiState.Loading -> {
+            val s = LocalStrings.current
+            GradientLoadingContent(mainText = s.monitoringDisasters, subText = s.fetchingData)
+        }
         is DisasterMonitorUiState.Success -> MonitorContent(
             data = state.data,
             onRefresh = { viewModel.loadDisasterMonitorData() }
@@ -60,44 +65,11 @@ fun DisasterMonitorScreen(
         is DisasterMonitorUiState.Empty -> MonitorEmptyContent(
             onRefresh = { viewModel.loadDisasterMonitorData() }
         )
-        is DisasterMonitorUiState.Error -> MonitorErrorContent(
+        is DisasterMonitorUiState.Error -> GradientErrorContent(
             message = state.message,
+            title = LocalStrings.current.failedToLoadData,
             onRetry = { viewModel.loadDisasterMonitorData() }
         )
-    }
-}
-
-// ═══════════════════════════════════════════════════
-//  LOADING
-// ═══════════════════════════════════════════════════
-
-@Composable
-private fun MonitorLoadingContent() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1A237E), Color(0xFF283593), Color(0xFF3949AB))
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            val s = LocalStrings.current
-            CircularProgressIndicator(color = Color.White)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                s.monitoringDisasters,
-                color = Color.White.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                s.fetchingData,
-                color = Color.White.copy(alpha = 0.5f),
-                style = MaterialTheme.typography.labelSmall
-            )
-        }
     }
 }
 
@@ -156,47 +128,6 @@ private fun MonitorEmptyContent(onRefresh: () -> Unit) {
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.4f)
             )
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════
-//  ERROR
-// ═══════════════════════════════════════════════════
-
-@Composable
-private fun MonitorErrorContent(message: String, onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color(0xFF1A237E), Color(0xFF283593), Color(0xFF3949AB))
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            val s = LocalStrings.current
-            Icon(
-                imageVector = Icons.Default.CloudOff,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = Color.White.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                s.failedToLoadData,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(message, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onRetry) { Text(s.retry) }
         }
     }
 }

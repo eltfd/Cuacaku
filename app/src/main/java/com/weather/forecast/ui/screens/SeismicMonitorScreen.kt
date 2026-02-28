@@ -41,6 +41,204 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// ═══════════════════════════════════════════════════
+//  SHARED COLORS & COMPOSABLES
+// ═══════════════════════════════════════════════════
+
+/** Semantic color palette for the seismic monitor screen. */
+private object SC {
+    val red = Color(0xFFF44336)
+    val deepRed = Color(0xFFD32F2F)
+    val darkRed = Color(0xFFB71C1C)
+    val orange = Color(0xFFFF9800)
+    val lightOrange = Color(0xFFFFB74D)
+    val amber = Color(0xFFFFC107)
+    val yellow = Color(0xFFFFEB3B)
+    val green = Color(0xFF4CAF50)
+    val blue = Color(0xFF2196F3)
+    val deepOrange = Color(0xFFFF5722)
+    val brown = Color(0xFF795548)
+    val blueGrey = Color(0xFF78909C)
+    val grey = Color(0xFF9E9E9E)
+    val lime = Color(0xFFCDDC39)
+    val lightRed = Color(0xFFEF9A9A)
+    val lightAmber = Color(0xFFFFCC80)
+    val darkIndigo = Color(0xFF1A237E)
+    val darkBlue = Color(0xFF0D47A1)
+    val lightBlue = Color(0xFF01579B)
+    val darkGreen = Color(0xFF1B5E20)
+
+    val backgroundGradient = listOf(darkIndigo, darkBlue, lightBlue)
+    val errorGradient = listOf(Color(0xFF37474F), Color(0xFF263238))
+
+    fun magnitude(mag: Double) = when {
+        mag >= 7.0 -> deepRed; mag >= 5.0 -> orange; mag >= 4.0 -> amber; else -> green
+    }
+}
+
+private val expandEnter = expandVertically() + fadeIn()
+private val expandExit = shrinkVertically() + fadeOut()
+
+/** Reusable expandable card section with header and animated content. */
+@Composable
+private fun ExpandableSection(
+    title: String,
+    containerColor: Color = Color.White.copy(alpha = 0.1f),
+    border: BorderStroke? = null,
+    initialExpanded: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    var expanded by remember { mutableStateOf(initialExpanded) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        border = border
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null, tint = Color.White.copy(alpha = 0.7f)
+                )
+            }
+            AnimatedVisibility(visible = expanded, enter = expandEnter, exit = expandExit) {
+                content()
+            }
+        }
+    }
+}
+
+/**
+ * Reusable card for crowdsourced report sections.
+ * Encapsulates: Card + emoji header + subtitle + expand/collapse + AnimatedVisibility.
+ *
+ * @param emoji Header emoji
+ * @param title Section title (e.g. "Flood Reports (12)")
+ * @param subtitle Subtitle line (e.g. "PetaBencana.id • 7 days")
+ * @param themeColor Section theme color
+ * @param middleContent Optional composable between header and expandable content (chips, alerts)
+ * @param content Expandable content
+ */
+@Composable
+private fun ReportSectionCard(
+    emoji: String,
+    title: String,
+    subtitle: String,
+    themeColor: Color,
+    border: BorderStroke? = null,
+    middleContent: @Composable ColumnScope.() -> Unit = {},
+    content: @Composable () -> Unit
+) {
+    var expanded by remember { mutableStateOf(true) }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = themeColor.copy(alpha = 0.12f)),
+        border = border
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(emoji, fontSize = 28.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.6f))
+                    }
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null, tint = Color.White.copy(alpha = 0.7f)
+                )
+            }
+            middleContent()
+            AnimatedVisibility(visible = expanded, enter = expandEnter, exit = expandExit) {
+                content()
+            }
+        }
+    }
+}
+
+/** Small pill chip used for summary stats in report sections. */
+@Composable
+private fun SummaryChip(text: String, color: Color, textColor: Color = Color.White) {
+    Surface(shape = RoundedCornerShape(20.dp), color = color.copy(alpha = 0.2f)) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = textColor,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+    }
+}
+
+/** Nearby alert badge shown between header and content. */
+@Composable
+private fun NearbyReportAlert(count: Int) {
+    if (count <= 0) return
+    val strings = LocalStrings.current
+    Spacer(modifier = Modifier.height(8.dp))
+    Surface(shape = RoundedCornerShape(8.dp), color = SC.orange.copy(alpha = 0.2f)) {
+        Text(
+            text = "⚠\uFE0F $count ${strings.localized("reports within 100 km", "laporan dalam 100 km")}",
+            style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold,
+            color = SC.lightOrange, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun NearbyAlertBadge(count: Int) {
+    val strings = LocalStrings.current
+    Surface(shape = RoundedCornerShape(8.dp), color = SC.orange.copy(alpha = 0.2f)) {
+        Text(
+            text = "⚠️ $count ${strings.localized("reports within 100 km", "laporan dalam 100 km")}",
+            style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold,
+            color = SC.lightOrange,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun AreaDistributionRow(
+    items: List<Map.Entry<String, Int>>,
+    color: Color
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(items) { (area, count) ->
+            Surface(shape = RoundedCornerShape(20.dp), color = color.copy(alpha = 0.2f)) {
+                Text(
+                    "$area ($count)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SafetyWarningBox(emoji: String, title: String, description: String, color: Color) {
+    Surface(shape = RoundedCornerShape(10.dp), color = color.copy(alpha = 0.15f)) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+            Text(emoji, fontSize = 20.sp)
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+            }
+        }
+    }
+}
+
 /**
  * SEISMIC MONITOR SCREEN
  *
@@ -56,7 +254,6 @@ fun SeismicMonitorScreen(
     viewModel: EnvironmentViewModel
 ) {
     val state by viewModel.seismicState.collectAsState()
-    val strings = LocalStrings.current
 
     when (val current = state) {
         is SeismicUiState.Loading -> SeismicLoadingScreen()
@@ -79,15 +276,7 @@ private fun SeismicLoadingScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1A237E),
-                        Color(0xFF0D47A1),
-                        Color(0xFF01579B)
-                    )
-                )
-            ),
+            .background(Brush.verticalGradient(SC.backgroundGradient)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -111,11 +300,7 @@ private fun SeismicErrorScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF37474F), Color(0xFF263238))
-                )
-            ),
+            .background(Brush.verticalGradient(SC.errorGradient)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -155,15 +340,7 @@ private fun SeismicContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1A237E),
-                        Color(0xFF0D47A1),
-                        Color(0xFF01579B)
-                    )
-                )
-            ),
+            .background(Brush.verticalGradient(SC.backgroundGradient)),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -433,46 +610,11 @@ private fun ActiveThreatsBanner(data: SeismicMonitorData) {
 @Composable
 private fun ImpactAreaSection(areas: List<DisasterImpactArea>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "🗺️ ${strings.impactAreas} (${areas.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    areas.forEach { area ->
-                        ImpactAreaCard(area)
-                    }
-                }
-            }
+    ExpandableSection(title = "🗺️ ${strings.impactAreas} (${areas.size})") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Spacer(modifier = Modifier.height(8.dp))
+            areas.forEach { area -> ImpactAreaCard(area) }
         }
     }
 }
@@ -713,55 +855,21 @@ private fun EarthquakeSection(
     earthquakes: List<EarthquakeEvent>,
     emptyText: String
 ) {
-    var expanded by remember { mutableStateOf(true) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    ExpandableSection(title = "📳 $title (${earthquakes.size})") {
+        if (earthquakes.isEmpty()) {
+            Text(
+                text = emptyText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        } else {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 8.dp)
             ) {
-                Text(
-                    text = "📳 $title (${earthquakes.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                if (earthquakes.isEmpty()) {
-                    Text(
-                        text = emptyText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.5f),
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                } else {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) {
-                        earthquakes.take(10).forEach { eq ->
-                            EarthquakeCard(eq)
-                        }
-                    }
+                earthquakes.take(10).forEach { eq ->
+                    EarthquakeCard(eq)
                 }
             }
         }
@@ -953,57 +1061,24 @@ private fun InfoChip(label: String, value: String, modifier: Modifier = Modifier
 @Composable
 private fun BmkgEarthquakeSection(earthquakes: List<BmkgEarthquakeEvent>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B5E20).copy(alpha = 0.3f))
+    ExpandableSection(
+        title = "🇮🇩 ${strings.localized("BMKG Earthquakes", "Gempa BMKG")} (${earthquakes.size})",
+        containerColor = SC.darkGreen.copy(alpha = 0.3f)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "🇮🇩 ${strings.localized("BMKG Earthquakes", "Gempa BMKG")} (${earthquakes.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = strings.localized(
-                            "Official Indonesian seismic data",
-                            "Data seismik resmi Indonesia"
-                        ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    earthquakes.take(10).forEach { eq ->
-                        BmkgEarthquakeCard(eq)
-                    }
-                }
+        Text(
+            text = strings.localized(
+                "Official Indonesian seismic data",
+                "Data seismik resmi Indonesia"
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            earthquakes.take(10).forEach { eq ->
+                BmkgEarthquakeCard(eq)
             }
         }
     }
@@ -1109,14 +1184,11 @@ private fun BmkgEarthquakeCard(earthquake: BmkgEarthquakeEvent) {
 @Composable
 private fun FloodReportSection(reports: List<CrowdsourcedDisasterReport>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
     val nearbyReports = reports.filter { it.isNearby }
     val maxDepth = reports.mapNotNull { it.floodDepthCm }.maxOrNull() ?: 0
     val avgDepth = reports.mapNotNull { it.floodDepthCm }.let { list ->
         if (list.isNotEmpty()) list.average().toInt() else 0
     }
-
-    // Depth distribution
     val depthCounts = mapOf(
         strings.localized("Low", "Rendah") to reports.count { (it.floodDepthCm ?: 0) in 1..29 },
         strings.localized("Medium", "Sedang") to reports.count { (it.floodDepthCm ?: 0) in 30..69 },
@@ -1124,158 +1196,79 @@ private fun FloodReportSection(reports: List<CrowdsourcedDisasterReport>) {
         strings.localized("Very Deep", "Sangat Dalam") to reports.count { (it.floodDepthCm ?: 0) >= 150 }
     )
 
-    val floodBlue = Color(0xFF2196F3)
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = floodBlue.copy(alpha = 0.12f))
+    ReportSectionCard(
+        emoji = "\uD83C\uDF0A",
+        title = "${strings.localized("Flood Reports", "Laporan Banjir")} (${reports.size})",
+        subtitle = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
+        themeColor = SC.blue,
+        middleContent = { NearbyReportAlert(nearbyReports.size) }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("\uD83C\uDF0A", fontSize = 28.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "${strings.localized("Flood Reports", "Laporan Banjir")} (${reports.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
+        Column(modifier = Modifier.padding(top = 12.dp)) {
+            // Flood Summary Stats
+            Row(modifier = Modifier.fillMaxWidth()) {
+                FloodStatBox(
+                    label = strings.localized("Max Depth", "Kedalaman Maks"),
+                    value = "${maxDepth} cm",
+                    color = when {
+                        maxDepth >= 150 -> SC.red; maxDepth >= 70 -> SC.orange
+                        maxDepth >= 30 -> SC.yellow; else -> SC.blue
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                FloodStatBox(
+                    label = strings.localized("Avg Depth", "Kedalaman Rata\u00B2"),
+                    value = "${avgDepth} cm", color = SC.blue, modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                FloodStatBox(
+                    label = strings.localized("Nearby", "Terdekat"),
+                    value = "${nearbyReports.size}", color = SC.green, modifier = Modifier.weight(1f)
                 )
             }
 
-            // Nearby alert
-            if (nearbyReports.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFFF9800).copy(alpha = 0.2f)
-                ) {
-                    Text(
-                        text = "\u26A0\uFE0F ${nearbyReports.size} ${strings.localized("reports within 100 km", "laporan dalam 100 km")}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFB74D),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
+            // Depth Severity Distribution
+            if (depthCounts.values.any { it > 0 }) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = strings.localized("Depth Distribution", "Distribusi Kedalaman"),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                val maxCount = depthCounts.values.maxOrNull()?.toFloat() ?: 1f
+                val depthColors = listOf(SC.green, SC.yellow, SC.orange, SC.red)
+                depthCounts.entries.forEachIndexed { index, (label, count) ->
+                    if (count > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(label, style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(90.dp))
+                            Box(
+                                modifier = Modifier.weight(1f).height(14.dp)
+                                    .clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = 0.08f))
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxHeight()
+                                        .fillMaxWidth(fraction = (count / maxCount).coerceIn(0.05f, 1f))
+                                        .clip(RoundedCornerShape(7.dp)).background(depthColors[index])
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("$count", style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
                 }
             }
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    // ── Flood Summary Stats ──
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        FloodStatBox(
-                            label = strings.localized("Max Depth", "Kedalaman Maks"),
-                            value = "${maxDepth} cm",
-                            color = when {
-                                maxDepth >= 150 -> Color(0xFFF44336)
-                                maxDepth >= 70 -> Color(0xFFFF9800)
-                                maxDepth >= 30 -> Color(0xFFFFEB3B)
-                                else -> floodBlue
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        FloodStatBox(
-                            label = strings.localized("Avg Depth", "Kedalaman Rata\u00B2"),
-                            value = "${avgDepth} cm",
-                            color = floodBlue,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        FloodStatBox(
-                            label = strings.localized("Nearby", "Terdekat"),
-                            value = "${nearbyReports.size}",
-                            color = Color(0xFF4CAF50),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    // ── Depth Severity Distribution ──
-                    if (depthCounts.values.any { it > 0 }) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = strings.localized("Depth Distribution", "Distribusi Kedalaman"),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        val maxCount = depthCounts.values.maxOrNull()?.toFloat() ?: 1f
-                        val depthColors = listOf(
-                            Color(0xFF4CAF50), Color(0xFFFFEB3B),
-                            Color(0xFFFF9800), Color(0xFFF44336)
-                        )
-                        depthCounts.entries.forEachIndexed { index, (label, count) ->
-                            if (count > 0) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        modifier = Modifier.width(90.dp)
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(14.dp)
-                                            .clip(RoundedCornerShape(7.dp))
-                                            .background(Color.White.copy(alpha = 0.08f))
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxHeight()
-                                                .fillMaxWidth(fraction = (count / maxCount).coerceIn(0.05f, 1f))
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .background(depthColors[index])
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "$count",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // ── Individual Flood Report Cards ──
-                    Spacer(modifier = Modifier.height(12.dp))
-                    reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
-                        FloodReportCard(report)
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
-                }
+            // Individual Flood Report Cards
+            Spacer(modifier = Modifier.height(12.dp))
+            reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
+                FloodReportCard(report)
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
@@ -1399,137 +1392,59 @@ private fun FloodReportCard(report: CrowdsourcedDisasterReport) {
 @Composable
 private fun CrowdsourcedEarthquakeReportSection(reports: List<CrowdsourcedDisasterReport>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
     val nearbyReports = reports.filter { it.isNearby }
-    val quakeOrange = Color(0xFFFF9800)
-
-    // Structure damage distribution
-    val damageCounts = (0..4).associateWith { level ->
-        reports.count { it.structureDamage == level }
-    }
+    val damageCounts = (0..4).associateWith { level -> reports.count { it.structureDamage == level } }
     val damageLabels = listOf(
-        strings.localized("None", "Tidak Ada"),
-        strings.localized("Light", "Ringan"),
-        strings.localized("Moderate", "Sedang"),
-        strings.localized("Heavy", "Berat"),
+        strings.localized("None", "Tidak Ada"), strings.localized("Light", "Ringan"),
+        strings.localized("Moderate", "Sedang"), strings.localized("Heavy", "Berat"),
         strings.localized("Severe", "Sangat Berat")
     )
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = quakeOrange.copy(alpha = 0.12f))
+    ReportSectionCard(
+        emoji = "\uD83C\uDF0D",
+        title = "${strings.localized("Earthquake Reports", "Laporan Gempa Warga")} (${reports.size})",
+        subtitle = "PetaBencana.id \u2022 ${strings.localized("Crowdsourced", "Laporan Warga")}",
+        themeColor = SC.orange,
+        middleContent = { NearbyReportAlert(nearbyReports.size) }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("\uD83C\uDF0D", fontSize = 28.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "${strings.localized("Earthquake Reports", "Laporan Gempa Warga")} (${reports.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "PetaBencana.id \u2022 ${strings.localized("Crowdsourced", "Laporan Warga")}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
+        Column(modifier = Modifier.padding(top = 12.dp)) {
+            // Structure Damage Distribution
+            val hasStructureData = damageCounts.values.any { it > 0 }
+            if (hasStructureData) {
+                Text(
+                    text = strings.localized("Structure Damage", "Kerusakan Struktur"),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f)
                 )
-            }
-
-            if (nearbyReports.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFFF9800).copy(alpha = 0.2f)
-                ) {
-                    Text(
-                        text = "\u26A0\uFE0F ${nearbyReports.size} ${strings.localized("reports within 100 km", "laporan dalam 100 km")}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFB74D),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    // ── Structure Damage Distribution ──
-                    val hasStructureData = damageCounts.values.any { it > 0 }
-                    if (hasStructureData) {
-                        Text(
-                            text = strings.localized("Structure Damage", "Kerusakan Struktur"),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        val maxDmg = damageCounts.values.maxOrNull()?.toFloat() ?: 1f
-                        val dmgColors = listOf(
-                            Color(0xFF4CAF50), Color(0xFFCDDC39), Color(0xFFFFEB3B),
-                            Color(0xFFFF9800), Color(0xFFF44336)
-                        )
-                        damageCounts.entries.forEachIndexed { index, (_, count) ->
-                            if (count > 0) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = damageLabels[index],
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        modifier = Modifier.width(80.dp)
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(14.dp)
-                                            .clip(RoundedCornerShape(7.dp))
-                                            .background(Color.White.copy(alpha = 0.08f))
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxHeight()
-                                                .fillMaxWidth(fraction = (count / maxDmg).coerceIn(0.05f, 1f))
-                                                .clip(RoundedCornerShape(7.dp))
-                                                .background(dmgColors[index])
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("$count", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                                }
+                Spacer(modifier = Modifier.height(6.dp))
+                val maxDmg = damageCounts.values.maxOrNull()?.toFloat() ?: 1f
+                val dmgColors = listOf(SC.green, SC.lime, SC.yellow, SC.orange, SC.red)
+                damageCounts.entries.forEachIndexed { index, (_, count) ->
+                    if (count > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(damageLabels[index], style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(80.dp))
+                            Box(modifier = Modifier.weight(1f).height(14.dp)
+                                .clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = 0.08f))) {
+                                Box(modifier = Modifier.fillMaxHeight()
+                                    .fillMaxWidth(fraction = (count / maxDmg).coerceIn(0.05f, 1f))
+                                    .clip(RoundedCornerShape(7.dp)).background(dmgColors[index]))
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("$count", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    // ── Individual Cards ──
-                    reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
-                        CrowdsourcedQuakeCard(report)
-                        Spacer(modifier = Modifier.height(6.dp))
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Individual Cards
+            reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
+                CrowdsourcedQuakeCard(report)
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
@@ -1629,110 +1544,41 @@ private fun CrowdsourcedQuakeCard(report: CrowdsourcedDisasterReport) {
 @Composable
 private fun WindReportSection(reports: List<CrowdsourcedDisasterReport>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
     val nearbyReports = reports.filter { it.isNearby }
-    val windGrey = Color(0xFF78909C)
     val significantImpact = reports.count { (it.windImpact ?: 0) >= 1 }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = windGrey.copy(alpha = 0.12f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("\uD83D\uDCA8", fontSize = 28.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "${strings.localized("Strong Wind Reports", "Laporan Angin Kencang")} (${reports.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            // Summary chips row
+    ReportSectionCard(
+        emoji = "\uD83D\uDCA8",
+        title = "${strings.localized("Strong Wind Reports", "Laporan Angin Kencang")} (${reports.size})",
+        subtitle = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
+        themeColor = SC.blueGrey,
+        middleContent = {
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Surface(shape = RoundedCornerShape(20.dp), color = Color.White.copy(alpha = 0.12f)) {
-                    Text(
-                        text = "\uD83D\uDCCD ${strings.localized("Nearby", "Terdekat")}: ${nearbyReports.size}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
+                SummaryChip("\uD83D\uDCCD ${strings.localized("Nearby", "Terdekat")}: ${nearbyReports.size}", Color.White)
                 if (significantImpact > 0) {
-                    Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFF44336).copy(alpha = 0.2f)) {
-                        Text(
-                            text = "\u26A0\uFE0F ${strings.localized("Significant Impact", "Dampak Signifikan")}: $significantImpact",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFEF9A9A),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
+                    SummaryChip("\u26A0\uFE0F ${strings.localized("Significant Impact", "Dampak Signifikan")}: $significantImpact", SC.red, SC.lightRed)
                 }
             }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    // Province distribution
-                    val provinceCounts = reports.groupBy { it.cityName ?: strings.localized("Unknown", "Tidak Diketahui") }
-                        .mapValues { it.value.size }
-                        .entries.sortedByDescending { it.value }
-                        .take(5)
-                    if (provinceCounts.isNotEmpty()) {
-                        Text(
-                            text = strings.localized("Affected Areas", "Wilayah Terdampak"),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(provinceCounts) { (city, count) ->
-                                Surface(shape = RoundedCornerShape(20.dp), color = windGrey.copy(alpha = 0.2f)) {
-                                    Text(
-                                        text = "$city ($count)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
-                        GenericDisasterReportCard(report, windGrey)
-                        Spacer(modifier = Modifier.height(6.dp))
+        }
+    ) {
+        Column(modifier = Modifier.padding(top = 12.dp)) {
+            val provinceCounts = reports.groupBy { it.cityName ?: strings.localized("Unknown", "Tidak Diketahui") }
+                .mapValues { it.value.size }.entries.sortedByDescending { it.value }.take(5)
+            if (provinceCounts.isNotEmpty()) {
+                Text(strings.localized("Affected Areas", "Wilayah Terdampak"),
+                    style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f))
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(provinceCounts) { (city, count) ->
+                        SummaryChip("$city ($count)", SC.blueGrey)
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
+                GenericDisasterReportCard(report, SC.blueGrey)
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
@@ -1743,135 +1589,43 @@ private fun WindReportSection(reports: List<CrowdsourcedDisasterReport>) {
 @Composable
 private fun HazeReportSection(reports: List<CrowdsourcedDisasterReport>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
     val nearbyReports = reports.filter { it.isNearby }
-    val hazeGrey = Color(0xFF9E9E9E)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = hazeGrey.copy(alpha = 0.12f))
+    ReportSectionCard(
+        emoji = "\uD83C\uDF2B\uFE0F",
+        title = "${strings.localized("Haze Reports", "Laporan Kabut Asap")} (${reports.size})",
+        subtitle = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
+        themeColor = SC.grey,
+        middleContent = { NearbyReportAlert(nearbyReports.size) }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("\uD83C\uDF2B\uFE0F", fontSize = 28.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "${strings.localized("Haze Reports", "Laporan Kabut Asap")} (${reports.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
+        Column(modifier = Modifier.padding(top = 12.dp)) {
+            SafetyWarningBox(
+                emoji = "\uD83D\uDC41\uFE0F",
+                title = strings.localized("Visibility Warning", "Peringatan Jarak Pandang"),
+                description = strings.localized(
+                    "Haze may reduce visibility and affect air quality. Use mask when outdoors.",
+                    "Kabut asap dapat mengurangi jarak pandang dan mempengaruhi kualitas udara. Gunakan masker saat beraktivitas di luar."
+                ),
+                color = SC.grey
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val areaCounts = reports.groupBy { it.cityName ?: strings.localized("Unknown", "Tidak Diketahui") }
+                .mapValues { it.value.size }.entries.sortedByDescending { it.value }.take(5)
+            if (areaCounts.isNotEmpty()) {
+                Text(strings.localized("Affected Areas", "Wilayah Terdampak"),
+                    style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f))
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(areaCounts) { (city, count) ->
+                        SummaryChip("$city ($count)", SC.grey)
                     }
                 }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            if (nearbyReports.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFFF9800).copy(alpha = 0.2f)
-                ) {
-                    Text(
-                        text = "\u26A0\uFE0F ${nearbyReports.size} ${strings.localized("reports within 100 km", "laporan dalam 100 km")}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFB74D),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
             }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    // Haze visibility impact warning
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = hazeGrey.copy(alpha = 0.15f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("\uD83D\uDC41\uFE0F", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = strings.localized("Visibility Warning", "Peringatan Jarak Pandang"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = strings.localized(
-                                        "Haze may reduce visibility and affect air quality. Use mask when outdoors.",
-                                        "Kabut asap dapat mengurangi jarak pandang dan mempengaruhi kualitas udara. Gunakan masker saat beraktivitas di luar."
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Province distribution
-                    val areaCounts = reports.groupBy { it.cityName ?: strings.localized("Unknown", "Tidak Diketahui") }
-                        .mapValues { it.value.size }
-                        .entries.sortedByDescending { it.value }
-                        .take(5)
-                    if (areaCounts.isNotEmpty()) {
-                        Text(
-                            text = strings.localized("Affected Areas", "Wilayah Terdampak"),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(areaCounts) { (city, count) ->
-                                Surface(shape = RoundedCornerShape(20.dp), color = hazeGrey.copy(alpha = 0.2f)) {
-                                    Text(
-                                        text = "$city ($count)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
-                        GenericDisasterReportCard(report, hazeGrey)
-                        Spacer(modifier = Modifier.height(6.dp))
-                    }
-                }
+            reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
+                GenericDisasterReportCard(report, SC.grey)
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
@@ -1882,156 +1636,52 @@ private fun HazeReportSection(reports: List<CrowdsourcedDisasterReport>) {
 @Composable
 private fun FireReportSection(reports: List<CrowdsourcedDisasterReport>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
     val nearbyReports = reports.filter { it.isNearby }
-    val fireRed = Color(0xFFF44336)
     val evacuationReports = reports.filter { it.evacuationArea == true }
     val totalEvacuees = reports.mapNotNull { it.evacuationNumber }.sum()
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = fireRed.copy(alpha = 0.12f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("\uD83D\uDD25", fontSize = 28.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "${strings.localized("Forest Fire Reports", "Laporan Kebakaran Hutan")} (${reports.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            // Summary row
+    ReportSectionCard(
+        emoji = "\uD83D\uDD25",
+        title = "${strings.localized("Forest Fire Reports", "Laporan Kebakaran Hutan")} (${reports.size})",
+        subtitle = "PetaBencana.id \u2022 ${strings.localized("7 days", "7 hari")}",
+        themeColor = SC.red,
+        middleContent = {
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (nearbyReports.isNotEmpty()) {
-                    Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFFF9800).copy(alpha = 0.2f)) {
-                        Text(
-                            text = "\u26A0\uFE0F ${strings.localized("Nearby", "Terdekat")}: ${nearbyReports.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFFFB74D),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                if (evacuationReports.isNotEmpty()) {
-                    Surface(shape = RoundedCornerShape(20.dp), color = fireRed.copy(alpha = 0.2f)) {
-                        Text(
-                            text = "\uD83D\uDEA8 ${strings.localized("Evacuation", "Evakuasi")}: ${evacuationReports.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFEF9A9A),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                if (totalEvacuees > 0) {
-                    Surface(shape = RoundedCornerShape(20.dp), color = fireRed.copy(alpha = 0.2f)) {
-                        Text(
-                            text = "\uD83E\uDDD1 ${strings.localized("Evacuees", "Pengungsi")}: $totalEvacuees",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFEF9A9A),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
+                if (nearbyReports.isNotEmpty()) SummaryChip("\u26A0\uFE0F ${strings.localized("Nearby", "Terdekat")}: ${nearbyReports.size}", SC.orange, SC.lightOrange)
+                if (evacuationReports.isNotEmpty()) SummaryChip("\uD83D\uDEA8 ${strings.localized("Evacuation", "Evakuasi")}: ${evacuationReports.size}", SC.red, SC.lightRed)
+                if (totalEvacuees > 0) SummaryChip("\uD83E\uDDD1 ${strings.localized("Evacuees", "Pengungsi")}: $totalEvacuees", SC.red, SC.lightRed)
             }
+        }
+    ) {
+        Column(modifier = Modifier.padding(top = 12.dp)) {
+            SafetyWarningBox(
+                emoji = "\uD83D\uDEA8",
+                title = strings.localized("Fire Safety", "Keselamatan Kebakaran"),
+                description = strings.localized(
+                    "Stay away from fire areas. Follow evacuation instructions from authorities.",
+                    "Jauhi area kebakaran. Ikuti instruksi evakuasi dari pihak berwenang."
+                ),
+                color = SC.red
+            )
+            Spacer(modifier = Modifier.height(8.dp))
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    // Fire safety warning
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = fireRed.copy(alpha = 0.15f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("\uD83D\uDEA8", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = strings.localized("Fire Safety", "Keselamatan Kebakaran"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = strings.localized(
-                                        "Stay away from fire areas. Follow evacuation instructions from authorities.",
-                                        "Jauhi area kebakaran. Ikuti instruksi evakuasi dari pihak berwenang."
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Area distribution
-                    val areaCounts = reports.groupBy { it.cityName ?: strings.localized("Unknown", "Tidak Diketahui") }
-                        .mapValues { it.value.size }
-                        .entries.sortedByDescending { it.value }
-                        .take(5)
-                    if (areaCounts.isNotEmpty()) {
-                        Text(
-                            text = strings.localized("Fire Locations", "Lokasi Kebakaran"),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(areaCounts) { (city, count) ->
-                                Surface(shape = RoundedCornerShape(20.dp), color = fireRed.copy(alpha = 0.2f)) {
-                                    Text(
-                                        text = "$city ($count)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
-                        FireReportCard(report)
-                        Spacer(modifier = Modifier.height(6.dp))
+            val areaCounts = reports.groupBy { it.cityName ?: strings.localized("Unknown", "Tidak Diketahui") }
+                .mapValues { it.value.size }.entries.sortedByDescending { it.value }.take(5)
+            if (areaCounts.isNotEmpty()) {
+                Text(strings.localized("Fire Locations", "Lokasi Kebakaran"),
+                    style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f))
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(areaCounts) { (city, count) ->
+                        SummaryChip("$city ($count)", SC.red)
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
+                FireReportCard(report)
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
@@ -2112,111 +1762,38 @@ private fun FireReportCard(report: CrowdsourcedDisasterReport) {
 @Composable
 private fun CrowdsourcedVolcanoReportSection(reports: List<CrowdsourcedDisasterReport>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
     val nearbyReports = reports.filter { it.isNearby }
-    val volcanoRed = Color(0xFFD32F2F)
     val evacuationReports = reports.filter { it.evacuationArea == true }
-
-    // Aggregate volcanic signs
     val allSigns = reports.flatMap { it.volcanicSignsLabels }.groupBy { it }.mapValues { it.value.size }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = volcanoRed.copy(alpha = 0.12f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("\uD83C\uDF0B", fontSize = 28.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "${strings.localized("Volcano Reports", "Laporan Gunung Api")} (${reports.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "PetaBencana.id \u2022 ${strings.localized("Crowdsourced", "Laporan Warga")}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            // Summary chips
+    ReportSectionCard(
+        emoji = "\uD83C\uDF0B",
+        title = "${strings.localized("Volcano Reports", "Laporan Gunung Api")} (${reports.size})",
+        subtitle = "PetaBencana.id \u2022 ${strings.localized("Crowdsourced", "Laporan Warga")}",
+        themeColor = SC.deepRed,
+        middleContent = {
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (nearbyReports.isNotEmpty()) {
-                    Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFFF9800).copy(alpha = 0.2f)) {
-                        Text(
-                            text = "\u26A0\uFE0F ${strings.localized("Nearby", "Terdekat")}: ${nearbyReports.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFFFB74D),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-                if (evacuationReports.isNotEmpty()) {
-                    Surface(shape = RoundedCornerShape(20.dp), color = volcanoRed.copy(alpha = 0.2f)) {
-                        Text(
-                            text = "\uD83D\uDEA8 ${strings.localized("Evacuation", "Evakuasi")}: ${evacuationReports.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFEF9A9A),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
+                if (nearbyReports.isNotEmpty()) SummaryChip("\u26A0\uFE0F ${strings.localized("Nearby", "Terdekat")}: ${nearbyReports.size}", SC.orange, SC.lightOrange)
+                if (evacuationReports.isNotEmpty()) SummaryChip("\uD83D\uDEA8 ${strings.localized("Evacuation", "Evakuasi")}: ${evacuationReports.size}", SC.deepRed, SC.lightRed)
             }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    // Observed volcanic signs summary
-                    if (allSigns.isNotEmpty()) {
-                        Text(
-                            text = strings.localized("Observed Volcanic Signs", "Tanda Vulkanik Teramati"),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            items(allSigns.entries.toList()) { (sign, count) ->
-                                Surface(shape = RoundedCornerShape(20.dp), color = volcanoRed.copy(alpha = 0.2f)) {
-                                    Text(
-                                        text = "$sign ($count)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
-                        VolcanoReportCard(report)
-                        Spacer(modifier = Modifier.height(6.dp))
+        }
+    ) {
+        Column(modifier = Modifier.padding(top = 12.dp)) {
+            if (allSigns.isNotEmpty()) {
+                Text(strings.localized("Observed Volcanic Signs", "Tanda Vulkanik Teramati"),
+                    style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.7f))
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(allSigns.entries.toList()) { (sign, count) ->
+                        SummaryChip("$sign ($count)", SC.deepRed)
                     }
                 }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            reports.sortedBy { it.distanceFromUserKm }.take(10).forEach { report ->
+                VolcanoReportCard(report)
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
     }
@@ -2944,90 +2521,31 @@ private fun VolcanicActivitySection(
     nearbyVolcanoes: List<NearbyVolcano>
 ) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
     var showNearbyList by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "🌋 ${strings.volcanoActivity} (${events.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
+    ExpandableSection(title = "🌋 ${strings.volcanoActivity} (${events.size})") {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(4.dp))
+            if (events.isEmpty()) {
+                Text(strings.volcanoNoActivity, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.5f))
             }
+            events.forEach { VolcanoEventCard(it) }
 
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    if (events.isEmpty()) {
-                        Text(
-                            text = strings.volcanoNoActivity,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                    }
-
-                    events.forEach { volcano ->
-                        VolcanoEventCard(volcano)
-                    }
-
-                    // Nearby volcanoes list
-                    if (nearbyVolcanoes.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showNearbyList = !showNearbyList },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "🗻 ${strings.volcanoNearbyList} (${nearbyVolcanoes.size})",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White.copy(alpha = 0.8f)
-                            )
-                            Icon(
-                                if (showNearbyList) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.5f),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        AnimatedVisibility(
-                            visible = showNearbyList,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                nearbyVolcanoes.forEach { v ->
-                                    NearbyVolcanoRow(v)
-                                }
-                            }
-                        }
+            if (nearbyVolcanoes.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showNearbyList = !showNearbyList },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🗻 ${strings.volcanoNearbyList} (${nearbyVolcanoes.size})",
+                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.8f))
+                    Icon(if (showNearbyList) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(20.dp))
+                }
+                AnimatedVisibility(visible = showNearbyList, enter = expandEnter, exit = expandExit) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        nearbyVolcanoes.forEach { NearbyVolcanoRow(it) }
                     }
                 }
             }
@@ -3088,7 +2606,6 @@ private fun VolcanoEventCard(volcano: VolcanicEvent) {
 
 @Composable
 private fun NearbyVolcanoRow(volcano: NearbyVolcano) {
-    val strings = LocalStrings.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -3424,51 +2941,14 @@ private fun DisasterPhaseBanner(
 @Composable
 private fun EarlyWarningSection(states: List<DisasterLifecycleState>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFC107).copy(alpha = 0.15f)),
-        border = BorderStroke(1.dp, Color(0xFFFFC107).copy(alpha = 0.5f))
+    ExpandableSection(
+        title = "⚠️ ${strings.earlyWarningSystem}",
+        containerColor = SC.amber.copy(alpha = 0.15f),
+        border = BorderStroke(1.dp, SC.amber.copy(alpha = 0.5f))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("⚠️", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = strings.earlyWarningSystem,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFC107)
-                    )
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    states.forEach { state ->
-                        EarlyWarningCard(state)
-                    }
-                }
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Spacer(modifier = Modifier.height(8.dp))
+            states.forEach { EarlyWarningCard(it) }
         }
     }
 }
@@ -3813,63 +3293,15 @@ private fun ActiveDisasterPanel(states: List<DisasterLifecycleState>) {
 @Composable
 private fun PostDisasterReliefSection(reliefPoints: List<ReliefPoint>) {
     val strings = LocalStrings.current
-    var expanded by remember { mutableStateOf(true) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2196F3).copy(alpha = 0.15f))
+    ExpandableSection(
+        title = "🏕️ ${strings.nearbyReliefPoints} (${reliefPoints.size})",
+        containerColor = SC.blue.copy(alpha = 0.15f)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🏕️", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = strings.nearbyReliefPoints,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "${reliefPoints.size} ${strings.reliefPoints}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.7f)
-                )
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    reliefPoints.sortedBy { it.distanceFromUserKm }.forEach { point ->
-                        ReliefPointCard(point)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = strings.reliefDataSource,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.4f)
-                    )
-                }
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.height(8.dp))
+            reliefPoints.sortedBy { it.distanceFromUserKm }.forEach { ReliefPointCard(it) }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(strings.reliefDataSource, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.4f))
         }
     }
 }

@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.weather.forecast.data.locale.LocalStrings
 import com.weather.forecast.data.model.*
+import com.weather.forecast.ui.components.GradientErrorContent
+import com.weather.forecast.ui.components.GradientLoadingContent
+import com.weather.forecast.ui.components.StatusBadge
 import com.weather.forecast.ui.viewmodel.DisasterUiState
 import com.weather.forecast.ui.viewmodel.EnvironmentViewModel
 
@@ -45,103 +48,15 @@ fun DisasterForecastScreen(
 
     when (val state = uiState) {
         is DisasterUiState.Loading -> {
-            DisasterLoadingContent()
-        }
-        is DisasterUiState.Success -> {
-            DisasterForecastContent(data = state.data)
-        }
-        is DisasterUiState.Error -> {
-            DisasterErrorContent(
-                message = state.message,
-                onRetry = { viewModel.loadDisasterData() }
-            )
-        }
-    }
-}
-
-// ===================== LOADING =====================
-
-@Composable
-private fun DisasterLoadingContent() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1A237E),
-                        Color(0xFF283593),
-                        Color(0xFF3949AB)
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = Color.White)
-            Spacer(modifier = Modifier.height(16.dp))
             val s = LocalStrings.current
-            Text(
-                text = s.analyzingDisasters,
-                color = Color.White.copy(alpha = 0.7f),
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = s.aiProcessing,
-                color = Color.White.copy(alpha = 0.5f),
-                style = MaterialTheme.typography.labelSmall
-            )
+            GradientLoadingContent(mainText = s.analyzingDisasters, subText = s.aiProcessing)
         }
-    }
-}
-
-// ===================== ERROR =====================
-
-@Composable
-private fun DisasterErrorContent(message: String, onRetry: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1A237E),
-                        Color(0xFF283593),
-                        Color(0xFF3949AB)
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            val s = LocalStrings.current
-            Icon(
-                imageVector = Icons.Default.CloudOff,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = Color.White.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = s.failedToLoadAnalysis,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onRetry) {
-                Text(s.retry)
-            }
-        }
+        is DisasterUiState.Success -> DisasterForecastContent(data = state.data)
+        is DisasterUiState.Error -> GradientErrorContent(
+            message = state.message,
+            title = LocalStrings.current.failedToLoadAnalysis,
+            onRetry = { viewModel.loadDisasterData() }
+        )
     }
 }
 
@@ -394,18 +309,12 @@ private fun DisasterPredictionCard(prediction: DisasterPrediction) {
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // Risk badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(riskColor.copy(alpha = 0.4f))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = LocalStrings.current.localized(prediction.riskLevel.label, prediction.riskLevel.labelId),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                }
+                StatusBadge(
+                    text = LocalStrings.current.localized(prediction.riskLevel.label, prediction.riskLevel.labelId),
+                    color = riskColor,
+                    alpha = 0.4f,
+                    horizontalPadding = 10.dp
+                )
             }
 
             // Risk score bar
@@ -757,19 +666,12 @@ private fun DailyDisasterCard(day: DailyDisasterSummary) {
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // Risk badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(riskColor.copy(alpha = 0.4f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = LocalStrings.current.localized(day.highestRisk.label, day.highestRisk.labelId),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White,
-                        fontSize = 10.sp
-                    )
-                }
+                StatusBadge(
+                    text = LocalStrings.current.localized(day.highestRisk.label, day.highestRisk.labelId),
+                    color = riskColor,
+                    alpha = 0.4f,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                )
 
                 Spacer(modifier = Modifier.width(4.dp))
 

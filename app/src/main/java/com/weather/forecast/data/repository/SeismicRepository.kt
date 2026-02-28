@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.weather.forecast.data.api.RetrofitClient
+import com.weather.forecast.data.haversineDistance
 import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.*
 import kotlinx.coroutines.Dispatchers
@@ -652,7 +653,7 @@ class SeismicRepository(private val context: Context) {
         val lat = geo.coordinates?.getOrNull(1) ?: 0.0
         val lon = geo.coordinates?.getOrNull(0) ?: 0.0
         val depth = geo.coordinates?.getOrNull(2) ?: 0.0
-        val distance = KnownVolcanoes.haversineDistance(userLat, userLon, lat, lon)
+        val distance = haversineDistance(userLat, userLon, lat, lon)
         val mag = props.mag ?: 0.0
 
         return EarthquakeEvent(
@@ -809,7 +810,7 @@ class SeismicRepository(private val context: Context) {
                 if (data != null) {
                     val lat = alert.geometry?.coordinates?.getOrNull(1) ?: 0.0
                     val lon = alert.geometry?.coordinates?.getOrNull(0) ?: 0.0
-                    val dist = KnownVolcanoes.haversineDistance(latitude, longitude, lat, lon)
+                    val dist = haversineDistance(latitude, longitude, lat, lon)
 
                     events.add(VolcanicEvent(
                         id = "usgs_${data.volcanoName?.hashCode() ?: 0}",
@@ -846,7 +847,7 @@ class SeismicRepository(private val context: Context) {
                 val geo = event.geometry?.lastOrNull()
                 val lat = geo?.coordinates?.getOrNull(1) ?: 0.0
                 val lon = geo?.coordinates?.getOrNull(0) ?: 0.0
-                val dist = KnownVolcanoes.haversineDistance(latitude, longitude, lat, lon)
+                val dist = haversineDistance(latitude, longitude, lat, lon)
 
                 // Avoid duplicates from USGS
                 if (events.none { it.name.equals(event.title, ignoreCase = true) }) {
@@ -880,7 +881,7 @@ class SeismicRepository(private val context: Context) {
         // ── Nearby known volcanoes from embedded DB ──
         val nearbyRecords = KnownVolcanoes.findNearby(latitude, longitude, 300.0)
         val nearbyVolcanoes = nearbyRecords.map { record ->
-            val dist = KnownVolcanoes.haversineDistance(latitude, longitude, record.latitude, record.longitude)
+            val dist = haversineDistance(latitude, longitude, record.latitude, record.longitude)
             // Check if this volcano has active alerts
             val hasActiveAlert = events.any {
                 it.name.contains(record.name, ignoreCase = true) ||
@@ -1002,6 +1003,37 @@ class SeismicRepository(private val context: Context) {
     //  IMPACT AREA CALCULATION
     // ═══════════════════════════════════════════════════
 
+    /** Build graduated 3-zone impact zones from a config list. Each config = (label, labelId, radiusFactor, colorHex, alpha, desc, descId) */
+    private fun buildZones(
+        radius: Double,
+        configs: List<Triple<Pair<String, String>, Triple<Double, Long, Float>, Pair<String, String>>>
+    ): List<ImpactZone> = configs.map { (labels, metrics, descs) ->
+        ImpactZone(
+            label = labels.first, labelId = labels.second,
+            radiusKm = radius * metrics.first,
+            colorHex = metrics.second, alpha = metrics.third,
+            description = descs.first, descriptionId = descs.second
+        )
+    }
+
+    private fun earthquakeZones(radius: Double) = buildZones(radius, listOf(
+        Triple("Severe" to "Parah", Triple(0.3, 0xFFF44336L, 0.4f), "Heavy damage zone" to "Zona kerusakan berat"),
+        Triple("Moderate" to "Sedang", Triple(0.6, 0xFFFF9800L, 0.3f), "Moderate damage zone" to "Zona kerusakan sedang"),
+        Triple("Light" to "Ringan", Triple(1.0, 0xFFFFC107L, 0.2f), "Light damage / felt zone" to "Zona kerusakan ringan / terasa")
+    ))
+
+    private fun tsunamiZones(radius: Double) = buildZones(radius, listOf(
+        Triple("Danger" to "Berbahaya", Triple(0.2, 0xFFD32F2FL, 0.5f), "Immediate coastal danger" to "Bahaya pantai langsung"),
+        Triple("Warning" to "Peringatan", Triple(0.5, 0xFFFF9800L, 0.3f), "Tsunami wave impact zone" to "Zona dampak gelombang tsunami"),
+        Triple("Advisory" to "Waspada", Triple(1.0, 0xFFFFC107L, 0.2f), "Extended advisory zone" to "Zona peringatan dini diperluas")
+    ))
+
+    private fun volcanoZones(radius: Double) = buildZones(radius, listOf(
+        Triple("Exclusion" to "Zona Terlarang", Triple(0.3, 0xFFD32F2FL, 0.5f), "Pyroclastic flow / lava zone" to "Zona awan panas / lava"),
+        Triple("Danger" to "Berbahaya", Triple(0.6, 0xFFFF9800L, 0.3f), "Lahar / heavy ashfall zone" to "Zona lahar / hujan abu tebal"),
+        Triple("Alert" to "Siaga", Triple(1.0, 0xFFFFC107L, 0.2f), "Ashfall / gas hazard zone" to "Zona hujan abu / gas beracun")
+    ))
+
     /**
      * Build impact areas for interactive visualization.
      * Creates graduated zones for each significant event.
@@ -1022,35 +1054,7 @@ class SeismicRepository(private val context: Context) {
             val radius = eq.estimatedImpactRadiusKm
             val dist = eq.distanceFromUserKm
 
-            val zones = listOf(
-                ImpactZone(
-                    label = "Severe",
-                    labelId = "Parah",
-                    radiusKm = radius * 0.3,
-                    colorHex = 0xFFF44336,
-                    alpha = 0.4f,
-                    description = "Heavy damage zone",
-                    descriptionId = "Zona kerusakan berat"
-                ),
-                ImpactZone(
-                    label = "Moderate",
-                    labelId = "Sedang",
-                    radiusKm = radius * 0.6,
-                    colorHex = 0xFFFF9800,
-                    alpha = 0.3f,
-                    description = "Moderate damage zone",
-                    descriptionId = "Zona kerusakan sedang"
-                ),
-                ImpactZone(
-                    label = "Light",
-                    labelId = "Ringan",
-                    radiusKm = radius,
-                    colorHex = 0xFFFFC107,
-                    alpha = 0.2f,
-                    description = "Light damage / felt zone",
-                    descriptionId = "Zona kerusakan ringan / terasa"
-                )
-            )
+            val zones = earthquakeZones(radius)
 
             areas.add(DisasterImpactArea(
                 id = "eq_${eq.id}",
@@ -1080,35 +1084,7 @@ class SeismicRepository(private val context: Context) {
                     else -> 100.0
                 }
 
-                val zones = listOf(
-                    ImpactZone(
-                        label = "Danger",
-                        labelId = "Berbahaya",
-                        radiusKm = tsunamiRadius * 0.2,
-                        colorHex = 0xFFD32F2F,
-                        alpha = 0.5f,
-                        description = "Immediate coastal danger",
-                        descriptionId = "Bahaya pantai langsung"
-                    ),
-                    ImpactZone(
-                        label = "Warning",
-                        labelId = "Peringatan",
-                        radiusKm = tsunamiRadius * 0.5,
-                        colorHex = 0xFFFF9800,
-                        alpha = 0.3f,
-                        description = "Tsunami wave impact zone",
-                        descriptionId = "Zona dampak gelombang tsunami"
-                    ),
-                    ImpactZone(
-                        label = "Advisory",
-                        labelId = "Waspada",
-                        radiusKm = tsunamiRadius,
-                        colorHex = 0xFFFFC107,
-                        alpha = 0.2f,
-                        description = "Extended advisory zone",
-                        descriptionId = "Zona peringatan dini diperluas"
-                    )
-                )
+                val zones = tsunamiZones(tsunamiRadius)
 
                 areas.add(DisasterImpactArea(
                     id = "tsunami_${eq.id}",
@@ -1137,35 +1113,7 @@ class SeismicRepository(private val context: Context) {
             val radius = volcano.dangerZoneRadiusKm
             val dist = volcano.distanceFromUserKm
 
-            val zones = listOf(
-                ImpactZone(
-                    label = "Exclusion",
-                    labelId = "Zona Terlarang",
-                    radiusKm = radius * 0.3,
-                    colorHex = 0xFFD32F2F,
-                    alpha = 0.5f,
-                    description = "Pyroclastic flow / lava zone",
-                    descriptionId = "Zona awan panas / lava"
-                ),
-                ImpactZone(
-                    label = "Danger",
-                    labelId = "Berbahaya",
-                    radiusKm = radius * 0.6,
-                    colorHex = 0xFFFF9800,
-                    alpha = 0.3f,
-                    description = "Lahar / heavy ashfall zone",
-                    descriptionId = "Zona lahar / hujan abu tebal"
-                ),
-                ImpactZone(
-                    label = "Alert",
-                    labelId = "Siaga",
-                    radiusKm = radius,
-                    colorHex = 0xFFFFC107,
-                    alpha = 0.2f,
-                    description = "Ashfall / gas hazard zone",
-                    descriptionId = "Zona hujan abu / gas beracun"
-                )
-            )
+            val zones = volcanoZones(radius)
 
             areas.add(DisasterImpactArea(
                 id = "volcano_${volcano.id}",
@@ -1211,7 +1159,7 @@ class SeismicRepository(private val context: Context) {
             autoResult?.Infogempa?.gempa?.let { gempa ->
                 val lat = gempa.parsedLatitude
                 val lon = gempa.parsedLongitude
-                val dist = KnownVolcanoes.haversineDistance(userLat, userLon, lat, lon)
+                val dist = haversineDistance(userLat, userLon, lat, lon)
                 events.add(BmkgEarthquakeEvent(
                     magnitude = gempa.parsedMagnitude,
                     latitude = lat,
@@ -1232,7 +1180,7 @@ class SeismicRepository(private val context: Context) {
             terkiniResult?.Infogempa?.gempa?.forEach { gempa ->
                 val lat = gempa.parsedLatitude
                 val lon = gempa.parsedLongitude
-                val dist = KnownVolcanoes.haversineDistance(userLat, userLon, lat, lon)
+                val dist = haversineDistance(userLat, userLon, lat, lon)
 
                 // Avoid duplicate with autogempa
                 if (events.none { it.time == gempa.parsedTimeMillis && it.magnitude == gempa.parsedMagnitude }) {
@@ -1286,7 +1234,7 @@ class SeismicRepository(private val context: Context) {
                 // Skip training/test data  
                 if (props.is_training == true) return@forEach
 
-                val dist = KnownVolcanoes.haversineDistance(userLat, userLon, lat, lon)
+                val dist = haversineDistance(userLat, userLon, lat, lon)
 
                 reports.add(CrowdsourcedDisasterReport(
                     id = props.pkey ?: "",
