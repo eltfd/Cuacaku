@@ -2,8 +2,7 @@
 
 [![Android CI](https://github.com/eltfd/Cuacaku/actions/workflows/android-ci.yml/badge.svg)](https://github.com/eltfd/Cuacaku/actions/workflows/android-ci.yml)
 [![Release](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml/badge.svg)](https://github.com/eltfd/Cuacaku/actions/workflows/release-sign.yml)
-[![Latest Release](https://img.shields.io/github/v/release/eltfd/Cuacaku)](https://github.com/eltfd/Cuacaku/releases/latest)]
-(https://github.com/eltfd/Cuacaku/releases/tag/v2.0.3)
+[![Latest Release](https://img.shields.io/github/v/release/eltfd/Cuacaku)](https://github.com/eltfd/Cuacaku/releases/tag/v2.0.3)]
 
 Aplikasi prakiraan cuaca, kualitas udara, dan kualitas air real-time untuk Android dengan sumber data **100% gratis dan open source**. Tidak memerlukan API key atau berlangganan apapun.
 
