@@ -1252,7 +1252,7 @@ private fun FloodReportSection(reports: List<CrowdsourcedDisasterReport>) {
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxHeight()
-                                        .fillMaxWidth(fraction = (count / maxCount).coerceIn(0.05f, 1f))
+                                        .fillMaxWidth(fraction = if (maxCount > 0f) (count / maxCount).coerceIn(0.05f, 1f) else 0.05f)
                                         .clip(RoundedCornerShape(7.dp)).background(depthColors[index])
                                 )
                             }
@@ -1430,7 +1430,7 @@ private fun CrowdsourcedEarthquakeReportSection(reports: List<CrowdsourcedDisast
                             Box(modifier = Modifier.weight(1f).height(14.dp)
                                 .clip(RoundedCornerShape(7.dp)).background(Color.White.copy(alpha = 0.08f))) {
                                 Box(modifier = Modifier.fillMaxHeight()
-                                    .fillMaxWidth(fraction = (count / maxDmg).coerceIn(0.05f, 1f))
+                                    .fillMaxWidth(fraction = if (maxDmg > 0f) (count / maxDmg).coerceIn(0.05f, 1f) else 0.05f)
                                     .clip(RoundedCornerShape(7.dp)).background(dmgColors[index]))
                             }
                             Spacer(modifier = Modifier.width(8.dp))
@@ -2087,7 +2087,7 @@ private fun LandslideMonitorSection(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth(fraction = riskScore.toFloat().coerceIn(0f, 1f))
+                        .fillMaxWidth(fraction = riskScore.toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, 1f) })
                         .clip(RoundedCornerShape(4.dp))
                         .background(
                             Brush.horizontalGradient(
@@ -2393,7 +2393,7 @@ private fun SoilLayerBar(
     value: Double,
     maxValue: Double
 ) {
-    val fraction = (value / maxValue).toFloat().coerceIn(0f, 1f)
+    val fraction = if (maxValue > 0.0) (value / maxValue).toFloat().coerceIn(0f, 1f) else 0f
     val barColor = when {
         fraction > 0.8f -> Color(0xFFD32F2F)
         fraction > 0.5f -> Color(0xFFFF9800)
@@ -2503,7 +2503,7 @@ private fun LandslideFactorRow(
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .fillMaxWidth(fraction = contribution.toFloat().coerceIn(0.02f, 1f))
+                    .fillMaxWidth(fraction = contribution.toFloat().let { if (it.isNaN()) 0.02f else it.coerceIn(0.02f, 1f) })
                     .clip(RoundedCornerShape(3.dp))
                     .background(barColor)
             )

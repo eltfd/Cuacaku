@@ -1,5 +1,6 @@
 package com.weather.forecast.data.api
 
+import com.weather.forecast.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -25,12 +26,13 @@ object RetrofitClient {
             .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
+                level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+                        else HttpLoggingInterceptor.Level.NONE
             })
             // User-Agent required by Nominatim
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .header("User-Agent", "Cuacaku/1.9.2")
+                    .header("User-Agent", "Cuacaku/${BuildConfig.VERSION_NAME}")
                     .build()
                 chain.proceed(request)
             }
@@ -181,5 +183,18 @@ object RetrofitClient {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(PetaBencanaApiService::class.java)
+    }
+
+    /**
+     * SoilGrids ISRIC API Service (Global Soil Data)
+     * Free, 250m resolution, no API key required.
+     */
+    val soilGridsApi: SoilGridsApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(SoilGridsApiService.BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(SoilGridsApiService::class.java)
     }
 }

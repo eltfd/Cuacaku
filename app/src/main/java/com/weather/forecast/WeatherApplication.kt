@@ -5,8 +5,10 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.media.AudioAttributes
 import android.os.Build
+import android.util.Log
 import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.notification.NotificationChannels
+import com.weather.forecast.security.SecurityManager
 import com.weather.forecast.worker.WeatherWorkerScheduler
 
 /**
@@ -24,8 +26,35 @@ class WeatherApplication : Application() {
         super.onCreate()
         instance = this
         AppLocaleManager.init(this)
+
+        // Security check — deteksi tampering, root, debugger
+        performSecurityCheck()
+
         createNotificationChannels()
         scheduleBackgroundTasks()
+    }
+
+    /**
+     * Jalankan security checks saat app start.
+     * Hasil disimpan untuk referensi runtime.
+     */
+    private fun performSecurityCheck() {
+        val report = SecurityManager.performSecurityCheck(this)
+        securityReport = report
+
+        if (report.threatLevel == SecurityManager.ThreatLevel.CRITICAL) {
+            Log.e("Security", "CRITICAL: ${report.warnings.joinToString(", ")}")
+            // App tetap jalan tapi fitur sensitif bisa di-restrict di masa depan
+        }
+    }
+
+    companion object {
+        lateinit var instance: WeatherApplication
+            private set
+
+        /** Hasil security check, tersedia setelah onCreate */
+        var securityReport: SecurityManager.SecurityReport? = null
+            private set
     }
 
     /**
@@ -220,10 +249,5 @@ class WeatherApplication : Application() {
                 )
             )
         }
-    }
-
-    companion object {
-        lateinit var instance: WeatherApplication
-            private set
     }
 }

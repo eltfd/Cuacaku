@@ -420,7 +420,7 @@ private fun RiskScoreBar(score: Double, color: Color) {
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(score.toFloat().coerceIn(0f, 1f))
+                .fillMaxWidth(score.toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, 1f) })
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(3.dp))
                 .background(color.copy(alpha = 0.8f))
@@ -471,7 +471,7 @@ private fun FactorRow(factor: ContributingFactor) {
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(factor.contribution.toFloat())
+                    .fillMaxWidth(factor.contribution.toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, 1f) })
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(2.dp))
                     .background(
@@ -728,7 +728,7 @@ private fun DailyDisasterCard(day: DailyDisasterSummary) {
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth(pred.riskScore.toFloat())
+                                        .fillMaxWidth(pred.riskScore.toFloat().let { if (it.isNaN()) 0f else it.coerceIn(0f, 1f) })
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(2.dp))
                                         .background(predColor.copy(alpha = 0.8f))
@@ -982,7 +982,7 @@ private fun SoilMoistureBar(
     value: Double,
     maxValue: Double
 ) {
-    val fraction = (value / maxValue).toFloat().coerceIn(0f, 1f)
+    val fraction = if (maxValue > 0.0) (value / maxValue).toFloat().coerceIn(0f, 1f) else 0f
     val color = when {
         fraction > 0.8f -> Color(0xFFD32F2F)
         fraction > 0.5f -> Color(0xFFFF9800)

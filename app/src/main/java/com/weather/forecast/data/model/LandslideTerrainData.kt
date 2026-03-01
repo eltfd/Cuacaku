@@ -12,6 +12,7 @@ package com.weather.forecast.data.model
  *
  * Data Sources:
  * - Open-Elevation API: elevasi → kemiringan
+ * - SoilGrids ISRIC API: tipe tanah (clay, sand, silt, SOC)
  * - Open-Meteo hourly: soil_moisture, soil_temperature
  * - Weather data: curah hujan, kelembaban udara
  */
@@ -47,7 +48,18 @@ data class LandslideTerrainData(
     /** Durasi hujan terus-menerus (jam) */
     val continuousRainHours: Int,
     /** Detail elevasi grid 5 titik */
-    val elevationGrid: List<ElevationPoint> = emptyList()
+    val elevationGrid: List<ElevationPoint> = emptyList(),
+    // ── Soil Type dari SoilGrids ISRIC ──
+    /** Kadar lempung rata-rata 0-30cm (g/kg, 0-1000) — null jika belum di-fetch */
+    val clayContent: Double? = null,
+    /** Kadar pasir rata-rata 0-30cm (g/kg, 0-1000) */
+    val sandContent: Double? = null,
+    /** Kadar debu rata-rata 0-30cm (g/kg, 0-1000) */
+    val siltContent: Double? = null,
+    /** Karbon organik tanah rata-rata 0-30cm (dg/kg) */
+    val soilOrganicCarbon: Double? = null,
+    /** Indeks stabilitas tanah (0.0-1.0) — derived, 0=sangat tidak stabil */
+    val soilStabilityIndex: Double? = null
 )
 
 /**
@@ -208,5 +220,110 @@ object VegetationProxyEstimator {
         }
 
         return (moistureScore * 0.4 + tempScore * 0.3 + humidityScore * 0.3).coerceIn(0.0, 1.0)
+    }
+}
+
+/**
+ * Soil Stability Calculator — menghitung indeks stabilitas tanah dari komposisi
+ *
+ * Berdasarkan klasifikasi USDA Soil Texture Triangle:
+ * - Tanah lempung (clay-rich): menahan air lebih lama → jenuh → licin → longsor
+ * - Tanah berpasir (sandy): drainase cepat → kohesi rendah → ambles jika tergerus
+ * - Tanah berimbang (loam): paling stabil → drainase baik + kohesi cukup
+ *
+ * Indeks stabilitas:
+ *   0.0 = sangat tidak stabil (pure clay atau pure sand)
+ *   1.0 = sangat stabil (balanced loam dengan SOC tinggi)
+ *
+ * Referensi:
+ * - USDA Soil Survey Manual (2017)
+ * - Hengl et al. (2017): SoilGrids250m
+ * - PVMBG (2019): Korelasi tipe tanah–longsor Indonesia
+ */
+object SoilStabilityCalculator {
+
+    /**
+     * Menghitung indeks stabilitas tanah.
+     *
+     * @param clay Clay content (g/kg, 0-1000)
+     * @param sand Sand content (g/kg, 0-1000)
+     * @param silt Silt content (g/kg, 0-1000)
+     * @param soc  Soil Organic Carbon (dg/kg, optional)
+     * @return Stability index 0.0 (tidak stabil) – 1.0 (sangat stabil)
+     */
+    fun calculate(clay: Double, sand: Double, silt: Double, soc: Double = 0.0): Double {
+        val total = clay + sand + silt
+        if (total <= 0) return 0.5 // Unknown
+
+        // Normalize to proportions (0-1)
+        val clayPct = clay / total
+        val sandPct = sand / total
+        val siltPct = silt / total
+
+        // Base stability from texture balance
+        // Ideal: ~20% clay, ~40% sand, ~40% silt (loam)
+        // Deviation from ideal reduces stability
+        val clayPenalty = when {
+            clayPct > 0.60 -> 0.15  // Heavy clay → very slippery when wet
+            clayPct > 0.40 -> 0.35  // High clay → still problematic
+            clayPct in 0.15..0.30 -> 0.85  // Optimal range
+            clayPct < 0.10 -> 0.50  // Too little clay → no cohesion
+            else -> 0.65
+        }
+
+        val sandPenalty = when {
+            sandPct > 0.70 -> 0.20  // Very sandy → no cohesion, erosion
+            sandPct > 0.50 -> 0.40  // Sandy → loosely packed
+            sandPct in 0.30..0.50 -> 0.80  // Good drainage + some structure
+            sandPct < 0.15 -> 0.50  // Too little sand → poor drainage
+            else -> 0.70
+        }
+
+        val siltPenalty = when {
+            siltPct > 0.60 -> 0.30  // High silt → easily eroded
+            siltPct in 0.30..0.50 -> 0.80  // Good range
+            else -> 0.60
+        }
+
+        // SOC bonus: organic matter improves soil structure
+        // Typical SOC range: 0-500 dg/kg (0-50 g/kg)
+        val socBonus = when {
+            soc > 200 -> 0.15   // Very high organic → strong structure
+            soc > 100 -> 0.10   // High organic
+            soc > 50  -> 0.05   // Moderate organic
+            else -> 0.0
+        }
+
+        return (clayPenalty * 0.40 + sandPenalty * 0.30 + siltPenalty * 0.30 + socBonus)
+            .coerceIn(0.0, 1.0)
+    }
+
+    /**
+     * Klasifikasi tipe tanah tekstural berdasarkan USDA Soil Texture Triangle.
+     *
+     * @param clay Clay content (g/kg)
+     * @param sand Sand content (g/kg)
+     * @param silt Silt content (g/kg)
+     * @return Nama klasifikasi tanah (e.g. "Clay Loam", "Sandy", "Silty Clay")
+     */
+    fun classifyTexture(clay: Double, sand: Double, silt: Double): String {
+        val total = clay + sand + silt
+        if (total <= 0) return "Unknown"
+
+        val c = clay / total * 100
+        val s = sand / total * 100
+
+        return when {
+            c >= 40 && s <= 45 -> "Clay"
+            c >= 27 && s <= 20 -> "Silty Clay"
+            c >= 35 && s >= 45 -> "Sandy Clay"
+            c >= 27 && s in 20.0..45.0 -> "Clay Loam"
+            c in 12.0..27.0 && s < 50 -> "Loam"
+            c < 12 && s >= 85 -> "Sand"
+            c < 12 && s >= 70 -> "Loamy Sand"
+            c < 27 && s >= 50 -> "Sandy Loam"
+            c < 12 && s < 50 -> "Silt Loam"
+            else -> "Loam"
+        }
     }
 }

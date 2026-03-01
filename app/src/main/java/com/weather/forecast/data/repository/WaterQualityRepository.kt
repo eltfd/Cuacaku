@@ -1,6 +1,7 @@
 package com.weather.forecast.data.repository
 
 import com.weather.forecast.data.api.RetrofitClient
+import com.weather.forecast.data.locale.AppLocaleManager
 import com.weather.forecast.data.model.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -29,6 +30,7 @@ class WaterQualityRepository {
 
     private val marineApi = RetrofitClient.marineApi
     private val floodApi = RetrofitClient.floodApi
+    private val geocodingApi = RetrofitClient.geocodingApi
 
     /**
      * Get complete water quality data
@@ -55,22 +57,78 @@ class WaterQualityRepository {
                     }
                 }
 
+                // Lookup nearest river name in parallel
+                val riverNameDeferred = async {
+                    findNearbyRiverName(latitude, longitude)
+                }
+
                 val marine = marineDeferred.await()
                 val flood = floodDeferred.await()
+                val nearbyRiverName = riverNameDeferred.await()
 
                 // Bangun ringkasan tren tinggi muka air
                 val summary = buildWaterLevelSummary(marine, flood)
+
+                // Resolve sea name only if marine data is available (user near coast)
+                val hasValidMarineData = marine != null &&
+                    marine.dailyForecast.any { it.waveHeightMax > 0.0 }
+                val locale = if (AppLocaleManager.locale == com.weather.forecast.data.locale.AppLocale.ID) "id" else "en"
+                val nearbySeaName = if (hasValidMarineData) {
+                    NearbySeaResolver.findNearestSea(latitude, longitude, locale)
+                } else null
 
                 Result.success(
                     WaterQualityData(
                         marine = marine,
                         flood = flood,
-                        waterLevelSummary = summary
+                        waterLevelSummary = summary,
+                        nearbySeaName = nearbySeaName,
+                        nearbyRiverName = nearbyRiverName
                     )
                 )
             } catch (e: Exception) {
                 Result.failure(e)
             }
+        }
+    }
+
+    // ===================== NEARBY WATER BODY LOOKUP =====================
+
+    /**
+     * Cari nama sungai terdekat dari Nominatim (OpenStreetMap).
+     * Menggunakan bounded viewbox dalam radius ~2 km dari posisi user.
+     * Data & lokasi user di-update berkala → sungai terdekat mengikuti perpindahan user.
+     */
+    private suspend fun findNearbyRiverName(latitude: Double, longitude: Double): String? {
+        return try {
+            val delta = 0.018 // ~2 km search radius (1° ≈ 111 km)
+            val viewbox = "${longitude - delta},${latitude - delta},${longitude + delta},${latitude + delta}"
+
+            val results = geocodingApi.searchBounded(
+                query = "river",
+                viewbox = viewbox,
+                bounded = 1,
+                limit = 5
+            )
+
+            // Filter only actual waterway/river results
+            val rivers = results.filter { result ->
+                result.type == "river" || result.type == "stream" ||
+                result.addressType == "river" ||
+                (result.osmClass == "waterway" && result.type in listOf("river", "canal"))
+            }
+
+            // Pick the most important (largest) river
+            val bestRiver = rivers.maxByOrNull { it.importance }
+                ?: results.firstOrNull { it.type == "river" }
+
+            bestRiver?.name?.let { name ->
+                // Clean up: some OSM entries have "Sungai X" in name
+                // Return as-is — it's already properly named
+                name.ifBlank { null }
+            }
+        } catch (e: Exception) {
+            null // Fallback gracefully
         }
     }
 

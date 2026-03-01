@@ -5,7 +5,7 @@ import com.weather.forecast.data.model.*
 /**
  * Weather Feature Extractor
  *
- * Mengekstrak dan menormalisasi 22 fitur meteorologi dari berbagai sumber data
+ * Mengekstrak dan menormalisasi 27 fitur meteorologi + terrain + soil dari berbagai sumber data
  * menjadi vektor fitur [0, 1] yang siap diproses oleh neural network.
  *
  * Fitur diturunkan dari penelitian korelasi cuaca–bencana:
@@ -16,6 +16,8 @@ import com.weather.forecast.data.model.*
  * - Hydrological features (debit sungai)
  * - Soil features (kelembaban tanah, saturasi)
  * - Derived features (kode cuaca WMO, antecedent rainfall)
+ * - Terrain features (slope gradient, elevation, vegetasi)
+ * - Soil type features (clay content, stabilitas tanah) — SoilGrids ISRIC
  *
  * Referensi normalisasi:
  * - WMO Guide to Meteorological Instruments and Methods of Observation (2018)
@@ -23,14 +25,16 @@ import com.weather.forecast.data.model.*
  */
 object WeatherFeatureExtractor {
 
-    const val FEATURE_COUNT = 22
+    const val FEATURE_COUNT = 27
 
     val FEATURE_NAMES = listOf(
         "precipTotal", "precipIntensity", "windSpeed", "windGusts", "windShear",
         "pressureLow", "pressureDrop", "humidity", "capeEnergy", "freezingLow",
         "cloudCover", "dewPointSpread", "waveHeight", "swellHeight", "dischargeRatio",
         "rainDuration", "antecedentRain", "consecutiveRain", "weatherSeverity", "temperatureHigh",
-        "soilSaturation", "soilMoistureRate"
+        "soilSaturation", "soilMoistureRate",
+        "slopeGradient", "elevationNorm", "vegetationCover",
+        "soilClayContent", "soilStability"
     )
 
     // ══════════════════════════════════════════════════
@@ -39,7 +43,8 @@ object WeatherFeatureExtractor {
 
     fun extractForToday(
         weather: WeatherData?,
-        waterData: WaterQualityData?
+        waterData: WaterQualityData?,
+        terrainData: LandslideTerrainData? = null
     ): WeatherFeatures {
         val hourly = weather?.hourly?.take(24) ?: emptyList()
         val current = weather?.current
@@ -67,7 +72,8 @@ object WeatherFeatureExtractor {
             hasWeather = weather != null,
             hasMarine = marine != null,
             hasFlood = flood != null,
-            initPressure = current?.pressure ?: hourly.firstOrNull()?.pressure ?: 1013.0
+            initPressure = current?.pressure ?: hourly.firstOrNull()?.pressure ?: 1013.0,
+            terrainData = terrainData
         )
     }
 
@@ -81,7 +87,8 @@ object WeatherFeatureExtractor {
         hourly: List<HourlyWeatherData>,
         marine: DailyMarineData?,
         flood: DailyFloodData?,
-        allDaily: List<DailyWeatherData>
+        allDaily: List<DailyWeatherData>,
+        terrainData: LandslideTerrainData? = null
     ): WeatherFeatures {
         return extractCommon(
             hourly = hourly,
@@ -101,7 +108,8 @@ object WeatherFeatureExtractor {
             hasWeather = true,
             hasMarine = marine != null,
             hasFlood = flood != null,
-            initPressure = 1013.0
+            initPressure = 1013.0,
+            terrainData = terrainData
         )
     }
 
@@ -116,7 +124,8 @@ object WeatherFeatureExtractor {
         waveHeight: Double, swellHeight: Double, dischargeRatio: Double,
         wmoCodes: List<Int>, antecedentDays: List<DailyWeatherData>,
         hasWeather: Boolean, hasMarine: Boolean, hasFlood: Boolean,
-        initPressure: Double
+        initPressure: Double,
+        terrainData: LandslideTerrainData? = null
     ): WeatherFeatures {
         val features = FloatArray(FEATURE_COUNT) { 0.5f }
         var dp = 0
@@ -173,6 +182,31 @@ object WeatherFeatureExtractor {
         features[19] = norm(tempMax, 20.0, 50.0); if (hasWeather) dp++
         // [20-21] Soil saturation & rate
         extractSoilFeatures(hourly, features) { dp++ }
+
+        // [22] Slope gradient (kemiringan lereng, 0-90°)
+        features[22] = if (terrainData != null) {
+            norm(terrainData.slopeAngle, 0.0, 90.0).also { dp++ }
+        } else 0f  // 0 = datar (asumsi konservatif tanpa data terrain)
+        // [23] Elevation (ketinggian lokasi, 0-5000m)
+        features[23] = if (terrainData != null) {
+            norm(terrainData.elevation, 0.0, 5000.0).also { dp++ }
+        } else 0f  // 0 = permukaan laut (asumsi konservatif)
+        // [24] Vegetation cover (indeks tutupan vegetasi, 0-1)
+        features[24] = if (terrainData != null) {
+            terrainData.vegetationIndex.toFloat().coerceIn(0f, 1f).also { dp++ }
+        } else 0.5f  // 0.5 = unknown/moderate
+
+        // [25] Soil clay content (kadar lempung, 0-1000 g/kg → normalized)
+        //      Tanah lempung tinggi → jenuh air → risiko longsor naik
+        features[25] = if (terrainData?.clayContent != null) {
+            norm(terrainData.clayContent, 0.0, 800.0).also { dp++ }
+        } else 0.3f  // 0.3 = moderate clay (default konservatif)
+        // [26] Soil stability index (indeks stabilitas tanah, 0-1)
+        //      0 = sangat tidak stabil, 1 = sangat stabil
+        //      Derived dari clay/sand/silt ratio + SOC
+        features[26] = if (terrainData?.soilStabilityIndex != null) {
+            terrainData.soilStabilityIndex.toFloat().coerceIn(0f, 1f).also { dp++ }
+        } else 0.5f  // 0.5 = unknown/moderate stability
 
         return WeatherFeatures(
             features = features,

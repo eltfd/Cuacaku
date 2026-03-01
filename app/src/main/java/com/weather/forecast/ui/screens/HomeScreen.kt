@@ -912,6 +912,8 @@ private fun HourlyForecastSection(hourlyData: List<HourlyWeatherData>) {
 
 @Composable
 private fun HourlyForecastItem(hourly: HourlyWeatherData) {
+    val s = LocalStrings.current
+    val condition = WeatherCondition.fromCode(hourly.weatherCode)
     Card(
         colors = CardDefaults.cardColors(
             containerColor = Color.White.copy(alpha = 0.2f)
@@ -932,7 +934,17 @@ private fun HourlyForecastItem(hourly: HourlyWeatherData) {
                 isDay = hourly.isDay,
                 modifier = Modifier.size(32.dp)
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = s.localized(condition.description, condition.descriptionId),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 9.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                lineHeight = 11.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = hourly.temperatureFormatted,
                 style = MaterialTheme.typography.titleMedium,
@@ -1301,6 +1313,8 @@ private fun DailyRiskBadge(text: String, risk: RiskLevel) {
  */
 @Composable
 private fun DailyHourlyItem(hourly: HourlyWeatherData) {
+    val s = LocalStrings.current
+    val condition = WeatherCondition.fromCode(hourly.weatherCode)
     Card(
         colors = CardDefaults.cardColors(
             containerColor = Color.White.copy(alpha = 0.15f)
@@ -1323,7 +1337,18 @@ private fun DailyHourlyItem(hourly: HourlyWeatherData) {
                 isDay = hourly.isDay,
                 modifier = Modifier.size(28.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
+            // Keterangan cuaca
+            Text(
+                text = s.localized(condition.description, condition.descriptionId),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 8.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                lineHeight = 10.sp
+            )
+            Spacer(modifier = Modifier.height(2.dp))
             // Suhu
             Text(
                 text = hourly.temperatureFormatted,

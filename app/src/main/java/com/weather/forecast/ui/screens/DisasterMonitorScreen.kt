@@ -639,7 +639,7 @@ private fun DisasterMonitorCard(disaster: ActiveDisaster) {
 @Composable
 private fun RecoveryProgressSection(disaster: ActiveDisaster) {
     val phaseColor = Color(disaster.phase.colorHex)
-    val progress = disaster.recoveryProgress.coerceIn(0f, 1f)
+    val progress = disaster.recoveryProgress.let { if (it.isNaN()) 0f else it.coerceIn(0f, 1f) }
     val s = LocalStrings.current
 
     Column {

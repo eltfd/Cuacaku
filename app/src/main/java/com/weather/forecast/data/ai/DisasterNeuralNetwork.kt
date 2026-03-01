@@ -6,8 +6,8 @@ import kotlin.math.sqrt
 /**
  * DisasterNeuralNetwork — Multi-Layer Perceptron untuk prediksi risiko bencana
  *
- * Arsitektur: Input(22) → Hidden(32, LeakyReLU) → Hidden(16, LeakyReLU) → Output(6, Sigmoid)
- * Total parameter: 22×32 + 32 + 32×16 + 16 + 16×6 + 6 = 1,366
+ * Arsitektur: Input(25) → Hidden(32, LeakyReLU) → Hidden(16, LeakyReLU) → Output(6, Sigmoid)
+ * Total parameter: 25×32 + 32 + 32×16 + 16 + 16×6 + 6 = 1,462
  *
  * ── Referensi Ilmiah ──
  * [1] Gorishniy et al. (2021) "Revisiting Deep Learning Models for Tabular Data"
@@ -40,14 +40,14 @@ import kotlin.math.sqrt
 object DisasterNeuralNetwork {
 
     // ── Arsitektur ──
-    private const val INPUT = 22
+    private const val INPUT = 27
     private const val H1 = 32   // Hidden layer 1
     private const val H2 = 16   // Hidden layer 2
     private const val OUTPUT = 6
     private const val TEMPERATURE = 1.3f  // Output calibration temperature
 
-    const val MODEL_VERSION = "MLP-v1.2-incremental"
-    const val TOTAL_PARAMS = INPUT * H1 + H1 + H1 * H2 + H2 + H2 * OUTPUT + OUTPUT // 1366
+    const val MODEL_VERSION = "MLP-v1.4-soiltype"
+    const val TOTAL_PARAMS = INPUT * H1 + H1 + H1 * H2 + H2 + H2 * OUTPUT + OUTPUT // 1526
 
     // ── Flat Weight Arrays (row-major) ──
     private val w1 = FloatArray(INPUT * H1)
@@ -64,7 +64,7 @@ object DisasterNeuralNetwork {
     /**
      * Predict disaster risk from normalized feature vector.
      *
-     * @param features FloatArray size 22 — weather features [0, 1]
+     * @param features FloatArray size 25 — weather + terrain features [0, 1]
      * @param deltas Weight deltas from incremental learning (nullable)
      * @return FloatArray size 6 — risk scores [0, 1] per disaster type
      */
@@ -124,7 +124,7 @@ object DisasterNeuralNetwork {
     // ════════════════════════════════════════════════
 
     /**
-     * Matriks relevansi fitur → jenis bencana [22 × 6]
+     * Matriks relevansi fitur → jenis bencana [25 × 6]
      *
      * Setiap baris = satu fitur input, setiap kolom = satu jenis bencana.
      * Nilai 0–1 menunjukkan seberapa relevan fitur tersebut untuk bencana itu.
@@ -133,33 +133,43 @@ object DisasterNeuralNetwork {
      * - BMKG threshold cuaca ekstrem
      * - WMO multi-hazard guidelines
      * - Penelitian korelasi parameter-bencana Indonesia
+     * - Van Zuidam (1985) — Geomorphological slope classification
+     * - PVMBG (2019) — terrain-landslide correlation
      *
      * Kolom: FLOOD, TIDAL, CYCLONE, THUNDER, LANDSLIDE, SUBSIDENCE
      */
     private val RELEVANCE = arrayOf(
         //                    FLOOD  TIDAL  CYCL  THUND  LANDS  SUBS
-        floatArrayOf(0.90f, 0.20f, 0.50f, 0.30f, 0.80f, 0.70f), //  0: precipTotal
-        floatArrayOf(0.85f, 0.10f, 0.30f, 0.50f, 0.60f, 0.30f), //  1: precipIntensity
+        floatArrayOf(0.90f, 0.20f, 0.50f, 0.30f, 0.65f, 0.70f), //  0: precipTotal       — reduced LANDS (terrain disambiguates)
+        floatArrayOf(0.85f, 0.10f, 0.30f, 0.50f, 0.45f, 0.30f), //  1: precipIntensity   — reduced LANDS
         floatArrayOf(0.10f, 0.50f, 0.90f, 0.40f, 0.05f, 0.05f), //  2: windSpeed
         floatArrayOf(0.10f, 0.40f, 0.85f, 0.60f, 0.05f, 0.05f), //  3: windGusts
         floatArrayOf(0.05f, 0.15f, 0.50f, 0.85f, 0.05f, 0.05f), //  4: windShear
         floatArrayOf(0.30f, 0.60f, 0.95f, 0.30f, 0.10f, 0.10f), //  5: pressureLow
         floatArrayOf(0.20f, 0.50f, 0.85f, 0.25f, 0.05f, 0.05f), //  6: pressureDrop
-        floatArrayOf(0.50f, 0.20f, 0.20f, 0.30f, 0.60f, 0.50f), //  7: humidity
+        floatArrayOf(0.50f, 0.20f, 0.20f, 0.30f, 0.50f, 0.50f), //  7: humidity           — reduced LANDS slightly
         floatArrayOf(0.15f, 0.10f, 0.40f, 0.95f, 0.10f, 0.05f), //  8: capeEnergy
         floatArrayOf(0.05f, 0.05f, 0.10f, 0.50f, 0.05f, 0.05f), //  9: freezingLow
         floatArrayOf(0.30f, 0.10f, 0.35f, 0.40f, 0.30f, 0.20f), // 10: cloudCover
         floatArrayOf(0.40f, 0.20f, 0.30f, 0.40f, 0.40f, 0.30f), // 11: dewPointSpread
         floatArrayOf(0.10f, 0.90f, 0.50f, 0.05f, 0.05f, 0.05f), // 12: waveHeight
         floatArrayOf(0.05f, 0.80f, 0.30f, 0.05f, 0.05f, 0.05f), // 13: swellHeight
-        floatArrayOf(0.80f, 0.10f, 0.05f, 0.05f, 0.30f, 0.60f), // 14: dischargeRatio
-        floatArrayOf(0.60f, 0.10f, 0.20f, 0.20f, 0.75f, 0.50f), // 15: rainDuration
-        floatArrayOf(0.50f, 0.10f, 0.10f, 0.05f, 0.90f, 0.85f), // 16: antecedentRain
-        floatArrayOf(0.30f, 0.05f, 0.05f, 0.05f, 0.60f, 0.90f), // 17: consecutiveRain
+        floatArrayOf(0.80f, 0.10f, 0.05f, 0.05f, 0.20f, 0.60f), // 14: dischargeRatio     — reduced LANDS
+        floatArrayOf(0.60f, 0.10f, 0.20f, 0.20f, 0.60f, 0.50f), // 15: rainDuration       — reduced LANDS slightly
+        floatArrayOf(0.50f, 0.10f, 0.10f, 0.05f, 0.75f, 0.85f), // 16: antecedentRain     — reduced LANDS slightly
+        floatArrayOf(0.30f, 0.05f, 0.05f, 0.05f, 0.50f, 0.90f), // 17: consecutiveRain    — reduced LANDS slightly
         floatArrayOf(0.40f, 0.20f, 0.30f, 0.70f, 0.20f, 0.10f), // 18: weatherSeverity
         floatArrayOf(0.10f, 0.10f, 0.20f, 0.25f, 0.10f, 0.10f), // 19: temperatureHigh
-        floatArrayOf(0.70f, 0.15f, 0.10f, 0.10f, 0.85f, 0.90f), // 20: soilSaturation
-        floatArrayOf(0.55f, 0.10f, 0.05f, 0.05f, 0.70f, 0.75f)  // 21: soilMoistureRate
+        floatArrayOf(0.70f, 0.15f, 0.10f, 0.10f, 0.70f, 0.90f), // 20: soilSaturation     — reduced LANDS slightly
+        floatArrayOf(0.55f, 0.10f, 0.05f, 0.05f, 0.55f, 0.75f), // 21: soilMoistureRate   — reduced LANDS slightly
+        // ── Terrain Features (penentu utama Longsor vs Banjir) ──
+        floatArrayOf(0.05f, 0.05f, 0.05f, 0.05f, 0.98f, 0.15f), // 22: slopeGradient      — KEY discriminator
+        floatArrayOf(0.10f, 0.05f, 0.05f, 0.10f, 0.90f, 0.20f), // 23: elevationNorm      — highland = landslide
+        floatArrayOf(0.05f, 0.05f, 0.05f, 0.05f, 0.85f, 0.15f), // 24: vegetationCover    — bare soil = slide risk
+        // ── Soil Type Features (dari SoilGrids ISRIC) ──
+        // Reduced LANDS relevance to avoid cumulative bias with terrain features
+        floatArrayOf(0.35f, 0.10f, 0.05f, 0.05f, 0.55f, 0.50f), // 25: soilClayContent    — clay retains water → slide & flood
+        floatArrayOf(0.25f, 0.08f, 0.05f, 0.05f, 0.50f, 0.45f)  // 26: soilStability      — inverted: low stability = risk
     )
 
     // Init block — harus setelah RELEVANCE agar tidak NPE
@@ -194,7 +204,7 @@ object DisasterNeuralNetwork {
         val scale2 = sqrt(2.0f / (H1 + H2)) * 2.0f
         val scale3 = sqrt(2.0f / (H2 + OUTPUT)) * 2.0f
 
-        // ── Layer 1: Input → Hidden1 (22 × 32) ──
+        // ── Layer 1: Input → Hidden1 (25 × 32) ──
         // 32 neurons = 6 disaster types × 5 variations + 2 bonus neurons
         for (j in 0 until H1) {
             val specialty = j % OUTPUT          // Jenis bencana yang dideteksi

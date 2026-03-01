@@ -73,9 +73,17 @@ data class SearchResult(
     val osmId: Long,
     val lat: String,
     val lon: String,
+    /** Feature name (e.g. "Sungai Cisadane", "Laut Jawa") */
+    val name: String? = null,
     @SerializedName("display_name")
     val displayName: String,
+    /** OSM class — e.g. "waterway", "place", "natural" */
+    @SerializedName("class")
+    val osmClass: String? = null,
+    /** OSM type — e.g. "river", "sea", "water" */
     val type: String,
+    @SerializedName("addresstype")
+    val addressType: String? = null,
     val importance: Double,
     val address: Address?
 )

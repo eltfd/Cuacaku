@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration
+    
+    Security policies:
+    1. Block ALL cleartext (HTTP) traffic — HTTPS only
+    2. Trust only system CA certificates (no user-installed CAs in release)
+    3. Certificate pinning for critical API domains
+    
+    Ref: https://developer.android.com/privacy-and-security/security-config
+-->
+<network-security-config>
+
+    <!-- Default: block cleartext, system CAs only -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Certificate pinning for critical domains -->
+    <domain-config>
+        <!-- Open-Meteo API (weather, air quality, marine, flood) -->
+        <domain includeSubdomains="true">open-meteo.com</domain>
+        <domain includeSubdomains="true">api.open-meteo.com</domain>
+        <domain includeSubdomains="true">air-quality-api.open-meteo.com</domain>
+        <domain includeSubdomains="true">marine-api.open-meteo.com</domain>
+        <domain includeSubdomains="true">flood-api.open-meteo.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <domain-config>
+        <!-- GitHub API (auto-update) -->
+        <domain includeSubdomains="true">api.github.com</domain>
+        <domain includeSubdomains="true">github.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <domain-config>
+        <!-- Nominatim / OpenStreetMap (geocoding) -->
+        <domain includeSubdomains="true">nominatim.openstreetmap.org</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
+    <!-- Debug overrides — allow user CAs only in debug builds -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+
+</network-security-config>

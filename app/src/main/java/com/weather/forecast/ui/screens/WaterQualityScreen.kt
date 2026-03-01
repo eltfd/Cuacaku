@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.weather.forecast.data.locale.LocalStrings
@@ -90,7 +91,8 @@ private fun WaterQualityContent(data: WaterQualityData) {
             item {
                 SectionTitle(
                     icon = Icons.Outlined.Sailing,
-                    title = LocalStrings.current.seaConditions
+                    title = LocalStrings.current.seaConditions,
+                    subtitle = data.nearbySeaName
                 )
             }
             // Current marine conditions
@@ -121,7 +123,8 @@ private fun WaterQualityContent(data: WaterQualityData) {
                 item {
                     SectionTitle(
                         icon = Icons.Outlined.Water,
-                        title = LocalStrings.current.riverWaterLevel
+                        title = LocalStrings.current.riverWaterLevel,
+                        subtitle = data.nearbyRiverName
                     )
                 }
 
@@ -188,7 +191,7 @@ private fun WaterQualityHeader() {
 }
 
 @Composable
-private fun SectionTitle(icon: ImageVector, title: String) {
+private fun SectionTitle(icon: ImageVector, title: String, subtitle: String? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -202,11 +205,22 @@ private fun SectionTitle(icon: ImageVector, title: String) {
             modifier = Modifier.size(24.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-            color = Color.White
-        )
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = Color.White
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = "📍 $subtitle",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
@@ -501,7 +515,7 @@ private fun WaveHeightTrendCard(dailyData: List<DailyMarineData>) {
                 verticalAlignment = Alignment.Bottom
             ) {
                 dailyData.take(7).forEach { day ->
-                    val fraction = (day.waveHeightMax / maxWave).toFloat().coerceIn(0.05f, 1f)
+                    val fraction = if (maxWave > 0.0) (day.waveHeightMax / maxWave).toFloat().coerceIn(0.05f, 1f) else 0.05f
                     val barColor = Color(day.seaCondition.colorHex)
 
                     Column(
@@ -608,7 +622,7 @@ private fun RiverLevelTrendCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 dailyData.take(7).forEach { day ->
-                    val fraction = (day.riverDischarge / maxDischarge).toFloat().coerceIn(0.05f, 1f)
+                    val fraction = if (maxDischarge > 0.0) (day.riverDischarge / maxDischarge).toFloat().coerceIn(0.05f, 1f) else 0.05f
                     val riskColor = Color(day.floodRisk.colorHex)
 
                     Column(

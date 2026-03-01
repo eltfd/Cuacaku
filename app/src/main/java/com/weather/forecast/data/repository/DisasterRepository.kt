@@ -129,7 +129,7 @@ class DisasterRepository(context: Context) {
 
                 // ═══ Background Learning (fire-and-forget) ═══
                 // Berjalan di background scope terpisah, tidak blocking UI
-                val todayFeatures = WeatherFeatureExtractor.extractForToday(weather, water)
+                val todayFeatures = WeatherFeatureExtractor.extractForToday(weather, water, terrainData)
                 val ruleScores = todayPredictions.map { it.riskScore.toFloat() }.toFloatArray()
 
                 runLearningInBackground(

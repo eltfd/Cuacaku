@@ -68,9 +68,13 @@ class SeismicRepository(private val context: Context) {
         private const val VOLCANO_FETCH_INTERVAL_MS = 30 * 60 * 1000L
 
         /** Max distance for "nearby" earthquakes */
-        private const val NEARBY_RADIUS_KM = 500.0
+        private const val NEARBY_RADIUS_KM = 300.0
         /** Max distance for earthquake query to USGS */
         private const val QUERY_RADIUS_KM = 2000.0
+        /** Max distance for volcanic events to display */
+        private const val VOLCANO_DISPLAY_RADIUS_KM = 1000.0
+        /** Max distance for crowdsourced reports to display */
+        private const val CROWDSOURCED_RADIUS_KM = 500.0
         /** Min magnitude to query */
         private const val MIN_MAGNITUDE = 2.5
         /** Min magnitude for significant quakes */
@@ -126,15 +130,19 @@ class SeismicRepository(private val context: Context) {
             }.sortedByDescending { it.time }
 
             val nearbyQuakes = processedQuakes.filter { it.distanceFromUserKm <= NEARBY_RADIUS_KM }
+
+            // Filter significant quakes: only within query radius (same region as user)
             val processedSignificant = significantEarthquakes.map { feature ->
                 mapToEarthquakeEvent(feature, latitude, longitude)
-            }.sortedByDescending { it.magnitude }
+            }.filter { it.distanceFromUserKm <= QUERY_RADIUS_KM }
+             .sortedByDescending { it.magnitude }
 
             // ── Assess tsunami risk ──
             val tsunamiRisk = assessTsunamiRisk(processedQuakes, latitude, longitude)
 
-            // ── Process volcanic data ──
-            val (volcanicEvents, nearbyVolcanoes) = volcanoData
+            // ── Process volcanic data — filter by proximity ──
+            val (allVolcanicEvents, nearbyVolcanoes) = volcanoData
+            val volcanicEvents = allVolcanicEvents.filter { it.distanceFromUserKm <= VOLCANO_DISPLAY_RADIUS_KM }
 
             // ── Process wave warnings ──
             val highWaveWarning = waveData
@@ -803,38 +811,9 @@ class SeismicRepository(private val context: Context) {
         val events = mutableListOf<VolcanicEvent>()
 
         // ── Source 1: USGS Volcano Alerts ──
-        try {
-            val alertResponse = volcanoApi.getVolcanoAlerts()
-            alertResponse.features?.forEach { alert ->
-                val data = alert.properties
-                if (data != null) {
-                    val lat = alert.geometry?.coordinates?.getOrNull(1) ?: 0.0
-                    val lon = alert.geometry?.coordinates?.getOrNull(0) ?: 0.0
-                    val dist = haversineDistance(latitude, longitude, lat, lon)
-
-                    events.add(VolcanicEvent(
-                        id = "usgs_${data.volcanoName?.hashCode() ?: 0}",
-                        name = data.volcanoName ?: "",
-                        latitude = lat,
-                        longitude = lon,
-                        elevation = 0,
-                        country = "",
-                        alertLevel = VolcanoAlertLevel.fromString(data.alertLevel),
-                        colorCode = VolcanoColorCode.fromString(data.colorCode),
-                        lastUpdate = try {
-                            SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                                .parse(data.date ?: "")?.time ?: System.currentTimeMillis()
-                        } catch (e: Exception) { System.currentTimeMillis() },
-                        distanceFromUserKm = dist,
-                        description = data.message ?: "",
-                        source = "USGS",
-                        type = ""
-                    ))
-                }
-            }
-        } catch (e: Exception) {
-            // USGS volcano API may fail; continue with other sources
-        }
+        // DISABLED: USGS Volcano API endpoint (volcanoes.usgs.gov/vsc/api/volcanoApi/volcanoAlerts)
+        // has been permanently removed (returns 404 since late 2025).
+        // Volcano data is still available from NASA EONET (Source 2) and embedded DB (Source 3).
 
         // ── Source 2: NASA EONET volcanic events ──
         try {
@@ -1204,7 +1183,9 @@ class SeismicRepository(private val context: Context) {
             // BMKG may be unreachable; continue with USGS data
         }
 
-        return events.sortedByDescending { it.time }
+        return events
+            .filter { it.distanceFromUserKm <= QUERY_RADIUS_KM }
+            .sortedByDescending { it.time }
     }
 
     // ═══════════════════════════════════════════════════
@@ -1265,6 +1246,7 @@ class SeismicRepository(private val context: Context) {
 
         return reports
             .filter { it.isReal }
+            .filter { it.distanceFromUserKm <= CROWDSOURCED_RADIUS_KM }
             .sortedByDescending { it.time }
     }
 

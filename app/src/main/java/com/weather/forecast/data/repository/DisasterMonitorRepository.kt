@@ -92,8 +92,8 @@ class DisasterMonitorRepository(private val context: Context) {
         /** Berapa hari ke belakang dicari event di ReliefWeb */
         private const val LOOKBACK_DAYS = 60L
 
-        /** Radius proximity filter (km) — bencana dalam jarak ini ditampilkan */
-        private const val PROXIMITY_RADIUS_KM = 500.0
+        /** Radius proximity filter (km) — tampilkan bencana dalam radius ini dari user */
+        private const val PROXIMITY_RADIUS_KM = 55.0
 
         /** ISO 3166-1 alpha-2 → alpha-3 mapping (common countries) */
         private val COUNTRY_CODE_MAP = mapOf(
@@ -269,7 +269,10 @@ class DisasterMonitorRepository(private val context: Context) {
                     filterValue2 = "ongoing",
                     limit = 20
                 )
-                disasters.addAll(mapReliefWebToActiveDisasters(ongoingResponse, DisasterPhase.ACTIVE))
+                disasters.addAll(
+                    mapReliefWebToActiveDisasters(ongoingResponse, DisasterPhase.ACTIVE)
+                        .filter { disaster -> isDisasterNearby(disaster, latitude, longitude) }
+                )
 
                 // Alerts (early warning) in user's country
                 val alertResponse = reliefWebApi.getDisastersByCountry(
@@ -277,7 +280,10 @@ class DisasterMonitorRepository(private val context: Context) {
                     filterValue2 = "alert",
                     limit = 10
                 )
-                disasters.addAll(mapReliefWebToActiveDisasters(alertResponse, DisasterPhase.ACTIVE))
+                disasters.addAll(
+                    mapReliefWebToActiveDisasters(alertResponse, DisasterPhase.ACTIVE)
+                        .filter { disaster -> isDisasterNearby(disaster, latitude, longitude) }
+                )
             }
 
             // Step 3: Fetch recent global disasters (proximity-based)
@@ -294,14 +300,13 @@ class DisasterMonitorRepository(private val context: Context) {
                 val fields = item.fields ?: return@forEach
                 val countries = fields.country ?: return@forEach
 
-                // Filter: nearby disasters by proximity OR recovery in user's country
+                // Filter: nearby disasters by proximity (coordinates required)
                 val isNearby = countries.any { country ->
                     val loc = country.location
                     if (loc?.lat != null && loc.lon != null) {
                         haversineDistance(latitude, longitude, loc.lat, loc.lon) <= PROXIMITY_RADIUS_KM
                     } else {
-                        // Fallback: match by country ISO3
-                        countryIso3 != null && country.iso3 == countryIso3
+                        false // Skip disasters without precise coordinates
                     }
                 }
 
@@ -325,7 +330,21 @@ class DisasterMonitorRepository(private val context: Context) {
         return disasters.distinctBy { it.id }
     }
 
-
+    /**
+     * Cek apakah bencana berada dalam radius PROXIMITY_RADIUS_KM dari user.
+     * Jika bencana tidak punya koordinat, abaikan (return false).
+     */
+    private fun isDisasterNearby(
+        disaster: ActiveDisaster,
+        userLat: Double,
+        userLon: Double
+    ): Boolean {
+        return disaster.locations.any { loc ->
+            val lat = loc.latitude ?: return@any false
+            val lon = loc.longitude ?: return@any false
+            haversineDistance(userLat, userLon, lat, lon) <= PROXIMITY_RADIUS_KM
+        }
+    }
 
     /**
      * Map ReliefWeb response ke ActiveDisaster list.

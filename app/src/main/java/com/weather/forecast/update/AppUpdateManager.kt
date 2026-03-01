@@ -164,6 +164,18 @@ class AppUpdateManager(private val context: Context) {
                     _updateState.value = UpdateState.NotAvailable
                     false
                 }
+            } catch (e: retrofit2.HttpException) {
+                // HTTP 404 = release belum ada / repo tidak ditemukan → bukan error user-facing
+                if (e.code() == 404) {
+                    Log.d(TAG, "Tidak ada release ditemukan (HTTP 404), skip update check")
+                    _updateState.value = UpdateState.NotAvailable
+                } else {
+                    Log.e(TAG, "Gagal memeriksa update: HTTP ${e.code()}", e)
+                    _updateState.value = UpdateState.Error(
+                        message = AppLocaleManager.strings.updateCheckFailed("HTTP ${e.code()}")
+                    )
+                }
+                false
             } catch (e: Exception) {
                 Log.e(TAG, "Gagal memeriksa update: ${e.message}", e)
                 _updateState.value = UpdateState.Error(

@@ -11,7 +11,7 @@ import com.weather.forecast.data.model.*
  * Disaster Analysis Engine — Hybrid AI + Rule-Based
  *
  * Mesin analisis bencana yang menggabungkan:
- * 1. Neural Network (MLP 20→32→16→6) untuk deteksi pola non-linear
+ * 1. Neural Network (MLP 27→32→16→6) untuk deteksi pola non-linear
  * 2. Rule-based fuzzy-logic scoring untuk domain constraints
  * 3. Ensemble fusion dengan adaptive weighting
  *
@@ -65,7 +65,7 @@ object DisasterAnalysisEngine {
         predictions.add(analyzeGroundSubsidence(hourly, dailyToday, weather?.daily, floodData))
 
         // ═══ Phase 2: Neural Network + Ensemble Fusion ═══
-        val features = WeatherFeatureExtractor.extractForToday(weather, marine ?: flood)
+        val features = WeatherFeatureExtractor.extractForToday(weather, marine ?: flood, terrainData)
         val nnScores = DisasterNeuralNetwork.predict(features.features, weightDeltas)
         return ensembleFuse(predictions, nnScores, features).sortedByDescending { it.riskScore }
     }
@@ -94,7 +94,7 @@ object DisasterAnalysisEngine {
 
         // ═══ Neural Network + Ensemble Fusion ═══
         val features = WeatherFeatureExtractor.extractForDay(
-            dayIndex, daily, hourlyForDay, marineDaily, floodDaily, allDaily
+            dayIndex, daily, hourlyForDay, marineDaily, floodDaily, allDaily, terrainData
         )
         val nnScores = DisasterNeuralNetwork.predict(features.features, weightDeltas)
         return ensembleFuse(predictions, nnScores, features).sortedByDescending { it.riskScore }

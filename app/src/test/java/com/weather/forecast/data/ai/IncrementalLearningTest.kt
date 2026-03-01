@@ -290,7 +290,7 @@ class IncrementalLearningTest {
     private fun createScenarios(): List<TrainingScenario> = listOf(
         TrainingScenario(
             "Banjir Bandang",
-            FloatArray(20) { 0.1f }.apply {
+            FloatArray(27) { 0.1f }.apply {
                 this[0]=0.90f; this[1]=0.85f; this[7]=0.90f; this[14]=0.80f
                 this[15]=0.75f; this[16]=0.70f; this[17]=0.60f; this[18]=0.80f
             },
@@ -299,7 +299,7 @@ class IncrementalLearningTest {
         ),
         TrainingScenario(
             "Siklon Tropis",
-            FloatArray(20) { 0.1f }.apply {
+            FloatArray(27) { 0.1f }.apply {
                 this[2]=0.90f; this[3]=0.95f; this[4]=0.70f; this[5]=0.90f
                 this[6]=0.80f; this[12]=0.80f; this[13]=0.70f
             },
@@ -307,26 +307,26 @@ class IncrementalLearningTest {
         ),
         TrainingScenario(
             "Badai Petir",
-            FloatArray(20) { 0.1f }.apply {
+            FloatArray(27) { 0.1f }.apply {
                 this[8]=0.95f; this[4]=0.55f; this[3]=0.60f; this[18]=1.0f
             },
             floatArrayOf(0.20f, 0.10f, 0.30f, 0.90f, 0.15f, 0.10f)
         ),
         TrainingScenario(
             "Longsor",
-            FloatArray(20) { 0.1f }.apply {
+            FloatArray(27) { 0.1f }.apply {
                 this[16]=0.90f; this[17]=0.85f; this[15]=0.80f; this[7]=0.95f; this[0]=0.60f
             },
             floatArrayOf(0.40f, 0.15f, 0.10f, 0.20f, 0.85f, 0.70f)
         ),
         TrainingScenario(
             "Cuaca Tenang",
-            FloatArray(20) { 0.05f },
+            FloatArray(27) { 0.05f },
             floatArrayOf(0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f)
         ),
         TrainingScenario(
             "Banjir Rob",
-            FloatArray(20) { 0.1f }.apply {
+            FloatArray(27) { 0.1f }.apply {
                 this[12]=0.90f; this[13]=0.85f; this[5]=0.60f; this[2]=0.50f
             },
             floatArrayOf(0.15f, 0.85f, 0.35f, 0.10f, 0.10f, 0.10f)
@@ -657,7 +657,7 @@ class IncrementalLearningTest {
         println("\n═══════════ GRADIENT CLIPPING TEST ═══════════")
 
         // Input dengan semua fitur sangat tinggi
-        val extremeFeatures = FloatArray(20) { 1.0f }
+        val extremeFeatures = FloatArray(27) { 1.0f }
         // Target yang sangat jauh dari prediksi → gradien besar
         val extremeTargets = floatArrayOf(0.01f, 0.99f, 0.01f, 0.99f, 0.01f, 0.99f)
 
@@ -1304,7 +1304,7 @@ class IncrementalLearningTest {
         println("  Phase 2: Simulating sudden distribution shift...")
         val driftScenario = TrainingScenario(
             "Musim Baru",
-            FloatArray(20) { 0.5f }, // Pola berbeda
+            FloatArray(27) { 0.5f }, // Pola berbeda
             floatArrayOf(0.95f, 0.95f, 0.05f, 0.05f, 0.95f, 0.05f) // Target berbeda
         )
         for (step in 0 until 15) {
@@ -1404,7 +1404,7 @@ class IncrementalLearningTest {
         println("\n  Phase 3: Drift — pola cuaca berubah drastis")
         val driftScenario = TrainingScenario(
             "Musim Baru",
-            FloatArray(20) { 0.6f },
+            FloatArray(27) { 0.6f },
             floatArrayOf(0.80f, 0.10f, 0.10f, 0.80f, 0.60f, 0.10f)
         )
         val driftsBefore = engine.driftDetectedCount

@@ -15,6 +15,10 @@ data class WaterQualityData(
     val flood: FloodData?,
     /** Ringkasan tinggi muka air & tren seluruh sumber */
     val waterLevelSummary: WaterLevelSummary? = null,
+    /** Nama laut/selat terdekat (null jika jauh dari pantai) */
+    val nearbySeaName: String? = null,
+    /** Nama sungai terdekat yang dipantau */
+    val nearbyRiverName: String? = null,
     val lastUpdated: Long = System.currentTimeMillis()
 )
 

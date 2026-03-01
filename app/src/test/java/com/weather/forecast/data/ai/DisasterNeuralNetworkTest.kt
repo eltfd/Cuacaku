@@ -9,7 +9,7 @@ import kotlin.math.abs
  * Comprehensive Testing Suite for Disaster Neural Network
  *
  * Menguji akurasi, sensitivitas, kalibrasi, dan robustness dari
- * DisasterNeuralNetwork (MLP 20→32→16→6 domain-informed initialization).
+ * DisasterNeuralNetwork (MLP 22→32→16→6 domain-informed initialization).
  *
  * Karena model ini BUKAN model yang di-training dari data, melainkan
  * diinisialisasi dengan domain knowledge, pengujian berfokus pada:
@@ -31,7 +31,7 @@ import kotlin.math.abs
  *   [8] capeEnergy, [9] freezingLow, [10] cloudCover, [11] dewPointSpread,
  *   [12] waveHeight, [13] swellHeight, [14] dischargeRatio, [15] rainDuration,
  *   [16] antecedentRain, [17] consecutiveRain, [18] weatherSeverity,
- *   [19] temperatureHigh
+ *   [19] temperatureHigh, [20] soilSaturation, [21] soilMoistureRate
  */
 class DisasterNeuralNetworkTest {
 
@@ -59,14 +59,14 @@ class DisasterNeuralNetworkTest {
     // ══════════════════════════════════════════════════════════
 
     /** Cuaca tenang / normal — baseline */
-    private fun calmWeather() = FloatArray(20) { 0.1f }
+    private fun calmWeather() = FloatArray(27) { 0.1f }
 
     /** Cuaca netral (semua 0.5) */
-    private fun neutralWeather() = FloatArray(20) { 0.5f }
+    private fun neutralWeather() = FloatArray(27) { 0.5f }
 
     /** Set a single feature high, rest low */
     private fun singleFeatureHigh(featureIdx: Int, value: Float = 0.95f): FloatArray {
-        val f = FloatArray(20) { 0.1f }
+        val f = FloatArray(27) { 0.1f }
         f[featureIdx] = value
         return f
     }
@@ -98,11 +98,11 @@ class DisasterNeuralNetworkTest {
     @Test
     fun `test output range - all outputs between 0 and 1`() {
         val testCases = listOf(
-            FloatArray(20) { 0f },      // All zeros
-            FloatArray(20) { 0.1f },    // Low
-            FloatArray(20) { 0.5f },    // Medium
-            FloatArray(20) { 0.9f },    // High
-            FloatArray(20) { 1f },      // All ones
+            FloatArray(27) { 0f },      // All zeros
+            FloatArray(27) { 0.1f },    // Low
+            FloatArray(27) { 0.5f },    // Medium
+            FloatArray(27) { 0.9f },    // High
+            FloatArray(27) { 1f },      // All ones
         )
 
         var allValid = true
@@ -130,7 +130,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 1 - flash flood extreme rain`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[0] = 0.90f   // precipTotal: 180mm
             this[1] = 0.85f   // precipIntensity: 42mm/h
             this[7] = 0.90f   // humidity: 90%
@@ -140,6 +140,9 @@ class DisasterNeuralNetworkTest {
             this[16] = 0.70f  // antecedentRain: 210mm / 3 hari
             this[17] = 0.60f  // consecutiveRain: ~4 hari
             this[18] = 0.80f  // weatherSeverity: tinggi
+            this[22] = 0.02f  // slopeGradient: datar (dataran rendah Jakarta)
+            this[23] = 0.01f  // elevationNorm: dekat laut
+            this[24] = 0.60f  // vegetationCover: urban/moderat
         }
         val result = DisasterNeuralNetwork.predict(features)
         printScenarioResult("BANJIR BANDANG", result)
@@ -157,7 +160,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 2 - tropical cyclone`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[2] = 0.90f   // windSpeed: 180 km/h
             this[3] = 0.95f   // windGusts: 190 km/h
             this[4] = 0.70f   // windShear: 56 km/h
@@ -183,7 +186,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 3 - severe thunderstorm`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[1] = 0.70f   // precipIntensity: 35mm/h burst
             this[3] = 0.60f   // windGusts: 120 km/h
             this[4] = 0.55f   // windShear: 44 km/h
@@ -206,7 +209,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 4 - landslide continuous rain`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[0] = 0.60f   // precipTotal: 120mm
             this[7] = 0.95f   // humidity: 95%
             this[11] = 0.90f  // dewPointSpread: sangat lembab
@@ -214,6 +217,11 @@ class DisasterNeuralNetworkTest {
             this[16] = 0.90f  // antecedentRain: 270mm / 3 hari
             this[17] = 0.85f  // consecutiveRain: 6 hari berturut
             this[18] = 0.60f  // weatherSeverity: moderate
+            this[22] = 0.55f  // slopeGradient: curam (25°)
+            this[23] = 0.40f  // elevationNorm: dataran tinggi (~2000m)
+            this[24] = 0.25f  // vegetationCover: rendah
+            this[25] = 0.65f  // soilClayContent: tanah lempung tinggi
+            this[26] = 0.25f  // soilStability: tidak stabil
         }
         val result = DisasterNeuralNetwork.predict(features)
         printScenarioResult("TANAH LONGSOR", result)
@@ -231,12 +239,15 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 5 - tidal flood high waves`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[5] = 0.60f   // pressureLow: moderate low
             this[12] = 0.90f  // waveHeight: 9m
             this[13] = 0.85f  // swellHeight: 4.25m
             this[2] = 0.50f   // windSpeed: 100 km/h
             this[6] = 0.40f   // pressureDrop: 12 hPa
+            this[22] = 0.01f  // slopeGradient: pesisir datar
+            this[23] = 0.01f  // elevationNorm: dekat laut
+            this[24] = 0.50f  // vegetationCover: moderat
         }
         val result = DisasterNeuralNetwork.predict(features)
         printScenarioResult("BANJIR ROB", result)
@@ -252,7 +263,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 6 - calm clear weather`() {
-        val features = FloatArray(20) { 0.05f }.apply {
+        val features = FloatArray(27) { 0.05f }.apply {
             this[19] = 0.30f  // temperatureHigh: 29°C (normal)
         }
         val result = DisasterNeuralNetwork.predict(features)
@@ -269,13 +280,18 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 7 - ground subsidence`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[0] = 0.50f   // precipTotal: 100mm
             this[7] = 0.90f   // humidity: 90%
             this[14] = 0.70f  // dischargeRatio: 7x
             this[16] = 0.85f  // antecedentRain: 255mm / 3 hari
             this[17] = 0.90f  // consecutiveRain: >6 hari
             this[15] = 0.70f  // rainDuration: 17 jam
+            this[22] = 0.03f  // slopeGradient: hampir datar
+            this[23] = 0.02f  // elevationNorm: dataran rendah
+            this[24] = 0.50f  // vegetationCover: sedang
+            this[25] = 0.20f  // soilClayContent: tanah berpasir
+            this[26] = 0.30f  // soilStability: agak tidak stabil
         }
         val result = DisasterNeuralNetwork.predict(features)
         printScenarioResult("TANAH AMBLAS", result)
@@ -290,7 +306,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 8 - multi-hazard extreme`() {
-        val features = FloatArray(20) { 0.90f }
+        val features = FloatArray(27) { 0.90f }
         val result = DisasterNeuralNetwork.predict(features)
         printScenarioResult("MULTI-HAZARD EXTREME", result)
 
@@ -305,7 +321,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 9 - short intense rain`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[1] = 0.90f   // precipIntensity: sangat tinggi
             this[0] = 0.25f   // precipTotal: tapi total rendah (singkat)
             this[15] = 0.15f  // rainDuration: hanya ~3.5 jam
@@ -325,7 +341,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 10 - hot dry weather`() {
-        val features = FloatArray(20) { 0.05f }.apply {
+        val features = FloatArray(27) { 0.05f }.apply {
             this[19] = 0.90f  // temperatureHigh: 47°C
             this[7] = 0.10f   // humidity: rendah
             this[11] = 0.10f  // dewPointSpread: besar (kering)
@@ -344,7 +360,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 11 - strong wind only`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[2] = 0.85f   // windSpeed: 170 km/h
             this[3] = 0.90f   // windGusts: 180 km/h
             this[4] = 0.70f   // windShear: 56 km/h
@@ -362,7 +378,7 @@ class DisasterNeuralNetworkTest {
      */
     @Test
     fun `scenario 12 - normal monsoon season`() {
-        val features = FloatArray(20) { 0.1f }.apply {
+        val features = FloatArray(27) { 0.1f }.apply {
             this[0] = 0.20f   // precipTotal: 40mm (normal)
             this[1] = 0.20f   // precipIntensity: 10mm/h
             this[7] = 0.75f   // humidity: 75%
@@ -476,7 +492,7 @@ class DisasterNeuralNetworkTest {
 
     // ══════════════════════════════════════════════════════════
     //  TEST 5: COMPREHENSIVE SENSITIVITY MATRIX
-    //  Test semua 20 fitur terhadap semua 6 output
+    //  Test semua 22 fitur terhadap semua 6 output
     // ══════════════════════════════════════════════════════════
 
     @Test
@@ -488,7 +504,8 @@ class DisasterNeuralNetworkTest {
             "precipTotal", "precipIntensity", "windSpeed", "windGusts", "windShear",
             "pressureLow", "pressureDrop", "humidity", "capeEnergy", "freezingLow",
             "cloudCover", "dewPointSpread", "waveHeight", "swellHeight", "dischargeRatio",
-            "rainDuration", "antecedentRain", "consecutiveRain", "weatherSeverity", "temperatureHigh"
+            "rainDuration", "antecedentRain", "consecutiveRain", "weatherSeverity", "temperatureHigh",
+            "soilSaturation", "soilMoistureRate"
         )
 
         // Expected dominant disaster per feature (from RELEVANCE matrix)
@@ -512,7 +529,9 @@ class DisasterNeuralNetworkTest {
             LANDSLIDE,  // 16: antecedentRain → Landslide (0.90)
             SUBSIDENCE, // 17: consecutiveRain → Subsidence (0.90)
             THUNDER,    // 18: weatherSeverity → Thunder (0.70)
-            -1          // 19: temperatureHigh → not strongly associated
+            -1,         // 19: temperatureHigh → not strongly associated
+            SUBSIDENCE, // 20: soilSaturation → Subsidence (0.90)
+            SUBSIDENCE  // 21: soilMoistureRate → Subsidence (0.75)
         )
 
         println("\n╔══════════════════════════════════════════════════════════════════════════════════╗")
@@ -524,7 +543,7 @@ class DisasterNeuralNetworkTest {
         var correctDominant = 0
         var totalChecked = 0
 
-        for (f in 0 until 20) {
+        for (f in 0 until 22) {
             val modified = calmWeather().apply { this[f] = 0.95f }
             val modResult = DisasterNeuralNetwork.predict(modified)
 
@@ -595,7 +614,7 @@ class DisasterNeuralNetworkTest {
         val rng = java.util.Random(123)
 
         for (i in 0 until 100) {
-            val features = FloatArray(20) { rng.nextFloat() }
+            val features = FloatArray(27) { rng.nextFloat() }
             val result = DisasterNeuralNetwork.predict(features)
             allOutputs.addAll(result.toList())
         }
@@ -630,7 +649,7 @@ class DisasterNeuralNetworkTest {
 
     @Test
     fun `edge case - all zeros input`() {
-        val result = DisasterNeuralNetwork.predict(FloatArray(20) { 0f })
+        val result = DisasterNeuralNetwork.predict(FloatArray(27) { 0f })
         printScenarioResult("ALL-ZEROS", result)
         for (i in result.indices) {
             assertTrue("All-zeros: output[$i] harus valid [0,1]",
@@ -640,7 +659,7 @@ class DisasterNeuralNetworkTest {
 
     @Test
     fun `edge case - all ones input`() {
-        val result = DisasterNeuralNetwork.predict(FloatArray(20) { 1f })
+        val result = DisasterNeuralNetwork.predict(FloatArray(27) { 1f })
         printScenarioResult("ALL-ONES", result)
         for (i in result.indices) {
             assertTrue("All-ones: output[$i] harus valid [0,1]",
@@ -656,7 +675,7 @@ class DisasterNeuralNetworkTest {
     fun `edge case - wrong size input should throw`() {
         try {
             DisasterNeuralNetwork.predict(FloatArray(10))
-            fail("Seharusnya throw IllegalArgumentException untuk ukuran salah")
+            fail("Seharusnya throw IllegalArgumentException untuk ukuran salah (10 != 22)")
         } catch (e: IllegalArgumentException) {
             println("✅ Input size validation bekerja: ${e.message}")
         }
@@ -714,14 +733,14 @@ class DisasterNeuralNetworkTest {
 
     @Test
     fun `model info - correct metadata`() {
-        assertEquals("MLP-v1.1-incremental", DisasterNeuralNetwork.MODEL_VERSION)
-        // TOTAL_PARAMS = 20*32 + 32 + 32*16 + 16 + 16*6 + 6 = 1302
-        assertEquals(1302, DisasterNeuralNetwork.TOTAL_PARAMS)
+        assertEquals("MLP-v1.4-soiltype", DisasterNeuralNetwork.MODEL_VERSION)
+        // TOTAL_PARAMS = 27*32 + 32 + 32*16 + 16 + 16*6 + 6 = 1526
+        assertEquals(1526, DisasterNeuralNetwork.TOTAL_PARAMS)
 
         val info = DisasterNeuralNetwork.getModelInfo()
         assertTrue("Architecture harus mengandung 'MLP'",
             (info["architecture"] as String).contains("MLP"))
-        assertEquals(1302, info["totalParameters"])
+        assertEquals(1526, info["totalParameters"])
         println("✅ MODEL INFO: Version=${info["version"]}, Params=${info["totalParameters"]}")
     }
 
@@ -736,7 +755,7 @@ class DisasterNeuralNetworkTest {
         println("║     DISASTER NEURAL NETWORK — COMPREHENSIVE TEST REPORT         ║")
         println("║     Model: ${DisasterNeuralNetwork.MODEL_VERSION}                          ║")
         println("║     Parameters: ${DisasterNeuralNetwork.TOTAL_PARAMS}                                       ║")
-        println("║     Architecture: MLP 20→32→16→6                                ║")
+        println("║     Architecture: MLP 22→32→16→6                                ║")
         println("╚══════════════════════════════════════════════════════════════════╝")
         println()
 
@@ -749,43 +768,49 @@ class DisasterNeuralNetworkTest {
         )
 
         val scenarios = listOf(
-            ScenarioTest("Banjir Bandang", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Banjir Bandang", FloatArray(27) { 0.1f }.apply {
                 this[0]=0.90f; this[1]=0.85f; this[7]=0.90f; this[14]=0.80f
                 this[15]=0.75f; this[16]=0.70f; this[17]=0.60f; this[18]=0.80f
+                this[22]=0.02f; this[23]=0.01f; this[24]=0.60f  // terrain: datar, dataran rendah
             }, listOf(FLOOD), listOf(CYCLONE)),
 
-            ScenarioTest("Siklon Tropis", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Siklon Tropis", FloatArray(27) { 0.1f }.apply {
                 this[2]=0.90f; this[3]=0.95f; this[4]=0.70f; this[5]=0.90f
                 this[6]=0.80f; this[12]=0.80f; this[13]=0.70f
             }, listOf(CYCLONE, TIDAL), listOf(LANDSLIDE)),
 
-            ScenarioTest("Badai Petir", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Badai Petir", FloatArray(27) { 0.1f }.apply {
                 this[8]=0.95f; this[4]=0.55f; this[3]=0.60f; this[18]=1.0f
             }, listOf(THUNDER), listOf(TIDAL)),
 
-            ScenarioTest("Longsor", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Longsor", FloatArray(27) { 0.1f }.apply {
                 this[16]=0.90f; this[17]=0.85f; this[15]=0.80f; this[7]=0.95f; this[0]=0.60f
+                this[22]=0.55f; this[23]=0.40f; this[24]=0.25f  // terrain: curam, tinggi, veg rendah
+                this[25]=0.65f; this[26]=0.25f  // soil: clay tinggi, tidak stabil
             }, listOf(LANDSLIDE), listOf(CYCLONE)),
 
-            ScenarioTest("Banjir Rob", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Banjir Rob", FloatArray(27) { 0.1f }.apply {
                 this[12]=0.90f; this[13]=0.85f; this[5]=0.60f; this[2]=0.50f
+                this[22]=0.01f; this[23]=0.01f; this[24]=0.50f  // terrain: pesisir datar
             }, listOf(TIDAL), listOf(LANDSLIDE, SUBSIDENCE)),
 
-            ScenarioTest("Tanah Amblas", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Tanah Amblas", FloatArray(27) { 0.1f }.apply {
                 this[17]=0.90f; this[16]=0.85f; this[14]=0.70f; this[15]=0.70f; this[7]=0.90f
+                this[22]=0.03f; this[23]=0.02f; this[24]=0.50f  // terrain: datar, rendah, veg sedang
+                this[25]=0.20f; this[26]=0.30f  // soil: sandy, kurang stabil
             }, listOf(SUBSIDENCE), listOf(CYCLONE)),
 
-            ScenarioTest("Cuaca Tenang", FloatArray(20) { 0.05f },
+            ScenarioTest("Cuaca Tenang", FloatArray(27) { 0.05f },
                 listOf(), listOf(FLOOD, CYCLONE, THUNDER, LANDSLIDE)),
 
-            ScenarioTest("Monsun Normal", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Monsun Normal", FloatArray(27) { 0.1f }.apply {
                 this[0]=0.20f; this[7]=0.75f; this[10]=0.70f; this[15]=0.30f
             }, listOf(), listOf(CYCLONE, THUNDER)),
 
-            ScenarioTest("Multi-Hazard", FloatArray(20) { 0.90f },
+            ScenarioTest("Multi-Hazard", FloatArray(27) { 0.90f },
                 listOf(FLOOD, CYCLONE, THUNDER, LANDSLIDE), listOf()),
 
-            ScenarioTest("Angin Kencang Saja", FloatArray(20) { 0.1f }.apply {
+            ScenarioTest("Angin Kencang Saja", FloatArray(27) { 0.1f }.apply {
                 this[2]=0.85f; this[3]=0.90f; this[4]=0.70f
             }, listOf(CYCLONE), listOf(FLOOD, LANDSLIDE))
         )
@@ -847,7 +872,8 @@ class DisasterNeuralNetworkTest {
             "precipTotal", "precipIntensity", "windSpeed", "windGusts", "windShear",
             "pressureLow", "pressureDrop", "humidity", "capeEnergy", "freezingLow",
             "cloudCover", "dewPointSpread", "waveHeight", "swellHeight", "dischargeRatio",
-            "rainDuration", "antecedentRain", "consecutiveRain", "weatherSeverity", "temperatureHigh"
+            "rainDuration", "antecedentRain", "consecutiveRain", "weatherSeverity", "temperatureHigh",
+            "soilSaturation", "soilMoistureRate"
         )
 
         var sensPassed = 0
@@ -882,7 +908,7 @@ class DisasterNeuralNetworkTest {
         println("\n═══════════ CALIBRATION ═══════════")
         val rng = java.util.Random(42)
         val allOutputs = (0 until 200).flatMap { i ->
-            val f = FloatArray(20) { rng.nextFloat() }
+            val f = FloatArray(27) { rng.nextFloat() }
             DisasterNeuralNetwork.predict(f).toList()
         }
         val mean = allOutputs.average()

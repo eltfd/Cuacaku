@@ -69,6 +69,31 @@ interface GeocodingApiService {
         @Query("limit") limit: Int = 10
     ): List<SearchResult>
 
+    /**
+     * Search for nearby features within a bounding box
+     *
+     * @param query Search query (e.g., "river", "sungai")
+     * @param viewbox Bounding box: "lon1,lat1,lon2,lat2" (corners)
+     * @param bounded 1 = restrict to viewbox, 0 = prefer viewbox
+     * @param format Response format
+     * @param limit Max results
+     *
+     * Example:
+     * ```
+     * api.searchBounded("river", "106.5,-6.3,107.0,-6.7", bounded = 1)
+     * // Returns nearby river features within the bounding box
+     * ```
+     */
+    @GET("search")
+    suspend fun searchBounded(
+        @Query("q") query: String,
+        @Query("viewbox") viewbox: String,
+        @Query("bounded") bounded: Int = 1,
+        @Query("format") format: String = "json",
+        @Query("addressdetails") addressDetails: Int = 0,
+        @Query("limit") limit: Int = 5
+    ): List<SearchResult>
+
     companion object {
         const val BASE_URL = "https://nominatim.openstreetmap.org/"
     }
