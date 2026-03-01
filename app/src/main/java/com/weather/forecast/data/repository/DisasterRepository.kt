@@ -60,8 +60,8 @@ class DisasterRepository(context: Context) {
         context.getSharedPreferences("ai_learning_throttle", Context.MODE_PRIVATE)
 
     companion object {
-        /** Interval minimum antar learning steps (6 jam) */
-        private const val LEARNING_THROTTLE_MS = 6 * 3600 * 1000L
+        /** Interval minimum antar learning steps (1 jam — lebih sering karena refresh 15 menit) */
+        private const val LEARNING_THROTTLE_MS = 1 * 3600 * 1000L
         private const val KEY_LAST_LEARN_TIME = "last_learn_time"
     }
 

@@ -100,7 +100,14 @@ fun HomeScreen(
                         viewModel.clearSearch()
                     }
                 },
-                onSettingsClick = onNavigateToSettings
+                onSettingsClick = onNavigateToSettings,
+                searchResults = searchResults,
+                isSearching = isSearching,
+                onResultClick = { result ->
+                    viewModel.loadWeatherForLocation(result)
+                    showSearchBar = false
+                    searchQuery = ""
+                }
             )
         }
     ) { paddingValues ->
@@ -134,22 +141,6 @@ fun HomeScreen(
                     )
                 }
             }
-
-            // Search Results Overlay
-            if (showSearchBar && searchResults.isNotEmpty()) {
-                SearchResultsList(
-                    results = searchResults,
-                    isLoading = isSearching,
-                    onResultClick = { result ->
-                        viewModel.loadWeatherForLocation(result)
-                        showSearchBar = false
-                        searchQuery = ""
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                )
-            }
         }
     }
 }
@@ -162,7 +153,10 @@ private fun WeatherTopBar(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onSearchBarToggle: (Boolean) -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    searchResults: List<SearchResult> = emptyList(),
+    isSearching: Boolean = false,
+    onResultClick: (SearchResult) -> Unit = {}
 ) {
     val s = LocalStrings.current
     val locationName = when (uiState) {
@@ -174,7 +168,7 @@ private fun WeatherTopBar(
         SearchBar(
             query = searchQuery,
             onQueryChange = onSearchQueryChange,
-            onSearch = {},
+            onSearch = { /* IME search action — no-op, results update live */ },
             active = true,
             onActiveChange = onSearchBarToggle,
             placeholder = { Text(s.searchPlaceholder) },
@@ -191,7 +185,15 @@ private fun WeatherTopBar(
                 }
             },
             modifier = Modifier.fillMaxWidth()
-        ) {}
+        ) {
+            // Search results rendered INSIDE the SearchBar content slot
+            // so they are visible when active=true (fullscreen mode)
+            SearchResultsContent(
+                results = searchResults,
+                isLoading = isSearching,
+                onResultClick = onResultClick
+            )
+        }
     } else {
         TopAppBar(
             title = {
@@ -1449,44 +1451,52 @@ private fun SunInfoCard(sunrise: String, sunset: String) {
 }
 
 @Composable
-private fun SearchResultsList(
+private fun SearchResultsContent(
     results: List<SearchResult>,
     isLoading: Boolean,
-    onResultClick: (SearchResult) -> Unit,
-    modifier: Modifier = Modifier
+    onResultClick: (SearchResult) -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            }
-        } else {
-            LazyColumn {
-                items(results) { result ->
-                    ListItem(
-                        headlineContent = { 
-                            Text(result.address?.getLocationName() ?: result.displayName)
-                        },
-                        supportingContent = {
-                            Text(
-                                result.address?.getFullLocation() ?: "",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        },
-                        leadingContent = {
-                            Icon(Icons.Default.LocationOn, contentDescription = null)
-                        },
-                        modifier = Modifier.clickableOnce { onResultClick(result) }
-                    )
-                }
+    if (isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        }
+    } else if (results.isEmpty()) {
+        // Empty state — show hint
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = LocalStrings.current.searchPlaceholder,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        LazyColumn {
+            items(results) { result ->
+                ListItem(
+                    headlineContent = { 
+                        Text(result.address?.getLocationName() ?: result.displayName)
+                    },
+                    supportingContent = {
+                        Text(
+                            result.address?.getFullLocation() ?: "",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
+                    leadingContent = {
+                        Icon(Icons.Default.LocationOn, contentDescription = null)
+                    },
+                    modifier = Modifier.clickable { onResultClick(result) }
+                )
             }
         }
     }

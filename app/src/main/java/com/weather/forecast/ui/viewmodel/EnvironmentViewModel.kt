@@ -19,7 +19,9 @@ import com.weather.forecast.data.repository.SeismicRepository
 import com.weather.forecast.data.repository.WaterQualityRepository
 import com.weather.forecast.location.LocationManager
 import com.weather.forecast.service.SOSManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -85,8 +87,86 @@ class EnvironmentViewModel(application: Application) : AndroidViewModel(applicat
             initialValue = com.weather.forecast.data.preferences.UserPreferences()
         )
 
+    companion object {
+        /** Auto-refresh interval: 15 minutes */
+        private const val AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000L
+    }
+
     init {
         loadAllData()
+        startAutoRefresh()
+    }
+
+    /**
+     * Start silent 15-minute auto-refresh loop.
+     * Refreshes all environment data + re-runs all prediction models
+     * without showing loading state to avoid UI flash.
+     */
+    private fun startAutoRefresh() {
+        viewModelScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                silentRefreshAll()
+            }
+        }
+    }
+
+    /**
+     * Silent refresh — update all data without flashing Loading state.
+     * Re-fetches from all APIs and re-runs all prediction models.
+     * On failure for any module, keeps showing previous data for that module.
+     */
+    private suspend fun silentRefreshAll() {
+        val location = getLocation() ?: return
+        currentLatitude = location.first
+        currentLongitude = location.second
+        val lat = location.first
+        val lon = location.second
+
+        // Phase 1: Air + Water (parallel, silent)
+        val airJob = viewModelScope.launch {
+            try {
+                val result = airQualityRepository.getAirQualityData(lat, lon)
+                result.onSuccess { _airQualityState.value = AirQualityUiState.Success(it) }
+            } catch (_: Exception) {}
+        }
+        val waterJob = viewModelScope.launch {
+            try {
+                val result = waterQualityRepository.getWaterQualityData(lat, lon)
+                result.onSuccess { _waterQualityState.value = WaterQualityUiState.Success(it) }
+            } catch (_: Exception) {}
+        }
+        airJob.join()
+        waterJob.join()
+
+        // Phase 2: Disaster forecast (re-runs neural network prediction)
+        try {
+            val result = disasterRepository.getDisasterForecast(lat, lon)
+            result.onSuccess { _disasterState.value = DisasterUiState.Success(it) }
+        } catch (_: Exception) {}
+
+        // Phase 3: Disaster monitor + Seismic (parallel, silent)
+        viewModelScope.launch {
+            try {
+                val result = disasterMonitorRepository.getActiveDisasters(lat, lon)
+                result.onSuccess { data ->
+                    _disasterMonitorState.value = if (data.disasters.isEmpty())
+                        DisasterMonitorUiState.Empty else DisasterMonitorUiState.Success(data)
+                }
+            } catch (_: Exception) {}
+        }
+        viewModelScope.launch {
+            try {
+                val result = seismicRepository.getSeismicMonitorData(lat, lon)
+                result.onSuccess { data ->
+                    val sosState = sosManager.evaluateSOSEligibility(
+                        impactAreas = data.impactAreas,
+                        userLat = lat, userLon = lon
+                    )
+                    _seismicState.value = SeismicUiState.Success(data.copy(sosState = sosState))
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     /**

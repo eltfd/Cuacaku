@@ -11,7 +11,9 @@ import com.weather.forecast.data.preferences.UserPreferences
 import com.weather.forecast.data.repository.WeatherRepository
 import com.weather.forecast.location.LocationManager
 import com.weather.forecast.worker.WeatherWorkerScheduler
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -53,9 +55,62 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    companion object {
+        /** Auto-refresh interval: 15 minutes */
+        private const val AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000L
+    }
+
     init {
         loadWeatherData()
         setupBackgroundWorker()
+        startAutoRefresh()
+    }
+
+    /**
+     * Start silent 15-minute auto-refresh loop.
+     * Refreshes data without showing loading state to avoid UI flash.
+     * Re-fetches weather + triggers re-prediction on every cycle.
+     */
+    private fun startAutoRefresh() {
+        viewModelScope.launch {
+            while (isActive) {
+                delay(AUTO_REFRESH_INTERVAL_MS)
+                silentRefresh()
+            }
+        }
+    }
+
+    /**
+     * Silent refresh — update data without flashing Loading state.
+     * Only updates UI on success; on failure, keeps showing previous data.
+     */
+    private suspend fun silentRefresh() {
+        try {
+            val location = if (locationManager.hasLocationPermission()) {
+                locationManager.getLocationWithFallback()
+            } else {
+                val prefs = userPreferences.value
+                if (prefs.lastLatitude != null && prefs.lastLongitude != null) {
+                    android.location.Location("").apply {
+                        latitude = prefs.lastLatitude
+                        longitude = prefs.lastLongitude
+                    }
+                } else null
+            } ?: return
+
+            val result = weatherRepository.getWeatherData(location.latitude, location.longitude)
+            result.onSuccess { weatherData ->
+                _uiState.value = WeatherUiState.Success(weatherData)
+                preferencesManager.saveLastLocation(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    name = weatherData.location.name
+                )
+            }
+            // On failure: keep current state, don't flash error
+        } catch (_: Exception) {
+            // Silent fail — keep showing previous data
+        }
     }
 
     /**

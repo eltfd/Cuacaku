@@ -225,7 +225,10 @@ class WeatherUpdateWorker(
 object WeatherWorkerScheduler {
 
     /**
-     * Schedule periodic weather update (setiap 1 jam)
+     * Schedule periodic weather update (setiap 15 menit)
+     * 
+     * 15 menit adalah interval minimum WorkManager.
+     * Setiap cycle: fetch data terbaru → re-run semua prediksi → kirim notifikasi jika perlu.
      */
     fun schedulePeriodicWeatherUpdate(context: Context) {
         val constraints = Constraints.Builder()
@@ -233,8 +236,8 @@ object WeatherWorkerScheduler {
             .build()
 
         val workRequest = PeriodicWorkRequestBuilder<WeatherUpdateWorker>(
-            repeatInterval = 1,
-            repeatIntervalTimeUnit = TimeUnit.HOURS
+            repeatInterval = 15,
+            repeatIntervalTimeUnit = TimeUnit.MINUTES
         )
             .setConstraints(constraints)
             .setBackoffCriteria(
@@ -246,7 +249,7 @@ object WeatherWorkerScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WeatherUpdateWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             workRequest
         )
     }
@@ -278,16 +281,16 @@ object WeatherWorkerScheduler {
     // ════════════════════════════════════════════════
 
     /**
-     * Schedule periodic AI learning (setiap 12 jam).
+     * Schedule periodic AI learning (setiap 6 jam).
      *
      * Constraints lebih ketat dari weather update karena learning
      * tidak urgent — user tidak perlu hasilnya segera:
      * - Requires network (untuk fetch cuaca terbaru)
      * - Requires battery not low (hemat daya)
      *
-     * Interval 12 jam dipilih karena:
-     * - Cuaca berubah signifikan dalam 12 jam (pagi ↔ malam)
-     * - Cukup sering untuk maintain akurasi
+     * Interval 6 jam dipilih karena:
+     * - Data di-refresh setiap 15 menit → lebih banyak sampel baru
+     * - Learning lebih sering = akurasi lebih cepat meningkat
      * - Cukup jarang untuk tidak boros resource
      */
     fun scheduleAiLearning(context: Context) {
@@ -297,7 +300,7 @@ object WeatherWorkerScheduler {
             .build()
 
         val workRequest = PeriodicWorkRequestBuilder<AiLearningWorker>(
-            repeatInterval = 12,
+            repeatInterval = 6,
             repeatIntervalTimeUnit = TimeUnit.HOURS
         )
             .setConstraints(constraints)
